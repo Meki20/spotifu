@@ -1,12 +1,13 @@
 from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks
 from pydantic import BaseModel
 from sqlmodel import Session, select
-from database import get_session
+from database import engine, get_session
 from deps import get_current_user
 from models import Track, TrackStatus, User
 from services.providers import musicbrainz as mb_provider
 from services.download import download_track_background
 from datetime import datetime
+from starlette.concurrency import run_in_threadpool
 
 router = APIRouter(prefix="/play", tags=["play"])
 
@@ -101,6 +102,25 @@ def _get_or_create_track_by_mb(session: Session, mbid: str, meta: dict | None) -
     return track, False
 
 
+def _bump_last_played_sync(track_id: int) -> None:
+    """Update last_played_at in a short-lived session (runs off the event loop)."""
+    with Session(engine) as session:
+        track = session.get(Track, track_id)
+        if track is None:
+            return
+        track.last_played_at = datetime.utcnow()
+        session.add(track)
+        session.commit()
+
+
+async def _bump_last_played_async(track_id: int) -> None:
+    await run_in_threadpool(_bump_last_played_sync, track_id)
+
+
+def _schedule_last_played_bump(background_tasks: BackgroundTasks, track_id: int) -> None:
+    background_tasks.add_task(_bump_last_played_async, track_id)
+
+
 @router.get("/{provider}/{id}", response_model=PlayResponse)
 async def play(
     provider: str,
@@ -120,9 +140,7 @@ async def play(
             raise HTTPException(status_code=404, detail="Track not found")
         is_ready = track.status == TrackStatus.READY and track.local_file_path
         if is_ready:
-            track.last_played_at = datetime.utcnow()
-            session.add(track)
-            session.commit()
+            _schedule_last_played_bump(background_tasks, track.id)
         return PlayResponse(
             track_id=track.id,
             local_stream_url=f"/stream/{track.id}" if is_ready else None,
@@ -140,6 +158,31 @@ async def play(
 
     elif provider == "musicbrainz":
         mbid = id
+        # Fast-path: if we already have this MBID downloaded locally, don't block playback
+        # on upstream MusicBrainz calls.
+        existing = session.query(Track).filter(Track.mb_id == mbid).first()
+        if (
+            existing is not None
+            and existing.status == TrackStatus.READY
+            and existing.local_file_path
+            and __import__("os").path.isfile(existing.local_file_path)
+        ):
+            _schedule_last_played_bump(background_tasks, existing.id)
+            return PlayResponse(
+                track_id=existing.id,
+                local_stream_url=f"/stream/{existing.id}",
+                preview_url=None,
+                title=existing.title,
+                artist=existing.artist,
+                artist_credit=existing.artist_credit,
+                status=existing.status.value,
+                mb_artist_id=existing.mb_artist_id,
+                mb_release_id=existing.mb_release_id,
+                mb_release_group_id=existing.mb_release_group_id,
+                release_date=existing.release_date,
+                genre=existing.genre,
+            )
+
         meta = await mb_provider.get_track(mbid, include_cover=False)
         caa_release_mbids: list[str] = []
         if meta:
@@ -165,9 +208,7 @@ async def play(
 
         is_ready = track.status == TrackStatus.READY and track.local_file_path
         if is_ready:
-            track.last_played_at = datetime.utcnow()
-            session.add(track)
-            session.commit()
+            _schedule_last_played_bump(background_tasks, track.id)
         return PlayResponse(
             track_id=track.id,
             local_stream_url=f"/stream/{track.id}" if is_ready else None,

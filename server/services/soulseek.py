@@ -622,6 +622,16 @@ def _score_file(
     # Slot factor: free slots means likely to start now; lack of free slots is a strong negative.
     slot_s = 1.0 if getattr(result, "has_free_slots", False) else 0.0
     slot_term = 0.16 * slot_s - 0.12 * (1.0 - slot_s)
+    # Queue factor: even fast peers can be unusable if you're deep in queue.
+    # queue_size is 0 when you can start immediately (best). We apply a small penalty
+    # that saturates quickly so huge queues don't overly dominate other signals.
+    try:
+        q = int(getattr(result, "queue_size", 0) or 0)
+    except Exception:
+        q = 0
+    # 0 → 0.0, 1 → ~0.39, 3 → ~0.77, 7+ → ~1.0
+    queue_penalty = min(math.log1p(max(q, 0)) / math.log1p(7), 1.0)
+    queue_term = -0.14 * queue_penalty
 
     score = (
         content_s * 0.22
@@ -631,6 +641,7 @@ def _score_file(
         + format_s * 0.10
         + album_s * 0.04
         + slot_term
+        + queue_term
     )
     return min(max(score, 0.0), 1.0)
 
@@ -849,6 +860,7 @@ async def search_soulseek(
                 if (
                     elapsed >= _EXCELLENT_MIN_COLLECT
                     and getattr(r, "has_free_slots", False)
+                    and int(getattr(r, "queue_size", 0) or 0) == 0
                     and int(r.avg_speed or 0) >= _EXCELLENT_MIN_SPEED
                     and ext == "flac"
                     and score >= _EXCELLENT_THRESHOLD

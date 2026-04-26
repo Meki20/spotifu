@@ -1,0 +1,105 @@
+@import "tailwindcss";
+
+:root {
+  /* Backgrounds */
+  --bg-base: #0C0906;
+  --bg-surface: #1A1210;
+  --bg-surface-2: #231815;
+  --bg-surface-3: #2E1E19;
+
+  /* Borders */
+  --border: #3D2820;
+  --border-active: #8B2A1A;
+  --border-subtle: #261A14;
+
+  /* Primary — Muddy Red */
+  --red: #8B2A1A;
+  --red-bright: #C4391F;
+  --red-muted: #5C1A10;
+  --red-faint: #2A100A;
+
+  /* Text */
+  --text-primary: #E8DDD0;
+  --text-secondary: #9A8E84;
+  --text-faint: #4A413C;
+
+  /* Semantic */
+  --color-bg: var(--bg-base);
+  --color-panel: var(--bg-surface-2);
+  --color-card: var(--bg-surface);
+  --color-primary: var(--red);
+  --color-primary-hover: var(--red-bright);
+  --color-border: var(--border);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html, body, #root {
+  height: 100%;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  background: var(--bg-base);
+  color: var(--text-primary);
+  font-family: 'Barlow Semi Condensed', 'Space Mono', monospace;
+  font-size: 18px;
+  -webkit-font-smoothing: antialiased;
+}
+
+input, button {
+  font-size: 17px;
+}
+
+::-webkit-scrollbar {
+  width: 4px;
+  height: 4px;
+}
+::-webkit-scrollbar-track {
+  background: var(--bg-base);
+}
+::-webkit-scrollbar-thumb {
+  background: var(--border);
+  border-radius: 2px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--red);
+}
+
+h1 {
+  font-family: 'Barlow Condensed', sans-serif;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-primary);
+}
+
+h2, h3 {
+  font-family: 'Barlow Condensed', sans-serif;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: var(--text-primary);
+}
+
+.grain {
+  position: relative;
+}
+.grain::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0.08;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='200' height='200' filter='url(%23n)'/%3E%3C/svg%3E");
+  background-size: 200px 200px;
+  border-radius: inherit;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.4; }
+}

@@ -1,0 +1,36 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: spotifu-postgres
+    environment:
+      POSTGRES_USER: spotifu
+      POSTGRES_PASSWORD: spotifu
+      POSTGRES_DB: spotifu
+    volumes:
+      - spotifu-db:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U spotifu"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  server:
+    build:
+      context: ./server
+      dockerfile: Dockerfile
+    container_name: spotifu-server
+    environment:
+      DATABASE_URL: postgresql://spotifu:spotifu@postgres:5432/spotifu
+      SOULSEEK_USERNAME: ${SOULSEEK_USERNAME:-}
+      SOULSEEK_PASSWORD: ${SOULSEEK_PASSWORD:-}
+      SECRETS_FILE: /app/.secrets
+    volumes:
+      - ./.secrets:/app/.secrets:ro
+    ports:
+      - "1985:1985"
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+volumes:
+  spotifu-db:

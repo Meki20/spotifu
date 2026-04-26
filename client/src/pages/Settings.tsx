@@ -276,7 +276,9 @@ export default function Settings() {
     color: '#E8DDD0',
     padding: '5px 10px',
     outline: 'none' as const,
-    width: 200,
+    width: '100%' as const,
+    maxWidth: '100%',
+    boxSizing: 'border-box' as const,
   }
 
   function ApiKeyRow(props: {
@@ -381,7 +383,8 @@ export default function Settings() {
   }
 
   return (
-    <div className="p-6 max-w-lg flex-1 overflow-y-auto">
+    <div className="flex-1 overflow-y-auto w-full">
+      <div className="mx-auto w-full max-w-5xl px-6 sm:px-10 md:px-14 lg:px-24 py-6">
       <h1
         className="text-3xl font-bold uppercase mb-5"
         style={{
@@ -704,6 +707,7 @@ export default function Settings() {
           Logout
         </button>
       </section>
+      </div>
     </div>
   )
 }

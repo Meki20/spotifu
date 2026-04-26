@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { Play, ArrowLeft, X } from 'lucide-react'
+import { Play, ArrowLeft, X, FileSpreadsheet, Pencil, Trash2 } from 'lucide-react'
 import * as controller from '../playback/controller'
 import { authFetch } from '../api'
 import { requestMbDownload } from '../stores/downloadBusyStore'
@@ -268,16 +268,20 @@ export default function PlaylistPage() {
         >
           <ArrowLeft size={20} />
         </button>
-        <div
-          className="w-44 h-44 md:w-52 md:h-52 shrink-0 rounded overflow-hidden flex items-center justify-center"
-          style={{ background: '#231815', boxShadow: '0 12px 40px rgba(0,0,0,0.45)' }}
+        <button
+          type="button"
+          onClick={openCoverEditor}
+          className="w-44 h-44 md:w-52 md:h-52 shrink-0 rounded overflow-hidden flex items-center justify-center cursor-pointer transition-opacity hover:opacity-90 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#8B2A1A] focus-visible:ring-offset-2 focus-visible:ring-offset-[#0C0906]"
+          style={{ background: '#231815', boxShadow: '0 12px 40px rgba(0,0,0,0.45)', border: 'none', padding: 0 }}
+          aria-label="Change playlist cover"
+          title="Change cover art"
         >
           {cover ? (
             <img src={cover} alt="" className="w-full h-full object-cover" loading="lazy" />
           ) : (
             <span style={{ fontSize: 48, color: '#3D2820' }}>▦</span>
           )}
-        </div>
+        </button>
         <div className="min-w-0 flex-1 pb-1">
           <p
             className="text-xs uppercase mb-1"
@@ -307,7 +311,7 @@ export default function PlaylistPage() {
         </div>
       </div>
 
-      <div className="relative z-[1] px-6 py-4 flex flex-wrap items-center gap-3">
+      <div className="relative z-[1] px-6 py-4 flex flex-wrap items-center gap-2">
         <button
           type="button"
           onClick={playAll}
@@ -321,58 +325,44 @@ export default function PlaylistPage() {
         <button
           type="button"
           onClick={() => setUploadOpen(true)}
-          className="px-4 py-2 text-xs uppercase tracking-widest"
+          className="w-11 h-11 rounded flex items-center justify-center transition-colors hover:border-[#8B2A1A]"
           style={{
-            fontFamily: "'Barlow Condensed', sans-serif",
-            fontWeight: 600,
             color: '#E8DDD0',
             border: '1px solid #3D2820',
             background: 'transparent',
           }}
+          aria-label="Upload CSV"
+          title="Upload CSV"
         >
-          Upload CSV
-        </button>
-        <button
-          type="button"
-          onClick={openCoverEditor}
-          className="px-4 py-2 text-xs uppercase tracking-widest"
-          style={{
-            fontFamily: "'Barlow Condensed', sans-serif",
-            fontWeight: 600,
-            color: '#E8DDD0',
-            border: '1px solid #3D2820',
-            background: 'transparent',
-          }}
-        >
-          Cover art
+          <FileSpreadsheet size={20} strokeWidth={1.75} />
         </button>
         <button
           type="button"
           onClick={openRename}
-          className="px-4 py-2 text-xs uppercase tracking-widest"
+          className="w-11 h-11 rounded flex items-center justify-center transition-colors hover:border-[#8B2A1A]"
           style={{
-            fontFamily: "'Barlow Condensed', sans-serif",
-            fontWeight: 600,
             color: '#E8DDD0',
             border: '1px solid #3D2820',
             background: 'transparent',
           }}
+          aria-label="Rename playlist"
+          title="Rename"
         >
-          Rename
+          <Pencil size={18} strokeWidth={1.75} />
         </button>
         <button
           type="button"
           onClick={() => setDeleteOpen(true)}
-          className="px-4 py-2 text-xs uppercase tracking-widest"
+          className="w-11 h-11 rounded flex items-center justify-center transition-colors hover:border-[#C43030]"
           style={{
-            fontFamily: "'Barlow Condensed', sans-serif",
-            fontWeight: 600,
             color: '#C43030',
             border: '1px solid #5C1A10',
             background: 'transparent',
           }}
+          aria-label="Delete playlist"
+          title="Delete"
         >
-          Delete
+          <Trash2 size={18} strokeWidth={1.75} />
         </button>
       </div>
 

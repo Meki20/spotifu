@@ -120,7 +120,7 @@ export default function AlbumTrackPanel({ album, onClose }: AlbumTrackPanelProps
                   </p>
                   <p
                     className="text-xs mt-0.5"
-                    style={{ fontFamily: "'Barlow Semi Condensed', sans-serif", color: '#5C1A10' }}
+                    style={{ fontFamily: "'Barlow Semi Condensed', sans-serif", color: '#b4003e' }}
                   >
                     {album.cached_count} of {album.track_count} cached
                   </p>

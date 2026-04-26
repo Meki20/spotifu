@@ -167,7 +167,7 @@ export default function ContextMenu({
         <div className="mt-1 pt-1" style={{ borderTop: '1px solid #261A14' }}>
           <button
             className="w-full text-left px-4 py-2 hover:bg-[#2E1E19] transition-colors"
-            style={{ fontFamily: "'Barlow Semi Condensed', sans-serif", color: '#C43030' }}
+            style={{ fontFamily: "'Barlow Semi Condensed', sans-serif", color: '#b4003e' }}
             onClick={() => { onRemoveFromPlaylist(); onClose() }}
           >
             Remove from this playlist

@@ -346,7 +346,7 @@ export default function Search() {
             className="w-full px-4 py-3 pl-10 rounded text-sm"
             style={{
               background: '#1A1210',
-              border: `1px solid ${focused ? '#8B2A1A' : '#3D2820'}`,
+              border: `1px solid ${focused ? '#b4003e' : '#3D2820'}`,
               fontFamily: "'Barlow Semi Condensed', monospace",
               fontSize: 16,
               color: '#E8DDD0',
@@ -368,14 +368,14 @@ export default function Search() {
           <button
             onClick={() => setLocalOnly(false)}
             className="px-3 py-2 transition-colors"
-            style={{ background: !localOnly ? '#8B2A1A' : '#1A1210', color: !localOnly ? '#E8DDD0' : '#9A8E84' }}
+            style={{ background: !localOnly ? '#b4003e' : '#1A1210', color: !localOnly ? '#E8DDD0' : '#9A8E84' }}
           >
             All
           </button>
           <button
             onClick={() => setLocalOnly(true)}
             className="px-3 py-2 transition-colors"
-            style={{ background: localOnly ? '#8B2A1A' : '#1A1210', color: localOnly ? '#E8DDD0' : '#9A8E84' }}
+            style={{ background: localOnly ? '#b4003e' : '#1A1210', color: localOnly ? '#E8DDD0' : '#9A8E84' }}
           >
             Local Only
           </button>
@@ -393,7 +393,7 @@ export default function Search() {
                 fontWeight: 600,
                 textTransform: 'uppercase',
                 letterSpacing: '0.12em',
-                color: '#5C1A10',
+                color: '#b4003e',
               }}
             >
               Recent Searches
@@ -429,7 +429,7 @@ export default function Search() {
                   cursor: 'pointer',
                 }}
                 onMouseEnter={(e) => {
-                  e.currentTarget.style.borderColor = '#8B2A1A'
+                  e.currentTarget.style.borderColor = '#b4003e'
                   e.currentTarget.style.color = '#E8DDD0'
                 }}
                 onMouseLeave={(e) => {
@@ -447,7 +447,7 @@ export default function Search() {
       {/* Results / all tracks */}
       <div
         className="flex items-center gap-2.5 mb-3"
-        style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 18, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.12em', color: '#5C1A10' }}
+        style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 18, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.12em', color: '#b4003e' }}
       >
         {showResults ? `results for "${query}"` : 'All Tracks'}
         <div className="flex-1 h-px" style={{ background: '#261A14' }} />
@@ -470,7 +470,7 @@ export default function Search() {
         </div>
       )}
       {error && (
-        <div className="text-base" style={{ color: '#C43030' }}>Error: {String(error)}</div>
+        <div className="text-base" style={{ color: '#b4003e' }}>Error: {String(error)}</div>
       )}
       {!isLoading && results?.length === 0 && debouncedQuery.length > 2 && (
         <div className="text-base" style={{ color: '#4A413C', fontFamily: "'Space Mono', monospace" }}>
@@ -561,9 +561,9 @@ export default function Search() {
               onClick={() => setActiveTab(tab)}
               className="px-4 py-1 rounded text-sm font-semibold capitalize transition-colors"
               style={{
-                background: activeTab === tab ? '#8B2A1A' : '#1A1210',
+                background: activeTab === tab ? '#b4003e' : '#1A1210',
                 color: activeTab === tab ? '#E8DDD0' : '#9A8E84',
-                border: `1px solid ${activeTab === tab ? '#8B2A1A' : '#3D2820'}`,
+                border: `1px solid ${activeTab === tab ? '#b4003e' : '#3D2820'}`,
                 fontFamily: "'Barlow Condensed', sans-serif",
                 fontWeight: 600,
                 textTransform: 'uppercase',

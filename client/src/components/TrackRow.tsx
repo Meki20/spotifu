@@ -50,14 +50,14 @@ const TrackRowImpl = ({
         {index != null && (
           <span
             className="text-sm group-hover:hidden"
-            style={{ fontFamily: "'Barlow Semi Condensed', monospace", color: isPlaying ? '#C4391F' : '#4A413C' }}
+            style={{ fontFamily: "'Barlow Semi Condensed', monospace", color: isPlaying ? '#b4003e' : '#4A413C' }}
           >
             {isPlaying ? '▶' : index + 1}
           </span>
         )}
         <span
           className="absolute inset-0 hidden group-hover:flex items-center justify-center"
-          style={{ color: '#1DB954' }}
+          style={{ color: '#b4003e' }}
         >
           <Play size={12} fill="currentColor" />
         </span>

@@ -220,7 +220,7 @@ export default function PlaylistPage() {
 
   if (error || !playlist) {
     return (
-      <div className="p-6" style={{ color: '#C43030', fontFamily: "'Barlow Semi Condensed', sans-serif" }}>
+      <div className="p-6" style={{ color: '#b4003e', fontFamily: "'Barlow Semi Condensed', sans-serif" }}>
         Could not load playlist
       </div>
     )
@@ -271,7 +271,7 @@ export default function PlaylistPage() {
         <button
           type="button"
           onClick={openCoverEditor}
-          className="w-44 h-44 md:w-52 md:h-52 shrink-0 rounded overflow-hidden flex items-center justify-center cursor-pointer transition-opacity hover:opacity-90 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#8B2A1A] focus-visible:ring-offset-2 focus-visible:ring-offset-[#0C0906]"
+          className="w-44 h-44 md:w-52 md:h-52 shrink-0 rounded overflow-hidden flex items-center justify-center cursor-pointer transition-opacity hover:opacity-90 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#b4003e] focus-visible:ring-offset-2 focus-visible:ring-offset-[#0C0906]"
           style={{ background: '#231815', boxShadow: '0 12px 40px rgba(0,0,0,0.45)', border: 'none', padding: 0 }}
           aria-label="Change playlist cover"
           title="Change cover art"
@@ -289,7 +289,7 @@ export default function PlaylistPage() {
               fontFamily: "'Barlow Condensed', sans-serif",
               fontWeight: 700,
               letterSpacing: '0.15em',
-              color: '#8B2A1A',
+              color: '#b4003e',
             }}
           >
             Playlist
@@ -317,7 +317,7 @@ export default function PlaylistPage() {
           onClick={playAll}
           disabled={!playlist.items.length}
           className="w-12 h-12 rounded-full flex items-center justify-center transition-transform hover:scale-105 disabled:opacity-40"
-          style={{ background: '#8B2A1A', color: '#E8DDD0' }}
+          style={{ background: '#b4003e', color: '#E8DDD0' }}
           aria-label="Play"
         >
           <Play size={22} fill="currentColor" className="ml-0.5" />
@@ -325,7 +325,7 @@ export default function PlaylistPage() {
         <button
           type="button"
           onClick={() => setUploadOpen(true)}
-          className="w-11 h-11 rounded flex items-center justify-center transition-colors hover:border-[#8B2A1A]"
+          className="w-11 h-11 rounded flex items-center justify-center transition-colors hover:border-[#b4003e]"
           style={{
             color: '#E8DDD0',
             border: '1px solid #3D2820',
@@ -339,7 +339,7 @@ export default function PlaylistPage() {
         <button
           type="button"
           onClick={openRename}
-          className="w-11 h-11 rounded flex items-center justify-center transition-colors hover:border-[#8B2A1A]"
+          className="w-11 h-11 rounded flex items-center justify-center transition-colors hover:border-[#b4003e]"
           style={{
             color: '#E8DDD0',
             border: '1px solid #3D2820',
@@ -353,10 +353,10 @@ export default function PlaylistPage() {
         <button
           type="button"
           onClick={() => setDeleteOpen(true)}
-          className="w-11 h-11 rounded flex items-center justify-center transition-colors hover:border-[#C43030]"
+          className="w-11 h-11 rounded flex items-center justify-center transition-colors hover:border-[#b4003e]"
           style={{
-            color: '#C43030',
-            border: '1px solid #5C1A10',
+            color: '#b4003e',
+            border: '1px solid #b4003e',
             background: 'transparent',
           }}
           aria-label="Delete playlist"
@@ -395,7 +395,7 @@ export default function PlaylistPage() {
               const isPlaying = currentTrack?.mb_id === mbid
               const isCached =
                 Boolean(item.is_cached) || Boolean(mbid && cachedMbIds.has(mbid))
-              const titleColor = isPlaying ? '#8B2A1A' : isCached ? '#E8DDD0' : '#4A413C'
+              const titleColor = isPlaying ? '#b4003e' : isCached ? '#E8DDD0' : '#4A413C'
               const downloadPercent = mbid ? downloadStates[mbid]?.percent : undefined
               const isDownloading = mbid ? downloadStates[mbid]?.status === 'downloading' : false
               return (
@@ -427,7 +427,7 @@ export default function PlaylistPage() {
                     </span>
                     <span
                       className="absolute inset-0 hidden group-hover:flex items-center justify-center"
-                      style={{ color: '#1DB954' }}
+                      style={{ color: '#b4003e' }}
                     >
                       <Play size={12} fill="currentColor" />
                     </span>
@@ -609,7 +609,7 @@ export default function PlaylistPage() {
                 autoFocus
               />
               {coverMutation.isError && (
-                <p className="text-sm" style={{ color: '#C43030' }}>
+                <p className="text-sm" style={{ color: '#b4003e' }}>
                   {coverMutation.error instanceof Error ? coverMutation.error.message : 'Save failed'}
                 </p>
               )}
@@ -623,8 +623,8 @@ export default function PlaylistPage() {
                     style={{
                       fontFamily: "'Barlow Condensed', sans-serif",
                       fontWeight: 600,
-                      color: '#C43030',
-                      border: '1px solid #5C1A10',
+                      color: '#b4003e',
+                      border: '1px solid #b4003e',
                       background: 'transparent',
                     }}
                   >
@@ -655,7 +655,7 @@ export default function PlaylistPage() {
                     fontWeight: 700,
                     textTransform: 'uppercase',
                     letterSpacing: '0.06em',
-                    background: '#8B2A1A',
+                    background: '#b4003e',
                     color: '#E8DDD0',
                     border: 'none',
                   }}
@@ -738,7 +738,7 @@ export default function PlaylistPage() {
               <div>
                 <label
                   className="block text-xs uppercase tracking-widest mb-1.5"
-                  style={{ fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 600, color: '#5C1A10' }}
+                  style={{ fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 600, color: '#b4003e' }}
                 >
                   Name
                 </label>
@@ -759,7 +759,7 @@ export default function PlaylistPage() {
               <div>
                 <label
                   className="block text-xs uppercase tracking-widest mb-1.5"
-                  style={{ fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 600, color: '#5C1A10' }}
+                  style={{ fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 600, color: '#b4003e' }}
                 >
                   Description (optional)
                 </label>
@@ -778,7 +778,7 @@ export default function PlaylistPage() {
                 />
               </div>
               {renameMutation.isError && (
-                <p className="text-sm" style={{ color: '#C43030' }}>
+                <p className="text-sm" style={{ color: '#b4003e' }}>
                   {renameMutation.error instanceof Error ? renameMutation.error.message : 'Save failed'}
                 </p>
               )}
@@ -807,7 +807,7 @@ export default function PlaylistPage() {
                     fontWeight: 700,
                     textTransform: 'uppercase',
                     letterSpacing: '0.06em',
-                    background: '#8B2A1A',
+                    background: '#b4003e',
                     color: '#E8DDD0',
                     border: 'none',
                   }}
@@ -849,7 +849,7 @@ export default function PlaylistPage() {
               not deleted.
             </p>
             {deleteMutation.isError && (
-              <p className="text-sm mb-4" style={{ color: '#C43030' }}>
+              <p className="text-sm mb-4" style={{ color: '#b4003e' }}>
                 {deleteMutation.error instanceof Error ? deleteMutation.error.message : 'Delete failed'}
               </p>
             )}
@@ -879,7 +879,7 @@ export default function PlaylistPage() {
                   fontWeight: 700,
                   textTransform: 'uppercase',
                   letterSpacing: '0.06em',
-                  background: '#5C1A10',
+                  background: '#b4003e',
                   color: '#E8DDD0',
                   border: 'none',
                 }}

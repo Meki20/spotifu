@@ -70,7 +70,7 @@ function PlaylistCard({
       onClick={() => onOpen?.(playlist)}
       onMouseEnter={(e) => {
         e.currentTarget.style.background = '#231815'
-        e.currentTarget.style.borderColor = '#8B2A1A'
+        e.currentTarget.style.borderColor = '#b4003e'
       }}
       onMouseLeave={(e) => {
         e.currentTarget.style.background = '#1A1210'
@@ -228,7 +228,7 @@ export default function Library() {
       <div className="mb-8">
         <div
           className="flex items-center gap-2.5 mb-4"
-          style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 16, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.12em', color: '#5C1A10' }}
+          style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 16, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.12em', color: '#b4003e' }}
         >
           Albums
           <div className="flex-1 h-px" style={{ background: '#261A14' }} />
@@ -271,7 +271,7 @@ export default function Library() {
         <div className="flex items-center justify-between mb-4">
           <div
             className="flex items-center gap-2.5"
-            style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 16, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.12em', color: '#5C1A10' }}
+            style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 16, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.12em', color: '#b4003e' }}
           >
             Playlists
             <div className="h-px flex-1" style={{ background: '#261A14' }} />
@@ -334,7 +334,7 @@ export default function Library() {
               type="submit"
               className="px-4 py-2 text-sm font-bold transition-colors"
               style={{
-                background: '#8B2A1A',
+                background: '#b4003e',
                 color: '#E8DDD0',
                 border: 'none',
                 cursor: 'pointer',
@@ -488,7 +488,7 @@ export default function Library() {
                   textTransform: 'uppercase',
                   letterSpacing: '0.1em',
                   color: '#E8DDD0',
-                  background: '#8B2A1A',
+                  background: '#b4003e',
                   border: 'none',
                   cursor: 'pointer',
                   opacity: saveOrderMutation.isPending ? 0.6 : 1,

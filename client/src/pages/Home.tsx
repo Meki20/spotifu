@@ -103,7 +103,7 @@ export default function Home() {
         <div className="mb-8">
           <div
             className="flex items-center gap-2.5 mb-3"
-            style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 16, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.12em', color: '#5C1A10' }}
+            style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 16, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.12em', color: '#b4003e' }}
           >
             Your Playlists
             <div className="flex-1 h-px" style={{ background: '#261A14' }} />
@@ -113,7 +113,7 @@ export default function Home() {
               <Link
                 key={pl.id}
                 to={`/playlist/${pl.id}`}
-                className="relative flex items-center gap-3 px-4 py-3 cursor-pointer border transition-colors hover:border-[#8B2A1A] overflow-hidden"
+                className="relative flex items-center gap-3 px-4 py-3 cursor-pointer border transition-colors hover:border-[#b4003e] overflow-hidden"
                 style={{ background: '#1A1210', borderColor: '#3D2820', borderRadius: 4 }}
               >
                 {pl.cover_image_url && (
@@ -153,7 +153,7 @@ export default function Home() {
       <div className="mb-6">
         <div
           className="flex items-center gap-2.5 mb-3"
-          style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 16, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.12em', color: '#5C1A10' }}
+          style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 16, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.12em', color: '#b4003e' }}
         >
           Recently Added
           <div className="flex-1 h-px" style={{ background: '#261A14' }} />
@@ -176,7 +176,7 @@ export default function Home() {
       <div>
         <div
           className="flex items-center gap-2.5 mb-3"
-          style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 16, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.12em', color: '#5C1A10' }}
+          style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 16, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.12em', color: '#b4003e' }}
         >
           Recently Played
           <div className="flex-1 h-px" style={{ background: '#261A14' }} />

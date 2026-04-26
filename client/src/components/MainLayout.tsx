@@ -77,7 +77,7 @@ export default function MainLayout() {
                     lineHeight: 1,
                   }}
                 >
-                  Spoti<span style={{ color: '#8B2A1A' }}>FU</span>
+                  Spoti<span style={{ color: '#b4003e' }}>FU</span>
                 </div>
               </div>
               <div
@@ -104,14 +104,14 @@ export default function MainLayout() {
                     to={item.id}
                     className="flex items-center gap-3 px-4 py-1.5 cursor-pointer transition-all duration-150"
                     style={{
-                      background: active ? '#2A100A' : 'transparent',
-                      borderLeft: active ? '2px solid #8B2A1A' : '2px solid transparent',
+                      background: active ? 'rgba(180, 0, 62, 0.12)' : 'transparent',
+                      borderLeft: active ? '2px solid #b4003e' : '2px solid transparent',
                     }}
                   >
                     <item.icon
                       size={16}
                       className="w-4 h-4"
-                      style={{ color: active ? '#C4391F' : '#9A8E84' }}
+                      style={{ color: active ? '#b4003e' : '#9A8E84' }}
                     />
                     <span
                       className="text-sm"
@@ -147,8 +147,8 @@ export default function MainLayout() {
                       to={href}
                       className="relative flex items-center gap-2 px-4 py-1.5 cursor-pointer transition-all duration-150 min-w-0 overflow-hidden rounded-r"
                       style={{
-                        background: active ? '#2A100A' : 'transparent',
-                        borderLeft: active ? '2px solid #8B2A1A' : '2px solid transparent',
+                        background: active ? 'rgba(180, 0, 62, 0.12)' : 'transparent',
+                        borderLeft: active ? '2px solid #b4003e' : '2px solid transparent',
                       }}
                       title={pl.title}
                     >

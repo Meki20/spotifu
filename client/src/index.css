@@ -9,14 +9,14 @@
 
   /* Borders */
   --border: #3D2820;
-  --border-active: #8B2A1A;
+  --border-active: #b4003e;
   --border-subtle: #261A14;
 
-  /* Primary — Muddy Red */
-  --red: #8B2A1A;
-  --red-bright: #C4391F;
-  --red-muted: #5C1A10;
-  --red-faint: #2A100A;
+  /* Primary accent */
+  --red: #b4003e;
+  --red-bright: #b4003e;
+  --red-muted: #b4003e;
+  --red-faint: #1c000f;
 
   /* Text */
   --text-primary: #E8DDD0;

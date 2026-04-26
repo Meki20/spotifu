@@ -30,7 +30,7 @@ function Toggle({ on, onChange }: { on: boolean; onChange: (v: boolean) => void 
     <button
       onClick={() => onChange(!on)}
       className="relative w-9 h-5 rounded-full transition-colors cursor-pointer"
-      style={{ background: on ? '#8B2A1A' : '#3D2820', border: 'none' }}
+      style={{ background: on ? '#b4003e' : '#3D2820', border: 'none' }}
     >
       <div
         className="absolute top-0.5 w-3.5 h-3.5 rounded-full transition-all"
@@ -261,7 +261,7 @@ export default function Settings() {
     fontWeight: 700,
     textTransform: 'uppercase' as const,
     letterSpacing: '0.15em',
-    color: '#5C1A10',
+    color: '#b4003e',
     marginBottom: 8,
     paddingBottom: 6,
     borderBottom: '1px solid #261A14',
@@ -349,7 +349,7 @@ export default function Settings() {
             disabled={props.loading || !props.value}
             className="px-3 py-2 text-sm font-bold transition-colors shrink-0"
             style={{
-              background: '#8B2A1A',
+              background: '#b4003e',
               color: '#E8DDD0',
               border: 'none',
               cursor: props.loading || !props.value ? 'not-allowed' : 'pointer',
@@ -371,7 +371,7 @@ export default function Settings() {
           <p
             className="text-xs"
             style={{
-              color: props.status === 'Saved' ? '#4A9' : '#8B2A1A',
+              color: props.status === 'Saved' ? '#4A9' : '#b4003e',
               fontFamily: "'Barlow Semi Condensed', sans-serif",
             }}
           >
@@ -415,7 +415,7 @@ export default function Settings() {
           <div
             className="w-2 h-2 rounded-full"
             style={{
-              background: settings?.soulseek_connected ? 'oklch(65% 0.14 160)' : '#C43030',
+              background: settings?.soulseek_connected ? 'oklch(65% 0.14 160)' : '#b4003e',
               boxShadow: settings?.soulseek_connected
                 ? '0 0 8px rgba(101, 163, 13, 0.6)'
                 : '0 0 8px rgba(196, 48, 48, 0.5)',
@@ -426,7 +426,7 @@ export default function Settings() {
             className="text-xs"
             style={{
               fontFamily: "'Barlow Semi Condensed', sans-serif",
-              color: settings?.soulseek_connected ? 'oklch(65% 0.14 160)' : '#E86B6B',
+              color: settings?.soulseek_connected ? 'oklch(65% 0.14 160)' : '#b4003e',
             }}
           >
             {settings?.soulseek_connected ? 'connected to soulseek' : 'disconnected from soulseek'}
@@ -457,13 +457,13 @@ export default function Settings() {
                 placeholder="your soulseek password"
               />
             </div>
-            {status && <p className="text-xs" style={{ color: '#8B2A1A', fontFamily: "'Barlow Semi Condensed', sans-serif" }}>{status}</p>}
+            {status && <p className="text-xs" style={{ color: '#b4003e', fontFamily: "'Barlow Semi Condensed', sans-serif" }}>{status}</p>}
             <button
               type="submit"
               disabled={loading || !username || !password}
               className="px-6 py-2 text-sm font-bold transition-colors"
               style={{
-                background: '#8B2A1A',
+                background: '#b4003e',
                 color: '#E8DDD0',
                 border: 'none',
                 cursor: 'pointer',
@@ -487,7 +487,7 @@ export default function Settings() {
               <div className="flex items-center gap-3">
                 <div
                   className="w-8 h-8 rounded-full flex items-center justify-center"
-                  style={{ background: settings?.soulseek_connected ? '#8B2A1A' : '#3D2820' }}
+                  style={{ background: settings?.soulseek_connected ? '#b4003e' : '#3D2820' }}
                 >
                   <span style={{ fontSize: 17 }}>⬡</span>
                 </div>
@@ -504,7 +504,7 @@ export default function Settings() {
               />
             </div>
 
-            {status && <p className="text-xs" style={{ color: '#8B2A1A', fontFamily: "'Barlow Semi Condensed', sans-serif" }}>{status}</p>}
+            {status && <p className="text-xs" style={{ color: '#b4003e', fontFamily: "'Barlow Semi Condensed', sans-serif" }}>{status}</p>}
             <div className="flex items-center justify-between">
               <span className="text-xs" style={{ fontFamily: "'Barlow Semi Condensed', sans-serif", color: '#9A8E84' }}>
                 Logged in as: <span style={{ color: '#E8DDD0' }}>{settings?.soulseek_username}</span>
@@ -594,7 +594,7 @@ export default function Settings() {
                       <div
                         className="w-6 h-6 rounded-full flex items-center justify-center shrink-0"
                         style={{
-                          background: track.status === 'READY' ? '#8B2A1A' : track.status === 'ERROR' ? '#C43030' : '#3D2820',
+                          background: track.status === 'READY' ? '#b4003e' : track.status === 'ERROR' ? '#b4003e' : '#3D2820',
                         }}
                       >
                         <span style={{ fontSize: 16, color: track.status === 'READY' || track.status === 'ERROR' ? '#E8DDD0' : '#9A8E84' }}>✓</span>
@@ -607,7 +607,7 @@ export default function Settings() {
                     <button
                       type="button"
                       onClick={() => handleDeleteTrack(track.id)}
-                      className="p-1 rounded hover:bg-[#C43030]/20 shrink-0 transition-colors"
+                      className="p-1 rounded hover:bg-[#b4003e]/20 shrink-0 transition-colors"
                       style={{ color: '#4A413C' }}
                       title="Remove download"
                     >
@@ -646,7 +646,7 @@ export default function Settings() {
                     className="text-xs tabular-nums"
                     style={{
                       fontFamily: "'Barlow Semi Condensed', sans-serif",
-                      color: cacheCleared[kind] === 'Cleared' ? '#8EC9A0' : '#C43030',
+                      color: cacheCleared[kind] === 'Cleared' ? '#8EC9A0' : '#b4003e',
                     }}
                   >
                     {cacheCleared[kind]}
@@ -695,8 +695,8 @@ export default function Settings() {
           className="px-4 py-2 text-sm font-semibold border transition-colors"
           style={{
             background: 'transparent',
-            color: '#C43030',
-            borderColor: '#C43030',
+            color: '#b4003e',
+            borderColor: '#b4003e',
             cursor: 'pointer',
             fontFamily: "'Barlow Condensed', sans-serif",
             fontWeight: 600,

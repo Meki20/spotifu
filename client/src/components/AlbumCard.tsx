@@ -30,7 +30,7 @@ export default function AlbumCard({ album, onClick, onMouseEnter, onContextMenu 
       onMouseEnter={(e) => {
         onMouseEnter?.()
         e.currentTarget.style.background = '#231815'
-        e.currentTarget.style.borderColor = '#8B2A1A'
+        e.currentTarget.style.borderColor = '#b4003e'
       }}
       onMouseLeave={(e) => {
         e.currentTarget.style.background = '#1A1210'

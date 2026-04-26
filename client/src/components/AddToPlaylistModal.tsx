@@ -194,7 +194,7 @@ export default function AddToPlaylistModal({
         {err && (
           <p
             className="px-4 pb-2 text-xs whitespace-pre-line"
-            style={{ color: '#C43030', fontFamily: "'Barlow Semi Condensed', sans-serif" }}
+            style={{ color: '#b4003e', fontFamily: "'Barlow Semi Condensed', sans-serif" }}
           >
             {err}
           </p>
@@ -225,7 +225,7 @@ export default function AddToPlaylistModal({
                   checked={selected.has(pl.id)}
                   onChange={() => toggle(pl)}
                   disabled={saving}
-                  className="accent-[#C4391F]"
+                  className="accent-[#b4003e]"
                 />
                 <span className="truncate">{pl.title}</span>
               </label>
@@ -251,7 +251,7 @@ export default function AddToPlaylistModal({
             style={{
               fontFamily: "'Barlow Semi Condensed', sans-serif",
               color: '#140E0C',
-              background: selectedCount === 0 ? '#4A413C' : '#C4391F',
+              background: selectedCount === 0 ? '#4A413C' : '#b4003e',
             }}
             disabled={selectedCount === 0 || saving}
             onClick={save}

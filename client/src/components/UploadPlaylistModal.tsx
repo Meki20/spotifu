@@ -329,7 +329,7 @@ export default function UploadPlaylistModal({
           <div className="shrink-0 mb-4">
             <label
               className="block text-xs uppercase tracking-widest mb-1.5"
-              style={{ fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 600, color: '#5C1A10' }}
+              style={{ fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 600, color: '#b4003e' }}
             >
               Target playlist
             </label>
@@ -357,7 +357,7 @@ export default function UploadPlaylistModal({
           <div className="shrink-0 mb-4">
             <label
               className="block text-xs uppercase tracking-widest mb-1.5"
-              style={{ fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 600, color: '#5C1A10' }}
+              style={{ fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 600, color: '#b4003e' }}
             >
               Or new playlist name
             </label>
@@ -379,7 +379,7 @@ export default function UploadPlaylistModal({
           <div className="shrink-0 mb-4">
             <label
               className="block text-xs uppercase tracking-widest mb-1.5"
-              style={{ fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 600, color: '#5C1A10' }}
+              style={{ fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 600, color: '#b4003e' }}
             >
               CSV file
             </label>
@@ -405,7 +405,7 @@ export default function UploadPlaylistModal({
               >
                 <div
                   className="h-full transition-[width] duration-150 ease-out rounded-full"
-                  style={{ width: `${pct}%`, background: '#8B2A1A' }}
+                  style={{ width: `${pct}%`, background: '#b4003e' }}
                 />
               </div>
               <div
@@ -417,7 +417,7 @@ export default function UploadPlaylistModal({
                   fontFamily: "'Barlow Semi Condensed', sans-serif",
                 }}
               >
-                <div className="text-[10px] uppercase tracking-widest mb-1" style={{ color: '#5C1A10' }}>
+                <div className="text-[10px] uppercase tracking-widest mb-1" style={{ color: '#b4003e' }}>
                   Now · row {importCurrent} / {importTotal}
                 </div>
                 <div className="text-sm font-medium" style={{ color: '#E8DDD0' }}>
@@ -444,7 +444,7 @@ export default function UploadPlaylistModal({
                     fontFamily: "'Barlow Semi Condensed', sans-serif",
                   }}
                 >
-                  <div className="text-[10px] uppercase tracking-widest mb-1" style={{ color: '#5C1A10' }}>
+                  <div className="text-[10px] uppercase tracking-widest mb-1" style={{ color: '#b4003e' }}>
                     Import summary (live)
                   </div>
                   <div>
@@ -453,7 +453,7 @@ export default function UploadPlaylistModal({
                   </div>
                   {liveUnmatched.length > 0 && (
                     <div className="mt-2">
-                      <div className="text-[10px] uppercase tracking-widest mb-1" style={{ color: '#5C1A10' }}>
+                      <div className="text-[10px] uppercase tracking-widest mb-1" style={{ color: '#b4003e' }}>
                         Unmatched preview
                       </div>
                       <div className="space-y-1 max-h-24 overflow-y-auto pr-1">
@@ -509,7 +509,7 @@ export default function UploadPlaylistModal({
                 <>
                   <div
                     className="text-[10px] uppercase tracking-widest"
-                    style={{ fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 600, color: '#5C1A10' }}
+                    style={{ fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 600, color: '#b4003e' }}
                   >
                     Imported
                   </div>
@@ -555,7 +555,7 @@ export default function UploadPlaylistModal({
                 <div className="mt-3 flex flex-col min-h-0 flex-1">
                   <div
                     className="flex items-center justify-between text-[10px] uppercase tracking-widest"
-                    style={{ fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 600, color: '#5C1A10' }}
+                    style={{ fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 600, color: '#b4003e' }}
                   >
                     <span>Unmatched</span>
                     <button
@@ -629,7 +629,7 @@ export default function UploadPlaylistModal({
                                   type="button"
                                   disabled={unmatchedBusy}
                                   className="px-3 py-1 rounded text-xs"
-                                  style={{ background: '#8B2A1A', color: '#E8DDD0' }}
+                                  style={{ background: '#b4003e', color: '#E8DDD0' }}
                                   onClick={() => {
                                     if (activePlaylistId && jobId) resolveOne(activePlaylistId, jobId, r.id, r.mb_recording_id ?? '')
                                   }}
@@ -698,7 +698,7 @@ export default function UploadPlaylistModal({
                                 type="button"
                                 disabled={unmatchedBusy}
                                 className="px-3 py-1 rounded text-xs"
-                                style={{ background: '#8B2A1A', color: '#E8DDD0' }}
+                                style={{ background: '#b4003e', color: '#E8DDD0' }}
                                 onClick={(e) => {
                                   const input = (e.currentTarget.parentElement?.querySelector('input') ??
                                     null) as HTMLInputElement | null
@@ -754,7 +754,7 @@ export default function UploadPlaylistModal({
                 fontWeight: 700,
                 textTransform: 'uppercase',
                 letterSpacing: '0.06em',
-                background: '#8B2A1A',
+                background: '#b4003e',
                 color: '#E8DDD0',
                 border: 'none',
               }}

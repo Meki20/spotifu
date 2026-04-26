@@ -105,7 +105,7 @@ export default function AlbumPage() {
   }
   if (error) {
     return (
-      <div className="p-6" style={{ color: '#C43030', fontFamily: "'Barlow Semi Condensed', sans-serif" }}>
+      <div className="p-6" style={{ color: '#b4003e', fontFamily: "'Barlow Semi Condensed', sans-serif" }}>
         Error loading album
       </div>
     )
@@ -157,7 +157,7 @@ export default function AlbumPage() {
               fontFamily: "'Barlow Condensed', sans-serif",
               fontWeight: 700,
               letterSpacing: '0.15em',
-              color: '#8B2A1A',
+              color: '#b4003e',
             }}
           >
             Album
@@ -198,7 +198,7 @@ export default function AlbumPage() {
           onClick={playAlbumFromStart}
           disabled={!album.tracks?.length}
           className="w-12 h-12 rounded-full flex items-center justify-center transition-transform hover:scale-105 disabled:opacity-40"
-          style={{ background: '#8B2A1A', color: '#E8DDD0' }}
+          style={{ background: '#b4003e', color: '#E8DDD0' }}
           aria-label="Play album"
         >
           <Play size={22} fill="currentColor" className="ml-0.5 shrink-0" />
@@ -224,7 +224,7 @@ export default function AlbumPage() {
           const isCurrentlyPlaying = hasCur && Boolean(tid) && curMb === tid
           const mbid = tid || ''
           const isCached = Boolean(track.is_cached) || (mbid !== '' && cachedMbIds.has(mbid))
-          const titleColor = isCurrentlyPlaying ? '#8B2A1A' : isCached ? '#E8DDD0' : '#4A413C'
+          const titleColor = isCurrentlyPlaying ? '#b4003e' : isCached ? '#E8DDD0' : '#4A413C'
           const downloadPercent = mbid ? downloadStates[mbid]?.percent : undefined
           const isDownloading = mbid ? downloadStates[mbid]?.status === 'downloading' : false
           return (
@@ -246,14 +246,14 @@ export default function AlbumPage() {
                   className="text-sm tabular-nums group-hover:hidden"
                   style={{
                     fontFamily: "'Barlow Semi Condensed', monospace",
-                    color: isCurrentlyPlaying ? '#8B2A1A' : '#4A413C',
+                    color: isCurrentlyPlaying ? '#b4003e' : '#4A413C',
                   }}
                 >
                   {isCurrentlyPlaying ? '▶' : i + 1}
                 </span>
                 <span
                   className="absolute inset-0 hidden group-hover:flex items-center justify-center"
-                  style={{ color: '#1DB954' }}
+                  style={{ color: '#b4003e' }}
                 >
                   <Play size={12} fill="currentColor" className="shrink-0" />
                 </span>

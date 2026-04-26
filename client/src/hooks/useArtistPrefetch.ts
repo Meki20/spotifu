@@ -30,7 +30,7 @@ export function useArtistPrefetch() {
     }))
     pending.clear()
 
-    console.log(`[prefetch] draining ${toProcess.length} artist(s)`, 'color: #8B2A1A')
+    console.log(`[prefetch] draining ${toProcess.length} artist(s)`, 'color: #b4003e')
 
     for (const { artistId, albumIds } of toProcess) {
       const uniqueAlbums = [...new Set(albumIds)]
@@ -73,7 +73,7 @@ export function useArtistPrefetch() {
           const { artist, albums } = data
 
           if (artist) {
-            console.log(`[prefetch] artist ${artistId} cached, ${albums?.length ?? 0} album tracklists`, 'color: #1DB954')
+            console.log(`[prefetch] artist ${artistId} cached, ${albums?.length ?? 0} album tracklists`, 'color: #b4003e')
             queryClient.setQueryData(['artist', artistId], artist)
           }
 

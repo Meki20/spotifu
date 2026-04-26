@@ -384,12 +384,12 @@ export default function ArtistPage() {
               >
                 <div className="relative w-8 h-8 shrink-0 flex items-center justify-center">
                   <span className="text-[#b3b3b3] text-sm tabular-nums group-hover:hidden">{i + 1}</span>
-                  <span className="absolute inset-0 hidden group-hover:flex items-center justify-center text-[#1DB954]">
+                  <span className="absolute inset-0 hidden group-hover:flex items-center justify-center text-[#b4003e]">
                     <Play size={14} fill="currentColor" className="shrink-0" />
                   </span>
                 </div>
                 <div className="min-w-0">
-                  <p className={`text-sm truncate ${isCurrentlyPlaying ? 'text-[#1DB954]' : !isCached ? 'text-[#6a6a6a]' : 'text-white'}`}>
+                  <p className={`text-sm truncate ${isCurrentlyPlaying ? 'text-[#b4003e]' : !isCached ? 'text-[#6a6a6a]' : 'text-white'}`}>
                     {track.title}
                   </p>
                 </div>
@@ -482,7 +482,7 @@ export default function ArtistPage() {
               >
                 <div className="relative w-8 h-8 shrink-0 flex items-center justify-center">
                   <span className="text-[#b3b3b3] text-sm tabular-nums group-hover:hidden">{i + 1}</span>
-                  <span className="absolute inset-0 hidden group-hover:flex items-center justify-center text-[#1DB954]">
+                  <span className="absolute inset-0 hidden group-hover:flex items-center justify-center text-[#b4003e]">
                     <Play size={14} fill="currentColor" className="shrink-0" />
                   </span>
                 </div>

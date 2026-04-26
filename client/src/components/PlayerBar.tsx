@@ -144,7 +144,7 @@ export default function PlayerBar() {
           <div
             className="w-12 h-12 rounded flex items-center justify-center shrink-0 border"
             style={{
-              background: 'linear-gradient(135deg, #5C1A10, #2A100A)',
+              background: 'linear-gradient(135deg, #b4003e, #1c000f)',
               borderColor: '#3D2820',
               borderRadius: 6,
               overflow: 'hidden',
@@ -161,7 +161,7 @@ export default function PlayerBar() {
               <div
                 className="w-7 h-7 rounded-full"
                 style={{
-                  background: 'conic-gradient(from 0deg, #8B2A1A, #C4391F, #2A100A, #8B2A1A)',
+                  background: 'conic-gradient(from 0deg, #b4003e, #b4003e, #1c000f, #b4003e)',
                   boxShadow: '0 0 10px rgba(139, 42, 26, 0.6)',
                 }}
               />
@@ -198,7 +198,7 @@ export default function PlayerBar() {
             disabled={showMascotInsteadOfHeart}
             title={showMascotInsteadOfHeart ? 'Loading…' : liked ? 'Unlike' : 'Like'}
             style={{
-              color: liked ? '#8B2A1A' : '#4A413C',
+              color: liked ? '#b4003e' : '#4A413C',
               opacity: showMascotInsteadOfHeart ? 1 : undefined,
               cursor: showMascotInsteadOfHeart ? 'default' : 'pointer',
             }}
@@ -206,7 +206,7 @@ export default function PlayerBar() {
             {showMascotInsteadOfHeart ? (
               <PollyLoading size={26} />
             ) : (
-              <Heart size={14} fill={liked ? '#8B2A1A' : 'none'} />
+              <Heart size={14} fill={liked ? '#b4003e' : 'none'} />
             )}
           </button>
         </div>
@@ -218,7 +218,7 @@ export default function PlayerBar() {
             <button
               onClick={() => controller.setShuffle(!shuffle)}
               className="w-7 h-7 flex items-center justify-center transition-colors"
-              style={{ color: shuffle ? '#8B2A1A' : '#9A8E84' }}
+              style={{ color: shuffle ? '#b4003e' : '#9A8E84' }}
               title="Shuffle"
             >
               <Shuffle size={14} />
@@ -235,7 +235,7 @@ export default function PlayerBar() {
               onClick={handlePlayPause}
               className="w-9 h-9 flex items-center justify-center transition-colors rounded"
               style={{
-                background: '#8B2A1A',
+                background: '#b4003e',
                 color: '#E8DDD0',
                 boxShadow: '0 0 12px rgba(139, 42, 26, 0.4)',
               }}
@@ -254,7 +254,7 @@ export default function PlayerBar() {
             <button
               onClick={cycleRepeat}
               className="w-7 h-7 flex items-center justify-center transition-colors"
-              style={{ color: repeat !== 'off' ? '#8B2A1A' : '#9A8E84' }}
+              style={{ color: repeat !== 'off' ? '#b4003e' : '#9A8E84' }}
               title={repeat === 'off' ? 'No repeat' : repeat === 'all' ? 'Repeat all' : 'Repeat one'}
             >
               {repeat === 'one' ? <Repeat1 size={14} /> : <Repeat size={14} />}
@@ -280,7 +280,7 @@ export default function PlayerBar() {
                 className="absolute left-0 top-0 h-full rounded"
                 style={{
                   width: `${progress}%`,
-                  background: '#8B2A1A',
+                  background: '#b4003e',
                   boxShadow: '0 0 6px rgba(139, 42, 26, 0.5)',
                 }}
               />
@@ -302,7 +302,7 @@ export default function PlayerBar() {
                 <div
                   className="absolute top-1/2 -translate-y-1/2 w-2 h-2 rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
                   style={{
-                    background: '#C4391F',
+                    background: '#b4003e',
                     left: `calc(${progress}% - 4px)`,
                     boxShadow: '0 0 6px rgba(139, 42, 26, 0.7)',
                   }}
@@ -419,7 +419,7 @@ export default function PlayerBar() {
           <div className="mt-1 pt-1" style={{ borderTop: '1px solid #261A14' }}>
             <button
               className="w-full text-left px-4 py-2 hover:bg-[#2E1E19] transition-colors"
-              style={{ fontFamily: "'Barlow Semi Condensed', sans-serif", color: '#C43030' }}
+              style={{ fontFamily: "'Barlow Semi Condensed', sans-serif", color: '#b4003e' }}
               onClick={() => {
                 setContextMenu(null)
                 usePlayerStore.setState({ currentTrack: null, isPlaying: false, phase: 'idle' })

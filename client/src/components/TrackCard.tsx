@@ -15,7 +15,7 @@ const TrackCardImpl = ({ track, size = 96, onPlay, onHoverArtist, onContextMenu 
   const cover = track.album_cover as string | null | undefined
   return (
     <div
-      className="flex flex-col items-center gap-2 px-3 py-3 rounded cursor-pointer border shrink-0 transition-colors hover:border-[#8B2A1A] group relative overflow-hidden"
+      className="flex flex-col items-center gap-2 px-3 py-3 rounded cursor-pointer border shrink-0 transition-colors hover:border-[#b4003e] group relative overflow-hidden"
       style={{
         background: '#1A1210',
         borderColor: '#3D2820',

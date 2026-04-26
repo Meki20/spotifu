@@ -58,7 +58,7 @@ async function searchHybrid(q: string): Promise<HybridSearchResponse> {
 
 type SimilarStreamEvent =
   | { type: 'track'; track: Track }
-  | { type: 'done' }
+  | { type: 'done'; notice?: string; cached?: boolean }
 
 function parseNdjsonLine(line: string): SimilarStreamEvent | null {
   const t = line.trim()
@@ -84,6 +84,7 @@ export default function Search() {
   const [activeTab, setActiveTab] = useState<'songs' | 'albums'>('songs')
   const [similarTracks, setSimilarTracks] = useState<Track[]>([])
   const [similarStreamPending, setSimilarStreamPending] = useState(false)
+  const [similarNotice, setSimilarNotice] = useState<string | null>(null)
   const similarStreamGenRef = useRef(0)
   const [contextMenu, setContextMenu] = useState<ContextMenu | null>(null)
   const [addPlOpen, setAddPlOpen] = useState(false)
@@ -200,9 +201,10 @@ export default function Search() {
     return t?.mb_id || null
   }, [hybridData, localOnly])
 
-  // Background similar-tracks stream (non-blocking)
+  // Background similar-tracks stream (non-blocking; fast batch only on server)
   useEffect(() => {
     setSimilarTracks([])
+    setSimilarNotice(null)
     if (localOnly) {
       setSimilarStreamPending(false)
       return
@@ -234,7 +236,14 @@ export default function Search() {
           signal: ac.signal,
         })
         console.debug('[similar] stream response', { ok: res.ok, status: res.status, hasBody: Boolean(res.body) })
-        if (!res.ok || !res.body) return
+        if (!res.ok || !res.body) {
+          if (similarStreamGenRef.current === myGen) {
+            setSimilarNotice(
+              'Related tracks could not be loaded. Only the main search results are shown.',
+            )
+          }
+          return
+        }
         const reader = res.body.getReader()
         const dec = new TextDecoder()
         let buf = ''
@@ -255,7 +264,13 @@ export default function Search() {
                 return [...prev, ev.track]
               })
             } else if (ev.type === 'done') {
-              console.debug('[similar] stream done')
+              if (
+                similarStreamGenRef.current === myGen &&
+                typeof ev.notice === 'string' &&
+                ev.notice.trim()
+              ) {
+                setSimilarNotice(ev.notice.trim())
+              }
             }
           }
         }
@@ -529,6 +544,14 @@ export default function Search() {
               )
             })}
           </div>
+          {!localOnly && similarNotice && baseResults.length > 0 && (
+            <p
+              className="mt-3 px-4 text-sm leading-relaxed"
+              style={{ color: '#6B625C', fontFamily: "'Barlow Semi Condensed', sans-serif" }}
+            >
+              {similarNotice}
+            </p>
+          )}
         </>
       )}
 

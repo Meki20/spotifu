@@ -1,6 +1,5 @@
 import difflib
 import json
-import asyncio
 import logging
 import time
 from fastapi import APIRouter, Query, Depends
@@ -168,44 +167,13 @@ async def stream_similar_tracks(
 ):
     """Stream similar tracks for a MusicBrainz recording MBID as NDJSON.
 
-    Non-blocking for the client: yields tracks as they finalize (Last.fm → MB resolve → cover hydrate).
+    Uses cache, then Last.fm candidates resolved only via a fast MusicBrainz
+    batch (Lucene OR). Per-track / import-style resolution is not used.
     """
     from services.providers import lastfm
     from services.providers import musicbrainz
     from services.track_cache_status import annotate_tracks_is_cached
     import services.providers as providers
-
-    async def _resolve_one(sim: dict) -> dict | None:
-        sim_mbid = (sim.get("mbid") or "").strip()
-        title = (sim.get("name") or sim.get("title") or "").strip()
-        artist = (sim.get("artist") or "").strip()
-        if isinstance(sim.get("artist"), dict):
-            artist = (sim["artist"].get("name") or "").strip()
-
-        try:
-            if sim_mbid:
-                logger.debug("[similar] resolve via MBID %s", sim_mbid)
-                row = await musicbrainz.get_track(sim_mbid, include_cover=True)
-                return row
-        except Exception:
-            row = None
-
-        if not title or not artist:
-            logger.debug("[similar] skip: missing title/artist (title=%r artist=%r mbid=%r)", title, artist, sim_mbid)
-            return None
-        try:
-            logger.debug("[similar] resolve via text %r / %r", artist, title)
-            meta = await musicbrainz.resolve_recording_metadata(title, artist, None)
-        except Exception:
-            meta = None
-        if not meta or not meta.get("mbid"):
-            logger.debug("[similar] no MB resolve for %r / %r", artist, title)
-            return None
-        try:
-            logger.debug("[similar] hydrate track %s for %r / %r", meta["mbid"], artist, title)
-            return await musicbrainz.get_track(str(meta["mbid"]), include_cover=True)
-        except Exception:
-            return None
 
     async def _ndjson_core():
         logger.debug("[similar] stream start mbid=%s", mbid)
@@ -282,8 +250,6 @@ async def stream_similar_tracks(
 
         yielded: set[str] = set()
         yielded_count = 0
-        resolved_ok = 0
-        resolved_none = 0
         yielded_rows_for_cache: list[dict] = []
 
         # ------------------------------------------------------------------
@@ -361,160 +327,7 @@ async def stream_similar_tracks(
                 yielded_count += 1
                 yielded_rows_for_cache.append(row)
 
-        # ------------------------------------------------------------------
-        # Slow fallback: resolve remaining candidates.
-        #
-        # Prefer the CSV-import batch resolver when artist+title+album are known, in
-        # chunks of 10. This keeps MB search traffic low (1 query per ~10 tracks),
-        # and is both faster and more accurate than per-track text resolve.
-        # ------------------------------------------------------------------
-        if yielded_count < target_yields:
-            # Pass A: batch resolve with (artist,title,album) when album is present.
-            try:
-                from services.playlist_import import ImportInputRow, _query_normalized, _resolve_batch_verbatim
-            except Exception:
-                ImportInputRow = None  # type: ignore[assignment]
-                _query_normalized = None  # type: ignore[assignment]
-                _resolve_batch_verbatim = None  # type: ignore[assignment]
-
-            def _sim_album(sim: dict) -> str:
-                alb = sim.get("album")
-                if isinstance(alb, dict):
-                    return (alb.get("title") or alb.get("name") or "").strip()
-                if isinstance(alb, str):
-                    return alb.strip()
-                return ""
-
-            sims_with_album: list[dict] = []
-            sims_without_album: list[dict] = []
-            for sim in (sims or []):
-                if yielded_count >= target_yields:
-                    break
-                alb = _sim_album(sim)
-                if alb:
-                    sims_with_album.append(sim)
-                else:
-                    sims_without_album.append(sim)
-
-            if ImportInputRow and _query_normalized and _resolve_batch_verbatim and sims_with_album:
-                batch_size = 10
-                memo: dict[str, Any] = {}
-                stats: dict[str, int] = {"memo_hit": 0, "db_cache_hit": 0, "live_lookup": 0, "matched": 0, "unmatched": 0}
-                for i in range(0, len(sims_with_album), batch_size):
-                    if yielded_count >= target_yields:
-                        break
-                    chunk = sims_with_album[i : i + batch_size]
-                    rows: list[Any] = []
-                    for idx, sim in enumerate(chunk):
-                        title = (sim.get("name") or sim.get("title") or "").strip()
-                        artist = (sim.get("artist") or "").strip()
-                        if isinstance(sim.get("artist"), dict):
-                            artist = (sim["artist"].get("name") or "").strip()
-                        album = _sim_album(sim)
-                        if not title or not artist or not album:
-                            continue
-                        qn = _query_normalized(artist, title, album)
-                        rows.append(
-                            ImportInputRow(
-                                row_index=(i + idx),
-                                title=title,
-                                artist=artist,
-                                album=album,
-                                duration_ms=0,
-                                query_normalized=qn,
-                            )
-                        )
-                    if not rows:
-                        continue
-
-                    try:
-                        await _resolve_batch_verbatim(session, rows, memo=memo, stats=stats)
-                    except Exception:
-                        # If the batch resolver fails (rare), fall back to per-track resolve below.
-                        logger.debug("[similar] batch resolver failed; falling back to per-track", exc_info=True)
-                        break
-
-                    # Hydrate matched MBIDs (covers + full metadata) one-by-one, but only up to target_yields.
-                    for r in rows:
-                        if yielded_count >= target_yields:
-                            break
-                        outcome = memo.get(r.query_normalized)
-                        mbid2 = str(getattr(outcome, "mbid", "") or "")
-                        if not mbid2 or mbid2 in yielded:
-                            continue
-                        try:
-                            row = await musicbrainz.get_track(mbid2, include_cover=True)
-                        except Exception:
-                            row = None
-                        if not row or not row.get("mbid"):
-                            resolved_none += 1
-                            continue
-                        mb = str(row["mbid"])
-                        if mb in yielded:
-                            continue
-                        yielded.add(mb)
-                        yielded_count += 1
-                        resolved_ok += 1
-                        try:
-                            annotate_tracks_is_cached(session, [row])
-                        except Exception:
-                            pass
-                        out = _track_to_out(row, bool(row.get("is_cached", False)))
-                        logger.debug(
-                            "[similar] yield(fallback-batch10) mbid=%s title=%r artist=%r",
-                            out.mb_id,
-                            out.title,
-                            out.artist,
-                        )
-                        yield (json.dumps({"type": "track", "track": out.model_dump()}) + "\n").encode("utf-8")
-                        yielded_rows_for_cache.append(row)
-
-            # Pass B: true slow path (no album or batch missed) — per-track resolve.
-            if yielded_count < target_yields and sims_without_album:
-                sem = asyncio.Semaphore(4)
-
-                async def _guarded(sim: dict) -> dict | None:
-                    async with sem:
-                        return await _resolve_one(sim)
-
-                tasks = [asyncio.create_task(_guarded(sim)) for sim in sims_without_album]
-                for fut in asyncio.as_completed(tasks):
-                    if yielded_count >= target_yields:
-                        for t in tasks:
-                            if not t.done():
-                                t.cancel()
-                        break
-                    try:
-                        row = await fut
-                    except Exception:
-                        row = None
-                    if not row or not row.get("mbid"):
-                        resolved_none += 1
-                        continue
-                    mb = str(row["mbid"])
-                    if mb in yielded:
-                        continue
-                    yielded.add(mb)
-                    yielded_count += 1
-                    resolved_ok += 1
-
-                    try:
-                        annotate_tracks_is_cached(session, [row])
-                    except Exception:
-                        pass
-
-                    out = _track_to_out(row, bool(row.get("is_cached", False)))
-                    logger.debug("[similar] yield(fallback) mbid=%s title=%r artist=%r", out.mb_id, out.title, out.artist)
-                    yield (json.dumps({"type": "track", "track": out.model_dump()}) + "\n").encode("utf-8")
-                    yielded_rows_for_cache.append(row)
-
-        logger.debug(
-            "[similar] stream done mbid=%s yielded=%d resolved_ok=%d resolved_none=%d",
-            mbid,
-            yielded_count,
-            resolved_ok,
-            resolved_none,
-        )
+        logger.debug("[similar] stream done mbid=%s yielded=%d", mbid, yielded_count)
         logger.debug("[similar] total stream time mbid=%s %.2fs", mbid, time.monotonic() - t0)
         # Persist cache for instant next-time results.
         try:
@@ -523,7 +336,13 @@ async def stream_similar_tracks(
                 logger.debug("[similar] cache saved mbid=%s tracks=%d", mbid, len(yielded_rows_for_cache))
         except Exception:
             logger.debug("[similar] cache save failed", exc_info=True)
-        yield (json.dumps({"type": "done"}) + "\n").encode("utf-8")
+        done: dict = {"type": "done"}
+        if yielded_count == 0:
+            done["notice"] = (
+                "No related tracks — suggestions only use a fast catalogue batch match, "
+                "and none were found for this result."
+            )
+        yield (json.dumps(done) + "\n").encode("utf-8")
 
     async def ndjson():
         async with musicbrainz.mb_interactive_calls():

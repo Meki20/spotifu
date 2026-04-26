@@ -24,8 +24,9 @@ async def download_track_background(track_id: int, title: str, artist: str, albu
 
 
 async def _run_download(track_id: int, title: str, artist: str, album: str = "", mb_id: str | None = None, duration: int = 0):
-    from services.soulseek import search_track, download_file, set_progress_callback, remove_progress_callback, set_inflight_filesize
+    from services.soulseek import search_track_with_variants, download_file, set_progress_callback, remove_progress_callback, set_inflight_filesize
     from main import ws_manager
+    from sqlmodel import select
 
     query = f"{artist} - {title}"
     local_path = None
@@ -73,9 +74,10 @@ async def _run_download(track_id: int, title: str, artist: str, album: str = "",
 
     try:
         logger.debug("Searching: artist=%r title=%r album=%r query=%r", artist, title, album, query)
-        results = await search_track(artist, title, album=album, timeout=30.0)
+        variant_results = await search_track_with_variants(artist, title, album=album, timeout=30.0)
+        results_flat = [hit for _q, hits in variant_results for hit in hits]
 
-        if not results:
+        if not results_flat:
             logger.warning("No Soulseek results for: %s", query)
             await ws_manager.broadcast({
                 "type": "download_error",
@@ -90,35 +92,67 @@ async def _run_download(track_id: int, title: str, artist: str, album: str = "",
                     session.commit()
             return
 
-        logger.debug("Got %d results. Top candidates:", len(results))
-        for idx, (u, p, sz) in enumerate(results[:5]):
-            logger.debug("  [%d] %s | %s | %d bytes", idx+1, u, p, sz)
+        best_variant = next(((q, hits) for (q, hits) in variant_results if hits), ("", []))
+        logger.debug("Got Soulseek candidates. First non-empty variant=%r hits=%d", best_variant[0], len(best_variant[1]))
 
-        MAX_ATTEMPTS = 3
-        local_path = None
-        for i, (username, remote_path, file_size) in enumerate(results[:MAX_ATTEMPTS]):
-            logger.debug("Attempting download %d/%d: user=%r path=%r size=%d", i+1, min(len(results), MAX_ATTEMPTS), username, remote_path, file_size)
-            if i > 0:
-                logger.info(f"Soulseek retry: {remote_path} from {username} ({file_size} bytes)")
+        def _is_last_fetching_track() -> bool:
             try:
-                # If we observe repeated "0 bytes" polls, abort and try next peer—
-                # except on the final attempt where we give the last candidate a full chance.
-                abort_on_no_progress = i < (MAX_ATTEMPTS - 1)
-                local_path = await download_file(
+                with Session(engine) as session:
+                    ids = session.exec(select(Track.id).where(Track.status == TrackStatus.FETCHING)).all()
+                    return len(ids) <= 1
+            except Exception:
+                logger.debug("Failed to compute fetching queue size; assuming not last", exc_info=True)
+                return False
+
+        last_in_queue = _is_last_fetching_track()
+
+        MAX_ATTEMPTS_PER_VARIANT = 3
+        local_path = None
+        for variant_idx, (variant_query, results) in enumerate(variant_results):
+            if not results:
+                continue
+            logger.debug("Trying variant %d/%d query=%r hits=%d", variant_idx + 1, len(variant_results), variant_query, len(results))
+
+            attempt_rows = results[:MAX_ATTEMPTS_PER_VARIANT]
+            only_candidate = len(attempt_rows) <= 1
+            for i, (username, remote_path, file_size) in enumerate(attempt_rows):
+                logger.debug(
+                    "Attempting download variant=%d attempt=%d/%d: user=%r path=%r size=%d",
+                    variant_idx + 1,
+                    i + 1,
+                    len(attempt_rows),
                     username,
                     remote_path,
-                    timeout=600.0,
-                    track_id=track_id,
-                    abort_on_no_progress=abort_on_no_progress,
+                    file_size,
                 )
-                if local_path:
-                    logger.info("Download succeeded: %s", local_path)
-                    break
-                else:
+                lower_path = (remote_path or "").lower()
+                if lower_path.endswith((".png", ".jpg", ".jpeg")):
+                    logger.warning("Skipping non-audio Soulseek candidate: %s/%s", username, remote_path)
+                    continue
+                if variant_idx > 0 or i > 0:
+                    logger.info(f"Soulseek retry: {remote_path} from {username} ({file_size} bytes)")
+                try:
+                    # Stall abort is useful when there are other candidates to try.
+                    # If this is the only candidate, or we're effectively at the end of the queue,
+                    # don't self-abort — let it run its full course.
+                    abort_on_no_progress = not (only_candidate or last_in_queue)
+
+                    local_path = await download_file(
+                        username,
+                        remote_path,
+                        timeout=600.0,
+                        track_id=track_id,
+                        abort_on_no_progress=abort_on_no_progress,
+                    )
+                    if local_path:
+                        logger.info("Download succeeded: %s", local_path)
+                        break
                     logger.debug("Download returned None for %s/%s, trying next", username, remote_path)
-            except Exception as e:
-                logger.warning("Download attempt failed for %s/%s: %s", username, remote_path, e)
-                continue
+                except Exception as e:
+                    logger.warning("Download attempt failed for %s/%s: %s", username, remote_path, e)
+                    continue
+            if local_path:
+                break
 
         if local_path:
             status = TrackStatus.READY

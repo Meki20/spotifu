@@ -373,6 +373,8 @@ async def remove_progress_callback(track_id: int) -> None:
 
 _AUDIO_EXTS = {"flac", "mp3", "m4a", "ogg", "opus", "wav", "aac"}
 _MIN_AUDIO_BYTES = 500_000
+# Some peers include cover art alongside tracks; never treat these as candidates.
+_IMAGE_EXTS = {"jpg", "jpeg", "png"}
 # Minimum avg_speed (bytes/s) a peer must report to be considered for ranking.
 # This is intentionally conservative: very low speeds make "high quality" formats unusable.
 # Override via env: SOULSEEK_MIN_AVG_SPEED (bytes/s).
@@ -389,6 +391,20 @@ def _normalize_tokens(s: str) -> list[str]:
     """Lowercase, strip punctuation, split into tokens."""
     s = _NORM_PUNCT_RE.sub(' ', s.lower())
     return [t for t in s.split() if t]
+
+
+def _effective_ext(file) -> str:
+    """Best-effort extension for a Soulseek shared item.
+
+    aioslsk sometimes leaves `file.extension` empty; fall back to the filename.
+    """
+    ext = (getattr(file, "extension", None) or "").lower().lstrip(".")
+    if ext:
+        return ext
+    name = (getattr(file, "filename", None) or "").lower()
+    if "." in name:
+        return name.rsplit(".", 1)[-1]
+    return ""
 
 
 def _token_hit_rate(query_tokens: list[str], text: str) -> float:
@@ -592,7 +608,7 @@ def _score_file(
 ) -> float:
     """Composite holistic score [0, 1]. Higher = better."""
     path = file.filename or ""
-    ext = (file.extension or "").lower().lstrip(".")
+    ext = _effective_ext(file)
     size = int(file.filesize or 0)
     speed = int(result.avg_speed or 0)
 
@@ -631,8 +647,8 @@ def _flatten_and_rank(results, artist: str = "", title: str = "", album: str = "
             size = int(f.filesize or 0)
             if size < _MIN_AUDIO_BYTES:
                 continue
-            ext = (f.extension or "").lower().lstrip(".")
-            if ext and ext not in _AUDIO_EXTS:
+            ext = _effective_ext(f)
+            if not ext or ext in _IMAGE_EXTS or ext not in _AUDIO_EXTS:
                 continue
             akey = _availability_key(f.filename or "")
             avail_counts[akey] = avail_counts.get(akey, 0) + 1
@@ -693,6 +709,30 @@ async def search_track(
     return []
 
 
+async def search_track_with_variants(
+    artist: str,
+    title: str,
+    album: str = "",
+    timeout: float = 30.0,
+) -> List[Tuple[str, List[Tuple[str, str, int]]]]:
+    """Search across all query variants and return per-variant ranked hits.
+
+    Unlike `search_track()`, this does not stop at the first non-empty variant.
+    This lets callers fall back to alternative query shapes if the first variant
+    returns only a few candidates that later fail to download.
+    """
+    variants = _build_query_variants(artist, title)
+    out: List[Tuple[str, List[Tuple[str, str, int]]]] = []
+    for q in variants:
+        try:
+            hits = await search_soulseek(q, timeout=timeout, artist=artist, title=title, album=album)
+        except Exception:
+            logger.debug("Variant search failed for query=%r", q, exc_info=True)
+            hits = []
+        out.append((q, hits))
+    return out
+
+
 async def search_soulseek(
     query: str,
     timeout: float = 30.0,
@@ -750,8 +790,8 @@ async def search_soulseek(
                     size = int(f.filesize or 0)
                     if size < _MIN_AUDIO_BYTES:
                         continue
-                    ext = (f.extension or "").lower().lstrip(".")
-                    if ext and ext not in _AUDIO_EXTS:
+                    ext = _effective_ext(f)
+                    if not ext or ext in _IMAGE_EXTS or ext not in _AUDIO_EXTS:
                         continue
                     file_key = (r.username, f.filename)
                     if file_key in seen_files:
@@ -824,8 +864,8 @@ async def search_soulseek(
             size = int(f.filesize or 0)
             if size < _MIN_AUDIO_BYTES:
                 continue
-            ext = (f.extension or "").lower().lstrip(".")
-            if ext and ext not in _AUDIO_EXTS:
+            ext = _effective_ext(f)
+            if not ext or ext in _IMAGE_EXTS or ext not in _AUDIO_EXTS:
                 continue
             akey = _availability_key(f.filename or "")
             _candidate_rows.append((r, f, size, ext, akey))

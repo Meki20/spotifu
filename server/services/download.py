@@ -214,9 +214,10 @@ async def _run_download(track_id: int, title: str, artist: str, album: str = "",
             if status == TrackStatus.READY and not track.mb_id:
                 from services.providers import musicbrainz
                 try:
-                    mb_id_resolved = await musicbrainz.resolve_id(
-                        track.title, track.artist, track.album
-                    )
+                    async with musicbrainz.mb_prefetch_calls():
+                        mb_id_resolved = await musicbrainz.resolve_id(
+                            track.title, track.artist, track.album
+                        )
                     if mb_id_resolved:
                         track.mb_id = mb_id_resolved
                         mb_id_for_ws = mb_id_resolved

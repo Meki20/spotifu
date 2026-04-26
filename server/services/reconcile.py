@@ -198,7 +198,8 @@ async def reconcile_provider_ids() -> None:
                 track.id, track.artist, track.title, track.album,
             )
             try:
-                mb_id = await musicbrainz.resolve_id(track.title, track.artist, track.album)
+                async with musicbrainz.mb_prefetch_calls():
+                    mb_id = await musicbrainz.resolve_id(track.title, track.artist, track.album)
             except Exception as e:
                 logger.warning("mb resolve ERROR: %s", e)
                 mb_id = None

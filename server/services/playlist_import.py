@@ -820,7 +820,8 @@ async def run_csv_import_job(
         if not batch:
             continue
         try:
-            await _resolve_batch_verbatim(session, batch, memo=memo, stats=stats)
+            async with musicbrainz.mb_prefetch_calls():
+                await _resolve_batch_verbatim(session, batch, memo=memo, stats=stats)
         except Exception as ex:
             stats["live_error"] += 1
             for r in batch:
@@ -1046,7 +1047,8 @@ async def stream_csv_import(
         batch = [r for r in batch_all if r.title and r.artist]
         if batch:
             try:
-                await _resolve_batch_verbatim(session, batch, memo=memo, stats=stats)
+                async with musicbrainz.mb_prefetch_calls():
+                    await _resolve_batch_verbatim(session, batch, memo=memo, stats=stats)
             except Exception as ex:
                 stats["live_error"] += 1
                 for r in batch:

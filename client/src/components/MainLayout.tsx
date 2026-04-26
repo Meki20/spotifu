@@ -4,6 +4,8 @@ import PlayerBar from './PlayerBar'
 import { useAudioPlayer } from '../hooks/useAudioPlayer'
 import { ChevronLeft, ChevronRight, Home, Library, Search, Settings } from 'lucide-react'
 import { useAuthStore } from '../stores/authStore'
+import { usePrefetchSettingsStore } from '../stores/prefetchSettingsStore'
+import { authFetch } from '../api'
 import { fetchPlaylistsList } from '../api/playlists'
 import { useEffect, useState } from 'react'
 
@@ -42,6 +44,21 @@ export default function MainLayout() {
     queryFn: fetchPlaylistsList,
     enabled: !!token,
   })
+
+  useEffect(() => {
+    if (!token) {
+      usePrefetchSettingsStore.getState().resetToDefaults()
+      return
+    }
+    authFetch('/settings/preferences')
+      .then((r) => r.json())
+      .then((data: { prefetch?: Record<string, unknown> }) => {
+        usePrefetchSettingsStore.getState().applyServerPrefetch(data.prefetch)
+      })
+      .catch(() => {
+        /* keep persisted local prefs */
+      })
+  }, [token])
 
   const sidebarWidthPx = collapsed ? 60 : 240
   const playlistTileSize = collapsed ? 42 : 0

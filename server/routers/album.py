@@ -4,6 +4,7 @@ from database import get_session
 from deps import get_current_user
 from models import User
 from services.providers import MetadataService
+from services.providers import musicbrainz
 from services.track_cache_status import annotate_tracks_is_cached
 from schemas import TrackOut
 
@@ -17,7 +18,8 @@ async def get_album(
     user: User = Depends(get_current_user),
 ):
     svc = MetadataService(session)
-    data = await svc.get_album(album_id)
+    async with musicbrainz.mb_interactive_calls():
+        data = await svc.get_album(album_id)
     if not data:
         raise HTTPException(status_code=404, detail="Album not found")
     tracks = data.get("tracks")

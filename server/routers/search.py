@@ -93,9 +93,14 @@ async def hybrid_search(
     user: User = Depends(get_current_user),
 ):
     from services.hybrid_search import HybridSearchService
+    from services.providers import musicbrainz
     from services.track_cache_status import annotate_tracks_is_cached
+    from services.user_preferences import get_prefetch_prefs
+
     svc = HybridSearchService()
-    raw = await svc.search(q)
+    pf = get_prefetch_prefs(user)
+    async with musicbrainz.mb_interactive_calls():
+        raw = await svc.search(q, prefetch_prefs=pf)
 
     all_tracks = [t for sec in raw["sections"] for t in sec["tracks"]]
     annotate_tracks_is_cached(session, all_tracks)
@@ -119,8 +124,10 @@ async def search(
         return await _local_search(q, session, local_limit)
 
     from services.providers import MetadataService
+    from services.providers import musicbrainz
     svc = MetadataService(session)
-    results = await svc.search(q)
+    async with musicbrainz.mb_interactive_calls():
+        results = await svc.search(q)
 
     mb_ids = [r["mbid"] for r in results if r.get("mbid")]
     cached_mb: set[str] = set()
@@ -200,7 +207,7 @@ async def stream_similar_tracks(
         except Exception:
             return None
 
-    async def ndjson():
+    async def _ndjson_core():
         logger.debug("[similar] stream start mbid=%s", mbid)
         t0 = time.monotonic()
 
@@ -517,6 +524,11 @@ async def stream_similar_tracks(
         except Exception:
             logger.debug("[similar] cache save failed", exc_info=True)
         yield (json.dumps({"type": "done"}) + "\n").encode("utf-8")
+
+    async def ndjson():
+        async with musicbrainz.mb_interactive_calls():
+            async for chunk in _ndjson_core():
+                yield chunk
 
     return StreamingResponse(ndjson(), media_type="application/x-ndjson")
 

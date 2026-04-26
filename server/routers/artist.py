@@ -5,6 +5,7 @@ from database import get_session
 from deps import get_current_user
 from models import User
 from services.providers import MetadataService
+from services.providers import musicbrainz
 from services.providers.musicbrainz import _caa_release_group_front_url, CAA_SIZE_LIST
 from services.track_cache_status import annotate_tracks_is_cached
 
@@ -108,7 +109,8 @@ async def get_artist_images(
 
     artist_name = None
     svc = MetadataService(session)
-    mb = await svc.get_artist(artist_id)
+    async with musicbrainz.mb_interactive_calls():
+        mb = await svc.get_artist(artist_id)
     if mb:
         artist_name = mb.get("name")
     if not artist_name:
@@ -138,7 +140,8 @@ async def update_artist_images(
 ):
     artist_name = None
     svc = MetadataService(session)
-    mb = await svc.get_artist(artist_id)
+    async with musicbrainz.mb_interactive_calls():
+        mb = await svc.get_artist(artist_id)
     if mb:
         artist_name = mb.get("name")
     if not artist_name:
@@ -173,7 +176,8 @@ async def get_artist_albums(
     user: User = Depends(get_current_user),
 ):
     svc = MetadataService(session)
-    albums = await svc.get_artist_albums(artist_id)
+    async with musicbrainz.mb_interactive_calls():
+        albums = await svc.get_artist_albums(artist_id)
     return {"albums": albums}
 
 
@@ -195,7 +199,8 @@ async def get_artist(
     user: User = Depends(get_current_user),
 ):
     svc = MetadataService(session)
-    data = await svc.get_artist_head(artist_id)
+    async with musicbrainz.mb_interactive_calls():
+        data = await svc.get_artist_head(artist_id)
     if not data:
         raise HTTPException(status_code=404, detail="Artist not found")
     top = data.get("top_tracks")

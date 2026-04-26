@@ -320,7 +320,8 @@ async def list_library_albums(
     ) -> LibraryAlbumResponse | None:
         async with sem:
             try:
-                data = await svc.get_album(mb_id)
+                async with musicbrainz.mb_interactive_calls():
+                    data = await svc.get_album(mb_id)
             except Exception:
                 return None
         if not data:
@@ -475,10 +476,11 @@ async def get_release_cover_url(
     release_mbid: str,
     user: User = Depends(get_current_user),
 ):
-    url = await musicbrainz.cover_url_for_release_or_rg(
-        mb_release_id=release_mbid,
-        mb_release_group_id=None,
-    )
+    async with musicbrainz.mb_interactive_calls():
+        url = await musicbrainz.cover_url_for_release_or_rg(
+            mb_release_id=release_mbid,
+            mb_release_group_id=None,
+        )
     return RecordingCoverResponse(url=url if isinstance(url, str) else None)
 
 
@@ -487,10 +489,11 @@ async def get_release_group_cover_url(
     rg_mbid: str,
     user: User = Depends(get_current_user),
 ):
-    url = await musicbrainz.cover_url_for_release_or_rg(
-        mb_release_id=None,
-        mb_release_group_id=rg_mbid,
-    )
+    async with musicbrainz.mb_interactive_calls():
+        url = await musicbrainz.cover_url_for_release_or_rg(
+            mb_release_id=None,
+            mb_release_group_id=rg_mbid,
+        )
     return RecordingCoverResponse(url=url if isinstance(url, str) else None)
 
 
@@ -507,7 +510,8 @@ async def get_recording_cover_url(
     if found:
         return RecordingCoverResponse(url=cached_url if isinstance(cached_url, str) else None)
 
-    meta = await musicbrainz.get_track(recording_mbid)
+    async with musicbrainz.mb_interactive_calls():
+        meta = await musicbrainz.get_track(recording_mbid)
     url = (meta or {}).get("album_cover")
     url_str = url if isinstance(url, str) and url else None
     set_cached_cover("cover_recording", recording_mbid, url_str)
@@ -917,7 +921,8 @@ async def resolve_playlist_import_row(
         raise HTTPException(status_code=400, detail="Missing mb_recording_id")
 
     # Resolve metadata to populate item fields (and validate MB actually returns the recording).
-    meta = await musicbrainz.get_track(mbid, include_cover=False)
+    async with musicbrainz.mb_interactive_calls():
+        meta = await musicbrainz.get_track(mbid, include_cover=False)
     if not meta or not meta.get("mbid"):
         raise HTTPException(status_code=400, detail="MusicBrainz recording not found")
 

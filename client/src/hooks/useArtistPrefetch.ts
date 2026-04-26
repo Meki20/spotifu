@@ -1,6 +1,7 @@
 import { useCallback, useRef } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { useAuthStore } from '../stores/authStore'
+import { effectivePrefetch, usePrefetchSettingsStore } from '../stores/prefetchSettingsStore'
 import { API } from '../api'
 
 const DEFAULT_DRAIN_MS = 280
@@ -50,7 +51,8 @@ export function useArtistPrefetch(options?: ArtistPrefetchOptions) {
 
   const queueAlbumPosts = useCallback(
     (artistId: string, albumIds: string[]) => {
-      if (!token || albumIds.length === 0) return
+      const pf = effectivePrefetch(usePrefetchSettingsStore.getState().prefetch)
+      if (!pf.album_tracklists || !token || albumIds.length === 0) return
       const unique = [...new Set(albumIds)]
       const run = async () => {
         let rest = [...unique]
@@ -96,27 +98,31 @@ export function useArtistPrefetch(options?: ArtistPrefetchOptions) {
     }))
     pending.clear()
 
-    for (const { artistId, albumIds } of toProcess) {
-      void queryClient.prefetchQuery({
-        queryKey: ['artist', artistId],
-        queryFn: () =>
-          fetch(`${API}/artist/${artistId}`, {
-            headers: token ? { Authorization: `Bearer ${token}` } : {},
-          }).then((r) => {
-            if (!r.ok) throw new Error('Failed')
-            return r.json()
-          }),
-        staleTime: Infinity,
-      })
+    const pf = effectivePrefetch(usePrefetchSettingsStore.getState().prefetch)
 
-      void queryClient.prefetchQuery({
-        queryKey: ['artist-albums', artistId],
-        queryFn: (): Promise<{ albums: unknown[] }> =>
-          fetch(`${API}/artist/${artistId}/albums`, {
-            headers: token ? { Authorization: `Bearer ${token}` } : {},
-          }).then((r) => (r.ok ? r.json() : { albums: [] })),
-        staleTime: Infinity,
-      })
+    for (const { artistId, albumIds } of toProcess) {
+      if (pf.hover_metadata) {
+        void queryClient.prefetchQuery({
+          queryKey: ['artist', artistId],
+          queryFn: () =>
+            fetch(`${API}/artist/${artistId}`, {
+              headers: token ? { Authorization: `Bearer ${token}` } : {},
+            }).then((r) => {
+              if (!r.ok) throw new Error('Failed')
+              return r.json()
+            }),
+          staleTime: Infinity,
+        })
+
+        void queryClient.prefetchQuery({
+          queryKey: ['artist-albums', artistId],
+          queryFn: (): Promise<{ albums: unknown[] }> =>
+            fetch(`${API}/artist/${artistId}/albums`, {
+              headers: token ? { Authorization: `Bearer ${token}` } : {},
+            }).then((r) => (r.ok ? r.json() : { albums: [] })),
+          staleTime: Infinity,
+        })
+      }
 
       if (albumIds.length > 0) {
         queueAlbumPosts(artistId, albumIds)
@@ -136,6 +142,11 @@ export function useArtistPrefetch(options?: ArtistPrefetchOptions) {
     (artistId: string, albumIds: string[] = []) => {
       if (!artistId) return
 
+      const pf = effectivePrefetch(usePrefetchSettingsStore.getState().prefetch)
+      const wantMeta = pf.hover_metadata
+      const wantLists = pf.album_tracklists && albumIds.length > 0
+      if (!wantMeta && !wantLists) return
+
       const existing = pendingRef.current.get(artistId)
       if (existing) {
         for (const id of albumIds) existing.add(id)
@@ -151,6 +162,8 @@ export function useArtistPrefetch(options?: ArtistPrefetchOptions) {
   const enqueueAlbumsIdle = useCallback(
     (artistId: string, albumIds: string[]) => {
       if (!artistId || albumIds.length === 0) return
+      const pf = effectivePrefetch(usePrefetchSettingsStore.getState().prefetch)
+      if (!pf.artist_idle) return
       scheduleIdle(() => enqueue(artistId, albumIds))
     },
     [enqueue],

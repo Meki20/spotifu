@@ -183,7 +183,8 @@ async def play(
                 genre=existing.genre,
             )
 
-        meta = await mb_provider.get_track(mbid, include_cover=False)
+        async with mb_provider.mb_interactive_calls():
+            meta = await mb_provider.get_track(mbid, include_cover=False)
         caa_release_mbids: list[str] = []
         if meta:
             caa_release_mbids = list(meta.pop("_caa_release_mbids", []) or [])
@@ -261,7 +262,8 @@ async def download_track(
 
     elif provider == "musicbrainz":
         mbid = id
-        meta = await mb_provider.get_track(mbid, include_cover=False)
+        async with mb_provider.mb_interactive_calls():
+            meta = await mb_provider.get_track(mbid, include_cover=False)
         caa_release_mbids: list[str] = []
         if meta:
             caa_release_mbids = list(meta.pop("_caa_release_mbids", []) or [])

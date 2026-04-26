@@ -11,6 +11,7 @@ from deps import get_current_user
 from models import User
 from services.providers import MetadataService
 from services.providers import musicbrainz
+from services.user_preferences import get_prefetch_prefs
 
 logger = logging.getLogger(__name__)
 
@@ -42,6 +43,10 @@ async def prefetch_artist(
     artist_id = body.artist_id
     album_ids = body.album_ids
     logger.debug("prefetch artist_id=%r album_ids=%s", artist_id, album_ids)
+
+    pf = get_prefetch_prefs(user)
+    if not pf["enabled"] or not pf["album_tracklists"]:
+        return {"artist": None, "albums": []}
 
     album_ids_to_fetch = (album_ids or [])[:_PREFETCH_ALBUMS_PER_REQUEST]
     if not album_ids_to_fetch:

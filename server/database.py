@@ -86,6 +86,7 @@ def _migrate():
         "CREATE INDEX IF NOT EXISTS ix_playlist_import_rows_desired_position ON playlist_import_rows (desired_position)",
         "CREATE INDEX IF NOT EXISTS ix_playlist_import_rows_query_normalized ON playlist_import_rows (query_normalized)",
         "CREATE INDEX IF NOT EXISTS ix_playlist_import_rows_state ON playlist_import_rows (state)",
+        "ALTER TABLE users ADD COLUMN IF NOT EXISTS preferences_json VARCHAR(32768)",
     ]
     with engine.connect() as conn:
         for sql in migrations:

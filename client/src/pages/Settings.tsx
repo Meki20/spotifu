@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import { useVirtualizer } from '@tanstack/react-virtual'
 import { useNavigate } from 'react-router-dom'
 import { useAuthStore } from '../stores/authStore'
+import { usePrefetchSettingsStore } from '../stores/prefetchSettingsStore'
 import { subscribeSpotifuWebSocket, WS_RECONNECT } from '../spotifuWebSocket'
 import { authFetch } from '../api'
 import { PollyLoading } from '../components/PollyLoading'
@@ -61,6 +62,9 @@ export default function Settings() {
   const [settings, setSettings] = useState<Settings | null>(null)
   const [tracks, setTracks] = useState<TrackConfig[]>([])
   const [tracksLoading, setTracksLoading] = useState(false)
+  const [prefetchStatus, setPrefetchStatus] = useState('')
+  const prefetch = usePrefetchSettingsStore((s) => s.prefetch)
+  const applyServerPrefetch = usePrefetchSettingsStore((s) => s.applyServerPrefetch)
   const trackListRef = useRef<HTMLDivElement>(null)
   const trackVirtualizer = useVirtualizer({
     count: tracks.length,
@@ -83,6 +87,11 @@ export default function Settings() {
     authFetch('/settings')
       .then((r) => r.json())
       .then(setSettings)
+      .catch(console.error)
+
+    authFetch('/settings/preferences')
+      .then((r) => r.json())
+      .then((data: { prefetch?: Record<string, unknown> }) => applyServerPrefetch(data.prefetch))
       .catch(console.error)
 
     setTracksLoading(true)
@@ -233,6 +242,24 @@ export default function Settings() {
       setTracks(prev => prev.filter(t => t.id !== trackId))
     } catch (err) {
       console.error(err)
+    }
+  }
+
+  async function patchPrefetchPrefs(body: Record<string, boolean>) {
+    setPrefetchStatus('')
+    try {
+      const res = await authFetch('/settings/preferences', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      })
+      if (!res.ok) throw new Error('Failed to save preferences')
+      const data = (await res.json()) as { prefetch?: Record<string, unknown> }
+      applyServerPrefetch(data.prefetch)
+      setPrefetchStatus('Saved')
+      setTimeout(() => setPrefetchStatus(''), 2000)
+    } catch (err) {
+      setPrefetchStatus('Error: ' + String(err))
     }
   }
 
@@ -557,6 +584,104 @@ export default function Settings() {
             placeholder="Last.fm API key"
           />
         </div>
+      </section>
+
+      {/* Prefetching */}
+      <section className="mb-6">
+        <div style={sectionLabelStyle}>Prefetching</div>
+        <p className="text-xs mb-4" style={{ fontFamily: "'Barlow Semi Condensed', sans-serif", color: '#9A8E84' }}>
+          Control background metadata requests. When the master switch is off, all categories are inactive until you turn it on again.
+        </p>
+        {(() => {
+          const rows: { key: keyof typeof prefetch; label: string; hint: string }[] = [
+            {
+              key: 'enabled',
+              label: 'Background prefetch',
+              hint: 'Master switch for every category below.',
+            },
+            {
+              key: 'hover_metadata',
+              label: 'Artist & album list on hover',
+              hint: 'Warms artist head and discography list when you hover tiles (home, search, playlists).',
+            },
+            {
+              key: 'album_tracklists',
+              label: 'Album tracklists in the background',
+              hint: 'Fetches release tracks after hover or idle hints (MusicBrainz, low priority).',
+            },
+            {
+              key: 'artist_idle',
+              label: 'Artist page idle warm-up',
+              hint: 'After opening an artist, loads a few more albums when the browser is idle.',
+            },
+            {
+              key: 'hybrid_stale_refresh',
+              label: 'Hybrid search stale refresh',
+              hint: 'Refreshes cached hybrid “best match” results in the background when they age out.',
+            },
+          ]
+          return (
+            <div className="space-y-2">
+              {rows.map((row) => {
+                const isMaster = row.key === 'enabled'
+                const dimmed = !isMaster && !prefetch.enabled
+                const on = prefetch[row.key]
+                return (
+                  <div
+                    key={row.key}
+                    className="flex items-center justify-between gap-3 p-3 rounded"
+                    style={{
+                      background: '#1A1210',
+                      border: '1px solid #261A14',
+                      borderRadius: 4,
+                      opacity: dimmed ? 0.72 : 1,
+                    }}
+                  >
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <p className="text-xs" style={{ fontFamily: "'Barlow Semi Condensed', sans-serif", color: '#E8DDD0' }}>
+                          {row.label}
+                        </p>
+                        {!isMaster && prefetch.enabled && !on && (
+                          <span
+                            className="text-[10px] uppercase tracking-wider px-1.5 py-0.5 rounded"
+                            style={{
+                              fontFamily: "'Barlow Condensed', sans-serif",
+                              fontWeight: 700,
+                              letterSpacing: '0.08em',
+                              color: '#9A8E84',
+                              border: '1px solid #3D2820',
+                            }}
+                          >
+                            off
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-[11px] mt-1" style={{ fontFamily: "'Barlow Semi Condensed', sans-serif", color: '#4A413C' }}>
+                        {row.hint}
+                      </p>
+                    </div>
+                    <Toggle
+                      on={on}
+                      onChange={() => void patchPrefetchPrefs({ [row.key]: !on })}
+                    />
+                  </div>
+                )
+              })}
+              {prefetchStatus && (
+                <p
+                  className="text-xs px-1"
+                  style={{
+                    color: prefetchStatus.startsWith('Error') ? '#b4003e' : '#8EC9A0',
+                    fontFamily: "'Barlow Semi Condensed', sans-serif",
+                  }}
+                >
+                  {prefetchStatus}
+                </p>
+              )}
+            </div>
+          )
+        })()}
       </section>
 
       {/* Downloaded Tracks */}

@@ -85,14 +85,15 @@ _MB_RETRY_STATUS = frozenset({408, 429, 500, 502, 503, 504})
 
 # MusicBrainz etiquette: per-IP throttling is ~1 req/sec (see MB wiki rate limiting).
 # This server is deployed single-instance per IP, so this gate is globally sufficient.
-_MB_GLOBAL_GAP_S = 1.05
+_MB_GLOBAL_GAP_S = 0.6
 _mb_gap_lock = asyncio.Lock()
 _mb_last_call_at = 0.0
 _mb_cooldown_until = 0.0
 
-# Lower number = higher priority. Interactive traffic should preempt prefetch.
+# Lower tuple field = higher priority (asyncio.PriorityQueue is a min-heap).
+# Keep a large gap so future mid-tiers can slot between user and background.
 _MB_PRIO_INTERACTIVE = 0
-_MB_PRIO_PREFETCH = 50
+_MB_PRIO_PREFETCH = 1_000_000
 _mb_call_priority: contextvars.ContextVar[int] = contextvars.ContextVar(
     "mb_call_priority", default=_MB_PRIO_INTERACTIVE
 )
@@ -102,8 +103,22 @@ _mb_queue_worker: asyncio.Task[None] | None = None
 
 
 @asynccontextmanager
+async def mb_interactive_calls():
+    """User-facing MB work (search, artist/album pages, play, similar stream).
+
+    Nested inside ``mb_prefetch_calls()`` this temporarily overrides back to
+    interactive priority until the block exits.
+    """
+    tok = _mb_call_priority.set(_MB_PRIO_INTERACTIVE)
+    try:
+        yield
+    finally:
+        _mb_call_priority.reset(tok)
+
+
+@asynccontextmanager
 async def mb_prefetch_calls():
-    """Mark MusicBrainz HTTP done during this block as low-priority (after interactive)."""
+    """Lowest-priority MB: hover prefetch, CSV import resolve, startup reconcile, hybrid stale refresh."""
     tok = _mb_call_priority.set(_MB_PRIO_PREFETCH)
     try:
         yield

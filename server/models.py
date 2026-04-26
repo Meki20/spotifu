@@ -16,6 +16,7 @@ class User(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
     username: str = Field(unique=True, index=True, max_length=255)
     hashed_password: str = Field(max_length=128)
+    preferences_json: Optional[str] = Field(default=None, max_length=32768)
 
 
 class Track(SQLModel, table=True):

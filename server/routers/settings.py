@@ -5,6 +5,7 @@ from database import get_session
 from deps import get_current_user
 from models import User, Track, MBLookupCache, MBEntityCache, PlaylistItem
 from schemas.track import DownloadedTrackListItem, DownloadedTracksListResponse
+from services.user_preferences import get_stored_prefetch_prefs, merge_prefetch_into_user, PREFETCH_DEFAULTS
 
 router = APIRouter(prefix="/settings", tags=["settings"])
 
@@ -28,6 +29,35 @@ class SettingsResponse(BaseModel):
     soulseek_has_credentials: bool = False
     fanarttv_key_configured: bool = False
     lastfm_key_configured: bool = False
+
+
+class PrefetchPreferencesPatch(BaseModel):
+    enabled: bool | None = None
+    hover_metadata: bool | None = None
+    album_tracklists: bool | None = None
+    artist_idle: bool | None = None
+    hybrid_stale_refresh: bool | None = None
+
+
+class PreferencesResponse(BaseModel):
+    prefetch: dict[str, bool]
+
+
+@router.get("/preferences", response_model=PreferencesResponse)
+def get_preferences(user: User = Depends(get_current_user)):
+    return PreferencesResponse(prefetch=get_stored_prefetch_prefs(user))
+
+
+@router.patch("/preferences", response_model=PreferencesResponse)
+def patch_preferences(
+    body: PrefetchPreferencesPatch,
+    user: User = Depends(get_current_user),
+    session: Session = Depends(get_session),
+):
+    patch = {k: v for k, v in body.model_dump(exclude_unset=True).items() if k in PREFETCH_DEFAULTS}
+    if patch:
+        merge_prefetch_into_user(session, user, patch)
+    return PreferencesResponse(prefetch=get_stored_prefetch_prefs(user))
 
 
 @router.get("", response_model=SettingsResponse)

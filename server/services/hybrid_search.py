@@ -266,16 +266,20 @@ class HybridSearchService:
 
     async def _background_refresh(self, query: str, query_normalized: str) -> None:
         try:
-            await self._search_live(query, query_normalized)
+            async with musicbrainz.mb_prefetch_calls():
+                await self._search_live(query, query_normalized)
         except Exception as e:
             logger.debug("background hybrid refresh failed: %s", e)
         finally:
             _hybrid_bg_inflight.discard(query_normalized)
 
-    async def search(self, query: str) -> dict:
+    async def search(self, query: str, *, prefetch_prefs: dict[str, bool] | None = None) -> dict:
         query = query.strip()
         if not query:
             return {"intent": "track", "sections": []}
+
+        pf = prefetch_prefs or {}
+        allow_stale_bg = bool(pf.get("enabled", True)) and bool(pf.get("hybrid_stale_refresh", True))
 
         query_normalized = query.lower()
         cached, fetched_at = _get_cache_with_meta(query_normalized)
@@ -285,7 +289,7 @@ class HybridSearchService:
                 fetched_at is None
                 or (now - fetched_at > _SOFT_TTL)
             )
-            if stale and query_normalized not in _hybrid_bg_inflight:
+            if stale and allow_stale_bg and query_normalized not in _hybrid_bg_inflight:
                 _hybrid_bg_inflight.add(query_normalized)
                 asyncio.create_task(self._background_refresh(query, query_normalized))
             return self._response_from_tracks("Best Match", cached)

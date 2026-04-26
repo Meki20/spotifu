@@ -41,6 +41,11 @@ _EXCELLENT_THRESHOLD = 0.94         # early-exit score threshold (composite)
 _EXCELLENT_MIN_COLLECT = 1.5        # seconds: gather a bit before early-exit
 _EXCELLENT_MIN_SPEED = 10_000_000   # bytes/sec: 10MB/s for truly "excellent"
 
+# Download stall: if bytes_transfered is still 0 for this many consecutive progress polls
+# (poll every 0.5s in download_file) → abort and let download.py try the next candidate.
+# 12 ≈ 6s of "stuck at 0%" with no data moving.
+_STALL_MAX_ZERO_BYTE_TICKS = 12
+
 # Module state
 _client = None                       # type: Optional["SoulSeekClient"]
 _start_lock = asyncio.Lock()
@@ -988,8 +993,12 @@ async def download_file(
                     bytes_done = transfer.bytes_transfered or 0
                     if abort_on_no_progress and bytes_done <= 0:
                         no_progress_ticks += 1
-                        if no_progress_ticks >= 20:
-                            logger.warning("No-progress stall detected (ticks=%d); aborting download to try next candidate: %s/%s", no_progress_ticks, username, remote_path)
+                        if no_progress_ticks >= _STALL_MAX_ZERO_BYTE_TICKS:
+                            logger.warning(
+                                "No-progress stall detected (consecutive 0%% ticks=%d, max=%d); "
+                                "aborting download to try next candidate: %s/%s",
+                                no_progress_ticks, _STALL_MAX_ZERO_BYTE_TICKS, username, remote_path
+                            )
                             no_progress_event.set()
                             try:
                                 abort_fn = getattr(transfer, "abort", None)

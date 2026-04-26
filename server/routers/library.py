@@ -598,7 +598,7 @@ def update_playlist(
     pl = _get_playlist_for_user(session, playlist_id, user.id)
     data = body.model_dump(exclude_unset=True)
     if "title" in data:
-        pl.title = body["title"]  # type: ignore[assignment]
+        pl.title = data["title"]
     if "description" in data:
         pl.description = data["description"]
     if "cover_image_url" in data:

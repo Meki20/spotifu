@@ -15,6 +15,7 @@ import ContextMenu from '../components/ContextMenu'
 import AddToPlaylistModal, { type AddToPlaylistTrack } from '../components/AddToPlaylistModal'
 import { useContextMenuActions } from '../contexts/ContextMenuProvider'
 import { useAuthStore } from '../stores/authStore'
+import { PollyLoading } from '../components/PollyLoading'
 
 const RECENT_SEARCHES_KEY = 'spotifu_recent_searches'
 const MAX_RECENT = 20
@@ -82,6 +83,8 @@ export default function Search() {
   const [localOnly, setLocalOnly] = useState(false)
   const [activeTab, setActiveTab] = useState<'songs' | 'albums'>('songs')
   const [similarTracks, setSimilarTracks] = useState<Track[]>([])
+  const [similarStreamPending, setSimilarStreamPending] = useState(false)
+  const similarStreamGenRef = useRef(0)
   const [contextMenu, setContextMenu] = useState<ContextMenu | null>(null)
   const [addPlOpen, setAddPlOpen] = useState(false)
   const [addPlTrack, setAddPlTrack] = useState<AddToPlaylistTrack | null>(null)
@@ -188,6 +191,9 @@ export default function Search() {
     ? (localResults ?? [])
     : (hybridData?.sections.flatMap(s => s.tracks) ?? [])
 
+  const baseResultsRef = useRef(baseResults)
+  baseResultsRef.current = baseResults
+
   const bestMatchMbid = useMemo(() => {
     if (localOnly) return null
     const t = hybridData?.sections?.[0]?.tracks?.[0]
@@ -197,12 +203,26 @@ export default function Search() {
   // Background similar-tracks stream (non-blocking)
   useEffect(() => {
     setSimilarTracks([])
-    if (localOnly) return
-    if (!bestMatchMbid) return
-    if (!debouncedQuery || debouncedQuery.length <= 2) return
-    if (!token) return
+    if (localOnly) {
+      setSimilarStreamPending(false)
+      return
+    }
+    if (!bestMatchMbid) {
+      setSimilarStreamPending(false)
+      return
+    }
+    if (!debouncedQuery || debouncedQuery.length <= 2) {
+      setSimilarStreamPending(false)
+      return
+    }
+    if (!token) {
+      setSimilarStreamPending(false)
+      return
+    }
 
     const ac = new AbortController()
+    const myGen = ++similarStreamGenRef.current
+    setSimilarStreamPending(true)
 
     ;(async () => {
       try {
@@ -231,7 +251,7 @@ export default function Search() {
               console.debug('[similar] got track', { mbid: ev.track.mb_id, title: ev.track.title, artist: ev.track.artist })
               setSimilarTracks((prev) => {
                 if (prev.some((t) => t.mb_id === ev.track.mb_id)) return prev
-                if (baseResults.some((t) => t.mb_id === ev.track.mb_id)) return prev
+                if (baseResultsRef.current.some((t) => t.mb_id === ev.track.mb_id)) return prev
                 return [...prev, ev.track]
               })
             } else if (ev.type === 'done') {
@@ -241,6 +261,8 @@ export default function Search() {
         }
       } catch {
         // ignore background stream failures
+      } finally {
+        if (similarStreamGenRef.current === myGen) setSimilarStreamPending(false)
       }
     })()
 
@@ -432,8 +454,19 @@ export default function Search() {
       </div>
 
       {isLoading && (
-        <div className="text-base" style={{ color: '#4A413C', fontFamily: "'Space Mono', monospace" }}>
-          loading...
+        <div className="flex items-center gap-3 py-2">
+          <PollyLoading size={36} />
+          <span className="text-sm" style={{ color: '#4A413C', fontFamily: "'Space Mono', monospace" }}>
+            searching…
+          </span>
+        </div>
+      )}
+      {!isLoading && similarStreamPending && !localOnly && bestMatchMbid && (
+        <div className="flex items-center gap-3 py-2 mb-1">
+          <PollyLoading size={32} />
+          <span className="text-sm" style={{ color: '#4A413C', fontFamily: "'Space Mono', monospace" }}>
+            similar tracks…
+          </span>
         </div>
       )}
       {error && (

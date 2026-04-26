@@ -12,6 +12,7 @@ import { useArtistPrefetch } from '../hooks/useArtistPrefetch'
 import ContextMenu from '../components/ContextMenu'
 import ImagePickerModal from '../components/ImagePickerModal'
 import { toTrack } from '../utils/trackHelpers'
+import { PollyLoading } from '../components/PollyLoading'
 
 function AlbumSkeleton() {
   return (
@@ -86,7 +87,9 @@ function HorizontalAlbumStrip({ albums, navigate, isLoading, covers }: { albums:
 
   if (isLoading) {
     return (
-      <div className="relative flex items-center">
+      <div className="relative flex flex-col items-center gap-3 py-4">
+        <PollyLoading size={40} />
+        <div className="relative flex items-center w-full">
         <button
           onClick={() => scroll('left')}
           className="absolute left-0 z-10 w-8 h-8 rounded-full bg-black/60 text-white flex items-center justify-center shrink-0 opacity-50 pointer-events-none"
@@ -110,6 +113,7 @@ function HorizontalAlbumStrip({ albums, navigate, isLoading, covers }: { albums:
         >
           <ChevronRight size={20} />
         </button>
+        </div>
       </div>
     )
   }
@@ -272,7 +276,14 @@ export default function ArtistPage() {
     }))
   }
 
-  if (isLoading) return <div className="p-6 text-[#b3b3b3]">Loading...</div>
+  if (isLoading) {
+    return (
+      <div className="p-6 flex flex-col items-center gap-3 text-[#b3b3b3]">
+        <PollyLoading size={48} />
+        <span className="text-sm" style={{ fontFamily: "'Space Mono', monospace" }}>loading…</span>
+      </div>
+    )
+  }
   if (error) return <div className="p-6 text-red-500">Error loading artist</div>
   if (!artist) return null
 

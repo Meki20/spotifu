@@ -59,18 +59,26 @@ export default function MainLayout() {
           <div className="relative z-10 flex flex-col h-full overflow-hidden">
             {/* Logo */}
             <div className="px-4 pt-4 pb-3" style={{ borderBottom: '1px solid #261A14' }}>
-              <div
-                className="text-2xl font-bold tracking-wide"
-                style={{
-                  fontFamily: "'Barlow Condensed', sans-serif",
-                  fontWeight: 800,
-                  textTransform: 'uppercase',
-                  letterSpacing: '0.05em',
-                  color: '#E8DDD0',
-                  lineHeight: 1,
-                }}
-              >
-                Spoti<span style={{ color: '#8B2A1A' }}>FU</span>
+              <div className="flex items-center gap-2">
+                <img
+                  src="/assets/brand/polly_512x512.png"
+                  alt="SpotiFU icon"
+                  className="w-7 h-7 rounded-sm shrink-0"
+                  style={{ imageRendering: 'auto' }}
+                />
+                <div
+                  className="text-2xl font-bold tracking-wide"
+                  style={{
+                    fontFamily: "'Barlow Condensed', sans-serif",
+                    fontWeight: 800,
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.05em',
+                    color: '#E8DDD0',
+                    lineHeight: 1,
+                  }}
+                >
+                  Spoti<span style={{ color: '#8B2A1A' }}>FU</span>
+                </div>
               </div>
               <div
                 className="text-sm mt-1"

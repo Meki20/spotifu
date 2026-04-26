@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom'
 import { useAuthStore } from '../stores/authStore'
 import { subscribeSpotifuWebSocket, WS_RECONNECT } from '../spotifuWebSocket'
 import { authFetch } from '../api'
+import { PollyLoading } from '../components/PollyLoading'
 
 interface Settings {
   soulseek_username: string | null
@@ -559,7 +560,10 @@ export default function Settings() {
       <section className="mb-6">
         <div style={sectionLabelStyle}>Downloaded Tracks</div>
         {tracksLoading ? (
-          <p className="text-xs" style={{ fontFamily: "'Barlow Semi Condensed', sans-serif", color: '#4A413C' }}>Loading...</p>
+          <div className="flex items-center gap-2 py-2">
+            <PollyLoading size={28} />
+            <p className="text-xs" style={{ fontFamily: "'Barlow Semi Condensed', sans-serif", color: '#4A413C' }}>loading…</p>
+          </div>
         ) : tracks.length === 0 ? (
           <p className="text-xs" style={{ fontFamily: "'Barlow Semi Condensed', sans-serif", color: '#4A413C' }}>No downloaded tracks yet.</p>
         ) : (

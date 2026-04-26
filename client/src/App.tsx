@@ -9,6 +9,7 @@ import ContextMenuRenderer from './components/ContextMenuRenderer'
 import './index.css'
 import { lazy, Suspense } from 'react'
 import RouteErrorBoundary from './components/RouteErrorBoundary'
+import { PollyLoading } from './components/PollyLoading'
 
 const Home = lazy(() => import('./pages/Home'))
 const Search = lazy(() => import('./pages/Search'))
@@ -27,8 +28,9 @@ function ContextMenuLayer() {
 
 function LoadingSpinner() {
   return (
-    <div className="flex items-center justify-center h-full" style={{ color: '#4A413C', fontFamily: "'Space Mono', monospace" }}>
-      loading...
+    <div className="flex flex-col items-center justify-center gap-3 h-full" style={{ color: '#4A413C', fontFamily: "'Space Mono', monospace" }}>
+      <PollyLoading size={56} />
+      <span className="text-xs">loading…</span>
     </div>
   )
 }

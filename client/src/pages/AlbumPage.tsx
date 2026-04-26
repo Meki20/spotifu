@@ -11,6 +11,7 @@ import { useDownloadStates } from '../hooks/useDownloadStates'
 import { useArtistPrefetch } from '../hooks/useArtistPrefetch'
 import ContextMenu from '../components/ContextMenu'
 import { toTrack, formatDuration } from '../utils/trackHelpers'
+import { PollyLoading } from '../components/PollyLoading'
 
 interface ContextMenuState {
   x: number
@@ -96,8 +97,9 @@ export default function AlbumPage() {
 
   if (isLoading) {
     return (
-      <div className="p-6" style={{ color: '#4A413C', fontFamily: "'Space Mono', monospace" }}>
-        Loading…
+      <div className="p-6 flex flex-col items-center gap-3" style={{ color: '#4A413C', fontFamily: "'Space Mono', monospace" }}>
+        <PollyLoading size={48} />
+        <span className="text-sm">loading…</span>
       </div>
     )
   }

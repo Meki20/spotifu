@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { X } from 'lucide-react'
 import { fetchPlaylistsList, addTrackToPlaylist, type PlaylistSummary } from '../api/playlists'
+import { PollyLoading } from './PollyLoading'
 
 const modalShell = {
   overlay: { background: 'rgba(0,0,0,0.75)' } as const,
@@ -200,7 +201,10 @@ export default function AddToPlaylistModal({
         )}
         <ul className="max-h-72 overflow-y-auto py-1">
           {isLoading && (
-            <li className="px-4 py-3 text-sm" style={{ color: '#4A413C', fontFamily: "'Space Mono', monospace" }}>Loading…</li>
+            <li className="px-4 py-3 flex items-center gap-2 text-sm" style={{ color: '#4A413C', fontFamily: "'Space Mono', monospace" }}>
+              <PollyLoading size={24} />
+              <span>loading…</span>
+            </li>
           )}
           {!isLoading && (!playlists || playlists.length === 0) && (
             <li className="px-4 py-3 text-sm" style={{ color: '#4A413C', fontFamily: "'Barlow Semi Condensed', sans-serif" }}>No playlists. Create one in the library.</li>

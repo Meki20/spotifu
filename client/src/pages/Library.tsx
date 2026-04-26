@@ -9,6 +9,7 @@ import type { LibraryAlbum } from '../components/AlbumTrackPanel'
 import UploadPlaylistModal from '../components/UploadPlaylistModal'
 import { GripVertical, X } from 'lucide-react'
 import { useContextMenuActions } from '../contexts/ContextMenuProvider'
+import { PollyLoading } from '../components/PollyLoading'
 
 interface Playlist {
   id: number
@@ -251,7 +252,10 @@ export default function Library() {
           )}
         </div>
         {!libraryAlbums ? (
-          <div className="text-sm" style={{ color: '#4A413C', fontFamily: "'Space Mono', monospace" }}>Loading...</div>
+          <div className="flex items-center gap-2 text-sm" style={{ color: '#4A413C', fontFamily: "'Space Mono', monospace" }}>
+            <PollyLoading size={28} />
+            <span>loading…</span>
+          </div>
         ) : libraryAlbums.length === 0 ? (
           <div className="text-sm" style={{ color: '#4A413C', fontFamily: "'Space Mono', monospace" }}>no cached albums yet</div>
         ) : (
@@ -346,7 +350,10 @@ export default function Library() {
         )}
 
         {loadingPlaylists && (
-          <div className="text-sm" style={{ color: '#4A413C', fontFamily: "'Space Mono', monospace" }}>Loading...</div>
+          <div className="flex items-center gap-2 text-sm mb-2" style={{ color: '#4A413C', fontFamily: "'Space Mono', monospace" }}>
+            <PollyLoading size={28} />
+            <span>loading…</span>
+          </div>
         )}
         {!loadingPlaylists && playlists?.length === 0 && (
           <div className="text-sm" style={{ color: '#4A413C', fontFamily: "'Space Mono', monospace" }}>no playlists yet</div>

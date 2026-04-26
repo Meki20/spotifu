@@ -1,6 +1,7 @@
 import { memo } from 'react'
 import { Play } from 'lucide-react'
 import { displayArtist } from '../utils/trackHelpers'
+import { PollyLoading } from './PollyLoading'
 
 interface TrackRowProps {
   track: any
@@ -106,12 +107,19 @@ const TrackRowImpl = ({
       {/* Status / duration */}
       {showStatus && (
         <span
-          className="text-sm flex items-center justify-end"
+          className="text-sm flex items-center justify-end gap-1.5"
           style={{ fontFamily: "'Barlow Semi Condensed', monospace", color: '#4A413C' }}
         >
-          {downloadState?.status === 'downloading'
-            ? `${downloadState.percent || 0}%`
-            : isCached ? '✓' : '—'}
+          {downloadState?.status === 'downloading' ? (
+            <>
+              <PollyLoading size={18} />
+              <span>{downloadState.percent ?? 0}%</span>
+            </>
+          ) : isCached ? (
+            '✓'
+          ) : (
+            '—'
+          )}
         </span>
       )}
     </div>

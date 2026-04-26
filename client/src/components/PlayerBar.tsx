@@ -11,6 +11,8 @@ import {
 import type { RepeatMode } from '../stores/playerStore'
 import AddToPlaylistModal, { type AddToPlaylistTrack } from './AddToPlaylistModal'
 import { displayArtist } from '../utils/trackHelpers'
+import { useDownloadStates } from '../hooks/useDownloadStates'
+import { PollyLoading } from './PollyLoading'
 
 interface ContextMenu {
   x: number
@@ -57,6 +59,7 @@ export default function PlayerBar() {
   const [addPlTrack, setAddPlTrack] = useState<AddToPlaylistTrack | null>(null)
   const [liked, setLiked] = useState(false)
   const progressRef = useRef<HTMLDivElement>(null)
+  const { downloadStates } = useDownloadStates()
 
   useEffect(() => {
     if (!contextMenu) return
@@ -116,6 +119,11 @@ export default function PlayerBar() {
       </div>
     )
   }
+
+  const mbId = currentTrack.mb_id
+  const isDownloadingCurrent =
+    Boolean(mbId && downloadStates[mbId]?.status === 'downloading')
+  const showMascotInsteadOfHeart = isBuffering || isDownloadingCurrent
 
   return (
     <>
@@ -182,13 +190,24 @@ export default function PlayerBar() {
             </p>
           </div>
 
-          {/* Heart */}
+          {/* Heart (Polly while buffering / downloading until playback is ready) */}
           <button
-            onClick={() => setLiked(!liked)}
-            className="shrink-0"
-            style={{ color: liked ? '#8B2A1A' : '#4A413C' }}
+            type="button"
+            onClick={() => !showMascotInsteadOfHeart && setLiked(!liked)}
+            className="shrink-0 w-7 h-7 flex items-center justify-center"
+            disabled={showMascotInsteadOfHeart}
+            title={showMascotInsteadOfHeart ? 'Loading…' : liked ? 'Unlike' : 'Like'}
+            style={{
+              color: liked ? '#8B2A1A' : '#4A413C',
+              opacity: showMascotInsteadOfHeart ? 1 : undefined,
+              cursor: showMascotInsteadOfHeart ? 'default' : 'pointer',
+            }}
           >
-            <Heart size={14} fill={liked ? '#8B2A1A' : 'none'} />
+            {showMascotInsteadOfHeart ? (
+              <PollyLoading size={26} />
+            ) : (
+              <Heart size={14} fill={liked ? '#8B2A1A' : 'none'} />
+            )}
           </button>
         </div>
 

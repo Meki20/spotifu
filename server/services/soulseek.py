@@ -14,8 +14,6 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
-import time
-import logging
 import math
 import os
 import re
@@ -670,24 +668,16 @@ def _clean_query(q: str) -> str:
     return " ".join(q.split())
 
 
-def _build_query_variants(artist: str, title: str) -> List[str]:
-    """Progressive fallbacks; Soulseek does strict AND on terms, so drop noisy
-    words. Duplicates removed while preserving order."""
+def _strict_soulseek_query(artist: str, title: str) -> str:
+    """Single strict query: cleaned artist + title (Soulseek ANDs tokens)."""
     artist = _clean_query(artist)
     title = _clean_query(title)
-    first = artist.split(" ", 1)[0] if artist else ""
+    return f"{artist} {title}".strip()
 
-    variants = [
-        f"{artist} {title}".strip(),
-        f"{first} {title}".strip() if first else "",
-        title,
-    ]
-    seen, out = set(), []
-    for v in variants:
-        if v and v.lower() not in seen:
-            seen.add(v.lower())
-            out.append(v)
-    return out
+
+def _title_only_fallback_query(title: str) -> str:
+    """Looser fallback: title tokens only. Empty if title is blank after clean."""
+    return _clean_query(title).strip()
 
 
 async def search_track(
@@ -696,16 +686,19 @@ async def search_track(
     album: str = "",
     timeout: float = 30.0,
 ) -> List[Tuple[str, str, int]]:
-    """Search with progressive-fallback query shapes. Returns first non-empty."""
-    variants = _build_query_variants(artist, title)
-    logger.debug("Query variants to try: %s", variants)
-    for q in variants:
-        logger.debug("Trying query: %r", q)
-        hits = await search_soulseek(q, timeout=timeout, artist=artist, title=title, album=album)
+    """One strict `artist title` search; title-only if that returns no hits."""
+    strict_q = _strict_soulseek_query(artist, title)
+    if strict_q:
+        logger.debug("Soulseek search_track strict query: %r", strict_q)
+        hits = await search_soulseek(strict_q, timeout=timeout, artist=artist, title=title, album=album)
         if hits:
-            logger.debug("Query %r returned %d hits", q, len(hits))
             return hits
-        logger.debug("Query %r returned 0 hits, trying next variant", q)
+    tq = _title_only_fallback_query(title)
+    if tq and (not strict_q or tq.lower() != strict_q.lower()):
+        logger.debug("Soulseek search_track title-only fallback: %r", tq)
+        hits = await search_soulseek(tq, timeout=timeout, artist=artist, title=title, album=album)
+        if hits:
+            return hits
     return []
 
 
@@ -715,22 +708,67 @@ async def search_track_with_variants(
     album: str = "",
     timeout: float = 30.0,
 ) -> List[Tuple[str, List[Tuple[str, str, int]]]]:
-    """Search across all query variants and return per-variant ranked hits.
+    """Strict search first; title-only search only if strict returns zero hits.
 
-    Unlike `search_track()`, this does not stop at the first non-empty variant.
-    This lets callers fall back to alternative query shapes if the first variant
-    returns only a few candidates that later fail to download.
+    Callers that exhaust strict hits on download can run `search_title_fallback_hits`
+    for a second Soulseek query without paying for title-only up front.
     """
-    variants = _build_query_variants(artist, title)
+    strict_q = _strict_soulseek_query(artist, title)
     out: List[Tuple[str, List[Tuple[str, str, int]]]] = []
-    for q in variants:
+    if not strict_q:
+        tq = _title_only_fallback_query(title)
+        if not tq:
+            return []
         try:
-            hits = await search_soulseek(q, timeout=timeout, artist=artist, title=title, album=album)
+            hits = await search_soulseek(tq, timeout=timeout, artist=artist, title=title, album=album)
         except Exception:
-            logger.debug("Variant search failed for query=%r", q, exc_info=True)
+            logger.debug("Title-only search failed for query=%r", tq, exc_info=True)
             hits = []
-        out.append((q, hits))
+        return [(tq, hits)]
+
+    try:
+        strict_hits = await search_soulseek(
+            strict_q, timeout=timeout, artist=artist, title=title, album=album
+        )
+    except Exception:
+        logger.debug("Strict search failed for query=%r", strict_q, exc_info=True)
+        strict_hits = []
+    out.append((strict_q, strict_hits))
+
+    if strict_hits:
+        return out
+
+    tq = _title_only_fallback_query(title)
+    if tq and tq.lower() != strict_q.lower():
+        try:
+            title_hits = await search_soulseek(tq, timeout=timeout, artist=artist, title=title, album=album)
+        except Exception:
+            logger.debug("Title-only search failed for query=%r", tq, exc_info=True)
+            title_hits = []
+        out.append((tq, title_hits))
     return out
+
+
+async def search_title_fallback_hits(
+    artist: str,
+    title: str,
+    album: str = "",
+    timeout: float = 30.0,
+) -> Tuple[str, List[Tuple[str, str, int]]]:
+    """Title-only Soulseek search when strict already ran (e.g. strict had hits but downloads failed).
+
+    Returns ``("", [])`` if title-only would duplicate the strict query or is empty.
+    """
+    strict_q = _strict_soulseek_query(artist, title)
+    tq = _title_only_fallback_query(title)
+    if not tq or (strict_q and tq.lower() == strict_q.lower()):
+        return ("", [])
+    try:
+        hits = await search_soulseek(tq, timeout=timeout, artist=artist, title=title, album=album)
+    except Exception:
+        logger.debug("search_title_fallback_hits failed for query=%r", tq, exc_info=True)
+        hits = []
+    return (tq, hits)
 
 
 async def search_soulseek(
@@ -770,69 +808,72 @@ async def search_soulseek(
     _SEARCH_MAX_PEERS = 100   # stop early once we have enough peer responses
     _EXCELLENT_CHECK_INTERVAL = 0.25  # poll for excellent results every N seconds
 
-    # Track seen files to avoid duplicates across result batches
     seen_files: set[tuple[str, str]] = set()
     excellent_result: List[Tuple[str, str, int]] | None = None
-    # Track rough availability for similar filenames across peers.
-    avail_counts: dict[str, int] = {}
+    avail_by_key: Counter[str] = Counter()
+    _candidate_rows: list[tuple[Any, Any, int, str, str]] = []  # (r, f, size, ext, akey)
+
+    def _ingest_new_results() -> None:
+        """Append new audio candidates from the live request (same filters as final rank)."""
+        for r in request.results:
+            if (r.avg_speed or 0) < _MIN_RELAY_SPEED:
+                continue
+            for f in r.shared_items:
+                size = int(f.filesize or 0)
+                if size < _MIN_AUDIO_BYTES:
+                    continue
+                ext = _effective_ext(f)
+                if not ext or ext in _IMAGE_EXTS or ext not in _AUDIO_EXTS:
+                    continue
+                file_key = (r.username, f.filename)
+                if file_key in seen_files:
+                    continue
+                seen_files.add(file_key)
+                akey = _availability_key(f.filename or "")
+                _candidate_rows.append((r, f, size, ext, akey))
+                avail_by_key[akey] += 1
 
     async def _collect_results():
         nonlocal excellent_result
         elapsed = 0.0
         interval = _EXCELLENT_CHECK_INTERVAL
-        last_check = 0.0
 
         while elapsed < collect_for:
+            _ingest_new_results()
+
+            # Re-score all candidates each tick so availability + excellent detection stay fresh.
             best_excellent: tuple[float, str, str, int] | None = None
-            # Check for new results and score them
-            for r in request.results:
-                for f in r.shared_items:
-                    size = int(f.filesize or 0)
-                    if size < _MIN_AUDIO_BYTES:
-                        continue
-                    ext = _effective_ext(f)
-                    if not ext or ext in _IMAGE_EXTS or ext not in _AUDIO_EXTS:
-                        continue
-                    file_key = (r.username, f.filename)
-                    if file_key in seen_files:
-                        continue
-                    seen_files.add(file_key)
-
-                    akey = _availability_key(f.filename or "")
-                    avail_counts[akey] = avail_counts.get(akey, 0) + 1
-                    availability = avail_counts.get(akey, 1)
-
-                    score = _score_file(r, f, artist, title, album, availability=availability)
-                    # Only consider early-exit once we've collected a bit (avoid "fast find" bias),
-                    # and only if the peer is likely to start downloading immediately.
-                    if (
-                        elapsed >= _EXCELLENT_MIN_COLLECT
-                        and getattr(r, "has_free_slots", False)
-                        and int(r.avg_speed or 0) >= _EXCELLENT_MIN_SPEED
-                        and (ext == "flac")
-                        and score >= _EXCELLENT_THRESHOLD
-                    ):
-                        cand = (score, r.username, f.filename, size)
-                        if best_excellent is None or cand[0] > best_excellent[0]:
-                            best_excellent = cand
+            for r, f, size, ext, akey in _candidate_rows:
+                availability = int(avail_by_key[akey] or 1)
+                score = _score_file(r, f, artist, title, album, availability=availability)
+                if (
+                    elapsed >= _EXCELLENT_MIN_COLLECT
+                    and getattr(r, "has_free_slots", False)
+                    and int(r.avg_speed or 0) >= _EXCELLENT_MIN_SPEED
+                    and ext == "flac"
+                    and score >= _EXCELLENT_THRESHOLD
+                ):
+                    cand = (score, r.username, f.filename, size)
+                    if best_excellent is None or cand[0] > best_excellent[0]:
+                        best_excellent = cand
 
             if best_excellent is not None:
                 score, user, path, size = best_excellent
+                akey_log = _availability_key(path or "")
                 logger.info(
                     "EXCELLENT result: score=%.3f elapsed=%.2fs user=%r ext=%r availability=%d path=%r size=%d",
                     score, elapsed, user,
-                    (path.rsplit('.', 1)[-1].lower() if '.' in path else ''),
-                    avail_counts.get(_availability_key(path), 1),
+                    (path.rsplit(".", 1)[-1].lower() if "." in path else ""),
+                    int(avail_by_key[akey_log] or 1),
                     path, size,
                 )
                 excellent_result = [(user, path, size)]
-                return  # early exit
+                return
 
             if len(request.results) >= _SEARCH_MAX_PEERS:
                 logger.debug("Got %d peers, stopping early", len(request.results))
                 break
 
-            # Only sleep if no excellent result found
             await asyncio.sleep(interval)
             elapsed += interval
 
@@ -855,23 +896,8 @@ async def search_soulseek(
         logger.debug("Returning excellent result immediately (score >= %s)", _EXCELLENT_THRESHOLD)
         return excellent_result
 
-    # Full ranking: one walk of results, collect candidates, then score with final availability counts
-    _candidate_rows: list[tuple[Any, Any, int, str, str]] = []  # (r, f, size, ext, akey)
-    for r in request.results:
-        if (r.avg_speed or 0) < _MIN_RELAY_SPEED:
-            continue
-        for f in r.shared_items:
-            size = int(f.filesize or 0)
-            if size < _MIN_AUDIO_BYTES:
-                continue
-            ext = _effective_ext(f)
-            if not ext or ext in _IMAGE_EXTS or ext not in _AUDIO_EXTS:
-                continue
-            akey = _availability_key(f.filename or "")
-            _candidate_rows.append((r, f, size, ext, akey))
-
-    avail_by_key: Counter[str] = Counter(akey for *_, akey in _candidate_rows)
-
+    # Final ranking from the same candidate list (no second full scan of raw results).
+    _ingest_new_results()
     _scored_hits: List[Tuple[float, str, str, int]] = []
     for r, f, size, _ext, akey in _candidate_rows:
         availability = int(avail_by_key[akey] or 1)

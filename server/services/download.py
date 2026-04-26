@@ -24,7 +24,14 @@ async def download_track_background(track_id: int, title: str, artist: str, albu
 
 
 async def _run_download(track_id: int, title: str, artist: str, album: str = "", mb_id: str | None = None, duration: int = 0):
-    from services.soulseek import search_track_with_variants, download_file, set_progress_callback, remove_progress_callback, set_inflight_filesize
+    from services.soulseek import (
+        search_track_with_variants,
+        search_title_fallback_hits,
+        download_file,
+        set_progress_callback,
+        remove_progress_callback,
+        set_inflight_filesize,
+    )
     from main import ws_manager
     from sqlmodel import select
 
@@ -107,12 +114,20 @@ async def _run_download(track_id: int, title: str, artist: str, album: str = "",
         last_in_queue = _is_last_fetching_track()
 
         MAX_ATTEMPTS_PER_VARIANT = 3
-        local_path = None
-        for variant_idx, (variant_query, results) in enumerate(variant_results):
-            if not results:
-                continue
-            logger.debug("Trying variant %d/%d query=%r hits=%d", variant_idx + 1, len(variant_results), variant_query, len(results))
 
+        async def attempt_downloads(
+            variant_idx: int,
+            variant_query: str,
+            results: list[tuple[str, str, int]],
+        ) -> str | None:
+            if not results:
+                return None
+            logger.debug(
+                "Trying Soulseek variant slot=%d query=%r hits=%d",
+                variant_idx + 1,
+                variant_query,
+                len(results),
+            )
             attempt_rows = results[:MAX_ATTEMPTS_PER_VARIANT]
             only_candidate = len(attempt_rows) <= 1
             for i, (username, remote_path, file_size) in enumerate(attempt_rows):
@@ -130,29 +145,41 @@ async def _run_download(track_id: int, title: str, artist: str, album: str = "",
                     logger.warning("Skipping non-audio Soulseek candidate: %s/%s", username, remote_path)
                     continue
                 if variant_idx > 0 or i > 0:
-                    logger.info(f"Soulseek retry: {remote_path} from {username} ({file_size} bytes)")
+                    logger.info("Soulseek retry: %s from %s (%s bytes)", remote_path, username, file_size)
                 try:
-                    # Stall abort is useful when there are other candidates to try.
-                    # If this is the only candidate, or we're effectively at the end of the queue,
-                    # don't self-abort — let it run its full course.
                     abort_on_no_progress = not (only_candidate or last_in_queue)
-
-                    local_path = await download_file(
+                    got = await download_file(
                         username,
                         remote_path,
                         timeout=600.0,
                         track_id=track_id,
                         abort_on_no_progress=abort_on_no_progress,
                     )
-                    if local_path:
-                        logger.info("Download succeeded: %s", local_path)
-                        break
+                    if got:
+                        logger.info("Download succeeded: %s", got)
+                        return got
                     logger.debug("Download returned None for %s/%s, trying next", username, remote_path)
                 except Exception as e:
                     logger.warning("Download attempt failed for %s/%s: %s", username, remote_path, e)
                     continue
+            return None
+
+        local_path: str | None = None
+        for variant_idx, (variant_query, results) in enumerate(variant_results):
+            local_path = await attempt_downloads(variant_idx, variant_query, results)
             if local_path:
                 break
+
+        # Strict search returned hits but every download failed — try title-only once.
+        if not local_path and len(variant_results) == 1 and variant_results[0][1]:
+            tq, fb_hits = await search_title_fallback_hits(artist, title, album=album, timeout=30.0)
+            if fb_hits:
+                logger.info(
+                    "Soulseek title-only fallback after strict failures query=%r hits=%d",
+                    tq,
+                    len(fb_hits),
+                )
+                local_path = await attempt_downloads(1, tq, fb_hits)
 
         if local_path:
             status = TrackStatus.READY

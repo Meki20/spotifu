@@ -54,6 +54,24 @@ input, button {
   font-size: 17px;
 }
 
+/* Prevent default browser focus outlines from flashing during layout animations.
+   Re-add a consistent focus indicator only for keyboard navigation. */
+a:focus,
+button:focus {
+  outline: none;
+}
+a:focus-visible,
+button:focus-visible {
+  outline: 2px solid var(--red);
+  outline-offset: 2px;
+}
+
+/* Avoid mobile/Chromium tap highlight flashes during layout animations */
+a,
+button {
+  -webkit-tap-highlight-color: transparent;
+}
+
 ::-webkit-scrollbar {
   width: 4px;
   height: 4px;

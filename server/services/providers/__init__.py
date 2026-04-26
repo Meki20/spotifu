@@ -1,3 +1,4 @@
+import asyncio
 import copy
 import json
 import logging
@@ -208,38 +209,13 @@ class MetadataService:
         return result
 
     async def get_artist_head(self, artist_id: str) -> dict[str, Any] | None:
+        """Return artist identity and empty ``top_tracks`` from one MB call; no fanart/DDG (use ``load_artist_visuals``)."""
         cached = _cache_get(_artist_head_cache, "artist_head", artist_id)
         if cached is not None:
             logger.debug(f"[providers] get_artist_head {artist_id}: cache hit")
-            # artist_head is persisted; DDG (and other) rows may exist in mb_entity_cache while head still has nulls.
-            # Only re-run fallback when something is worth reading (avoids fanart HTTP for artists with no visuals).
-            if not cached.get("picture") and not cached.get("banner"):
-                name = cached.get("name")
-                has_visual_cache = bool(
-                    _db_get("cover_fanart_artist", artist_id)
-                    or _db_get("cover_audiodb_artist", artist_id)
-                    or (
-                        name
-                        and (
-                            _db_get("cover_ddg_thumb", name)
-                            or _db_get("cover_ddg_banner", name)
-                        )
-                    )
-                )
-                if has_visual_cache:
-                    fanart = await self._get_fanart_fallback(artist_id)
-                    if fanart.get("thumb") or fanart.get("banner"):
-                        merged = {
-                            **cached,
-                            "picture": fanart.get("thumb") or cached.get("picture"),
-                            "banner": fanart.get("banner") or cached.get("banner"),
-                        }
-                        _cache_set(_artist_head_cache, "artist_head", artist_id, merged)
-                        return merged
             return cached
         logger.debug(f"[providers] get_artist_head {artist_id}: cache miss, fetching from provider")
 
-        # Get artist data from MusicBrainz (name, top_tracks)
         detected = self._detect_provider(artist_id)
         result: dict[str, Any] | None = None
         if detected:
@@ -257,58 +233,87 @@ class MetadataService:
             logger.debug(f"[providers] get_artist_head {artist_id}: provider returned nothing")
             return None
 
-        # Get artist images from fanart.tv
-        fanart = await self._get_fanart_fallback(artist_id)
-        result["picture"] = fanart.get("thumb")
-        result["banner"] = fanart.get("banner")
-        logger.debug(f"[providers] get_artist_head {artist_id}: fanart thumb={result['picture'] is not None} banner={result['banner'] is not None}")
-
+        if "top_tracks" not in result or not isinstance(result.get("top_tracks"), list):
+            result["top_tracks"] = []
         _cache_set(_artist_head_cache, "artist_head", artist_id, result)
+        _cache_set(_artist_cache, "artist", artist_id, result)
         return result
 
-    async def _get_fanart_fallback(self, artist_id: str) -> dict[str, Any]:
-        """Fetch artist images from fanart.tv, then theaudiodb, then default thumb/banner from DDG as needed.
+    async def load_artist_visuals(self, artist_id: str, *, artist_name: str | None) -> dict[str, Any]:
+        """Fetch fanart, TheAudioDB, and DDG in parallel; fills entity caches. Returns best banner + thumb."""
+        return await self._get_fanart_fallback(artist_id, artist_name=artist_name)
 
-        DDG is always run when we have a MusicBrainz artist name so results are cached for the
-        image picker pool (banners/thumbs in ``/artist/{id}/images``), not only when other sources
-        are empty.
+    async def _get_fanart_fallback(self, artist_id: str, *, artist_name: str | None = None) -> dict[str, Any]:
+        """Fetch artist images: fanart, TheAudioDB, and DDG run in parallel (no MusicBrainz).
+
+        Each provider writes its own DB cache. Primary ``banner``/``thumb`` follow fanart →
+        theaudiodb → DDG. ``artist_name`` is used for DDG; if missing, one lite ``get_artist_head``
+        call on the provider resolves the name.
         """
         try:
-            artist_name: str | None = None
-            try:
-                detected = self._detect_provider(artist_id)
-                if detected:
-                    _, provider = detected
-                    mb_result = await provider.get_artist(artist_id)
-                    artist_name = mb_result.get("name") if mb_result else None
-            except Exception:
-                logger.debug("_get_fanart_fallback get_artist (ignored)", exc_info=True)
+            name = (artist_name or "").strip() or None
+            if not name:
+                try:
+                    detected = self._detect_provider(artist_id)
+                    if detected:
+                        _, provider = detected
+                        fn = getattr(provider, "get_artist_head", None) or getattr(provider, "get_artist", None)
+                        if fn:
+                            mb_result = await fn(artist_id)
+                            name = (mb_result.get("name") or "").strip() or None if mb_result else None
+                except Exception:
+                    logger.debug("_get_fanart_fallback get_artist_head (ignored)", exc_info=True)
 
             from services.soulseek import get_secrets_data
             api_key = get_secrets_data().get("fanarttv_api_key", "")
             logger.debug(f"[providers] _get_fanart_fallback {artist_id}: api_key present={bool(api_key)}")
 
+            async def do_fanart() -> Any:
+                if not api_key:
+                    return None
+                return await fanarttv.get_artist_images(artist_id, api_key)
+
+            async def do_audiodb() -> Any:
+                return await audiodb.get_artist_images(artist_id)
+
+            async def do_ddg_thumb() -> Any:
+                if not name:
+                    return None
+                return await ddg.search_artist_thumb(name)
+
+            async def do_ddg_banner() -> Any:
+                if not name:
+                    return None
+                return await ddg.search_artist_banner(name)
+
+            f_r, a_r, dt_r, db_r = await asyncio.gather(
+                do_fanart(),
+                do_audiodb(),
+                do_ddg_thumb(),
+                do_ddg_banner(),
+                return_exceptions=True,
+            )
+
+            def _unwrap(x: Any) -> Any:
+                if isinstance(x, Exception):
+                    logger.debug("_get_fanart_fallback subtask: %s", x)
+                    return None
+                return x
+
+            f_r, a_r, dt_r, db_r = _unwrap(f_r), _unwrap(a_r), _unwrap(dt_r), _unwrap(db_r)
+
             banner: str | None = None
             thumb: str | None = None
-            if api_key:
-                result = await fanarttv.get_artist_images(artist_id, api_key)
-                if result:
-                    banner = result.get("banner")
-                    thumb = result.get("thumb")
-
-            if not (banner or thumb):
-                result = await audiodb.get_artist_images(artist_id)
-                if result:
-                    banner = banner or result.get("banner")
-                    thumb = thumb or result.get("thumb")
-
-            if artist_name:
-                ddg_thumb = await ddg.search_artist_thumb(artist_name)
-                ddg_banner = await ddg.search_artist_banner(artist_name)
-                if not thumb and ddg_thumb:
-                    thumb = ddg_thumb.get("thumb")
-                if not banner and ddg_banner:
-                    banner = ddg_banner.get("thumb")
+            if f_r and isinstance(f_r, dict):
+                banner = f_r.get("banner")
+                thumb = f_r.get("thumb")
+            if a_r and isinstance(a_r, dict):
+                banner = banner or a_r.get("banner")
+                thumb = thumb or a_r.get("thumb")
+            if isinstance(dt_r, dict) and dt_r.get("thumb") and not thumb:
+                thumb = dt_r.get("thumb")
+            if isinstance(db_r, dict) and db_r.get("thumb") and not banner:
+                banner = db_r.get("thumb")
             return {"banner": banner, "thumb": thumb}
         except Exception as e:
             logger.warning(f"[providers] _get_fanart_fallback {artist_id}: exception={e}")

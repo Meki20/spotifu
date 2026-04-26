@@ -1,17 +1,11 @@
 import { useState, useRef, useEffect } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { useParams, useNavigate } from 'react-router-dom'
-import { usePlayerStore } from '../stores/playerStore'
 import { useAuthStore } from '../stores/authStore'
 import { Play, ChevronLeft, ChevronRight, Pencil } from 'lucide-react'
-import * as controller from '../playback/controller'
 import { API, authFetch } from '../api'
-import { requestMbDownload } from '../stores/downloadBusyStore'
-import { useDownloadStates } from '../hooks/useDownloadStates'
 import { useArtistPrefetch } from '../hooks/useArtistPrefetch'
-import ContextMenu from '../components/ContextMenu'
 import ImagePickerModal from '../components/ImagePickerModal'
-import { toTrack } from '../utils/trackHelpers'
 import { PollyLoading } from '../components/PollyLoading'
 
 function AlbumSkeleton() {
@@ -198,22 +192,12 @@ function HorizontalAlbumStrip({
   )
 }
 
-interface ContextMenu {
-  x: number
-  y: number
-  track: any
-}
-
 export default function ArtistPage() {
   const { artistId } = useParams<{ artistId: string }>()
   const navigate = useNavigate()
   const token = useAuthStore((s) => s.token)
-  const { currentTrack } = usePlayerStore()
-  const [contextMenu, setContextMenu] = useState<ContextMenu | null>(null)
   const [sortField, setSortField] = useState<'year' | 'alpha'>('year')
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc')
-
-  const { downloadStates, cachedMbIds } = useDownloadStates()
 
   const [showImagePicker, setShowImagePicker] = useState(false)
 
@@ -307,26 +291,6 @@ export default function ArtistPage() {
     enqueueAlbumsIdle(artistId, ids.slice(0, 8))
   }, [artistId, albumsData?.albums, enqueueAlbumsIdle])
 
-  function downloadTrack(track: any) {
-    if (!track?.mb_id) return
-    requestMbDownload(authFetch, track.mb_id).catch(console.error)
-  }
-
-  function handleContextMenu(e: React.MouseEvent, track: any) {
-    e.preventDefault()
-    setContextMenu({ x: e.clientX, y: e.clientY, track })
-  }
-
-  function playTrack(track: any) {
-    controller.play(toTrack(track, {
-      artist: artist?.name ?? '',
-      album: track.album ?? '',
-      album_cover: track.album_cover ?? null,
-      mb_release_id: track.mb_release_id ?? null,
-      mb_artist_id: artist?.mb_id ?? null,
-    }))
-  }
-
   if (isLoading) {
     return (
       <div className="p-6 flex flex-col items-center gap-3 text-[#b3b3b3]">
@@ -367,7 +331,7 @@ export default function ArtistPage() {
   const pictureUrl = artistImages?.thumb || artist.picture
 
   return (
-    <div onClick={() => setContextMenu(null)}>
+    <div>
       {/* Header with banner + artist image */}
       <div
         className="relative flex items-end gap-6 p-6 overflow-hidden"
@@ -391,14 +355,19 @@ export default function ArtistPage() {
           <Pencil size={16} />
         </button>
 
-        {/* Artist image - smaller circular, beside name */}
-        {pictureUrl && (
+        {/* Artist image — placeholder until /images + fanart/DDG return */}
+        {pictureUrl ? (
           <img
             src={pictureUrl}
             alt={artist.name}
             className="w-40 h-40 rounded-full shadow-xl object-cover shrink-0 relative z-10 border-2 border-[#383838]"
             loading="lazy"
             style={{ borderColor: '#2A2A2A' }}
+          />
+        ) : (
+          <div
+            className="w-40 h-40 rounded-full shrink-0 relative z-10 border-2 border-[#2A2A2A] bg-[#282828] animate-pulse"
+            aria-hidden
           />
         )}
         <div className="relative z-10">
@@ -410,49 +379,27 @@ export default function ArtistPage() {
         </div>
       </div>
 
-      {/* Popular tracks */}
-      {artist.top_tracks?.length > 0 && (
-        <div className="px-6 py-4">
-          <h2 className="text-xl font-bold text-white mb-4">Popular</h2>
-          <div className="text-[#b3b3b3] text-xs grid grid-cols-[auto_1fr_1fr_auto] gap-4 py-2 border-b border-[#282828] mb-1">
-            <span className="w-8 text-center">#</span>
-            <span>Title</span>
-            <span>Album</span>
-            <span className="text-right">Duration</span>
-          </div>
-          {artist.top_tracks.map((track: any, i: number) => {
-            const isCurrentlyPlaying = currentTrack?.mb_id === track.mb_id
-            const mbid = track.mb_id || ''
-            const isCached = Boolean(track.is_cached) || (mbid !== '' && cachedMbIds.has(mbid))
-            const isDownloading = mbid ? downloadStates[mbid]?.status === 'downloading' : false
-            const downloadPercent = mbid ? downloadStates[mbid]?.percent : undefined
-            return (
-              <div
-                key={track.mb_id || i}
-                className="grid grid-cols-[auto_1fr_1fr_auto] gap-4 py-2 items-center hover:bg-[#282828] rounded cursor-pointer group"
-                onClick={() => playTrack(track)}
-                onContextMenu={(e) => handleContextMenu(e, track)}
-              >
-                <div className="relative w-8 h-8 shrink-0 flex items-center justify-center">
-                  <span className="text-[#b3b3b3] text-sm tabular-nums group-hover:hidden">{i + 1}</span>
-                  <span className="absolute inset-0 hidden group-hover:flex items-center justify-center text-[#b4003e]">
-                    <Play size={14} fill="currentColor" className="shrink-0" />
-                  </span>
-                </div>
-                <div className="min-w-0">
-                  <p className={`text-sm truncate ${isCurrentlyPlaying ? 'text-[#b4003e]' : !isCached ? 'text-[#6a6a6a]' : 'text-white'}`}>
-                    {track.title}
-                  </p>
-                </div>
-                <span className="text-xs text-[#b3b3b3] truncate flex items-center">{track.album}</span>
-                <span className="text-xs text-[#b3b3b3] flex items-center tabular-nums">
-                  {isDownloading ? `${downloadPercent ?? 0}%` : '—'}
-                </span>
-              </div>
-            )
-          })}
+      {/* Popular — top tracks will be a dedicated endpoint later */}
+      <div className="px-6 py-4">
+        <h2 className="text-xl font-bold text-white mb-4">Popular</h2>
+        <div className="text-[#b3b3b3] text-xs grid grid-cols-[auto_1fr_1fr_auto] gap-4 py-2 border-b border-[#282828] mb-1">
+          <span className="w-8 text-center">#</span>
+          <span>Title</span>
+          <span>Album</span>
+          <span className="text-right">Duration</span>
         </div>
-      )}
+        {Array.from({ length: 5 }).map((_, i) => (
+          <div
+            key={i}
+            className="grid grid-cols-[auto_1fr_1fr_auto] gap-4 py-2.5 items-center"
+          >
+            <div className="w-8 h-4 bg-[#282828] rounded animate-pulse" />
+            <div className="h-4 bg-[#282828] rounded animate-pulse max-w-[60%]" />
+            <div className="h-4 bg-[#282828] rounded animate-pulse max-w-[50%]" />
+            <div className="h-4 bg-[#282828] rounded animate-pulse w-8 justify-self-end" />
+          </div>
+        ))}
+      </div>
 
       {/* Discography */}
       <div className="px-6 py-4">
@@ -567,23 +514,6 @@ export default function ArtistPage() {
           </div>
         )}
       </div>
-
-      {contextMenu && (
-        <ContextMenu
-          x={contextMenu.x}
-          y={contextMenu.y}
-          track={{ ...contextMenu.track, artist: artist?.name ?? '' }}
-          onPlay={() => { playTrack(contextMenu.track); setContextMenu(null) }}
-          onDownload={() => { downloadTrack(contextMenu.track); setContextMenu(null) }}
-          onAddToQueue={() => { controller.addToQueue(toTrack(contextMenu.track)); setContextMenu(null) }}
-          onGoToAlbum={() => {
-            const albumId = contextMenu.track.mb_release_group_id ?? contextMenu.track.mb_release_id
-            if (albumId) navigate(`/album/${albumId}`)
-            setContextMenu(null)
-          }}
-          onClose={() => setContextMenu(null)}
-        />
-      )}
 
       {showImagePicker && (
         <ImagePickerModal

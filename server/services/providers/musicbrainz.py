@@ -33,6 +33,9 @@ _MAX_OFFICIAL_RELEASES_TRY_CAA = 24
 _ARTIST_RG_BROWSE_PAGE = 100
 _ARTIST_RG_BROWSE_MAX_PAGES = 10
 _ARTIST_DISCOGRAPHY_MAX_RGS = 50
+# Release-group Lucene search: few pages even for huge catalogs (count is small vs /release crawl).
+_ARTIST_DISCOGRAPHY_RG_SEARCH_LIMIT = 100
+_ARTIST_DISCOGRAPHY_RG_SEARCH_MAX_PAGES = 15
 
 _MB_PAGE_SIZE = 100
 
@@ -46,6 +49,23 @@ _FEAT_JOINPHRASE = re.compile(r"\b(feat|ft|featuring|with|vs|pres)\b", re.IGNORE
 
 def _strip_featuring(title: str) -> str:
     return _FEAT_PATTERN.sub("", title).strip()
+
+
+def _artist_discography_rg_search_query(artist_mbid: str) -> str:
+    """Lucene query for album / EP / single release groups, no secondary types (live, compilation, …)."""
+    return (
+        f"arid:{artist_mbid} AND "
+        f"(primarytype:album OR primarytype:ep OR primarytype:single) AND "
+        f"-secondarytype:*"
+    )
+
+
+def _rg_search_embeds_only_non_official(rg: dict) -> bool:
+    """True if MB embedded release stubs and none are Official (then skip this RG)."""
+    rels = rg.get("releases")
+    if not isinstance(rels, list) or len(rels) == 0:
+        return False
+    return not any(isinstance(r, dict) and r.get("status") == "Official" for r in rels)
 
 
 def _artist_is_primary_credit(entity: dict, artist_mbid: str) -> bool:
@@ -1766,6 +1786,27 @@ async def get_track(mbid: str, *, include_cover: bool = True) -> dict[str, Any] 
         return None
 
 
+async def get_artist_head(artist_mbid: str) -> dict | None:
+    """One MB ``/artist`` request: id, name, empty ``top_tracks``. Used for fast artist page load."""
+    try:
+        resp = await _mb_get(f"{MUSICBRAINZ_API}/artist/{artist_mbid}", params={"fmt": "json"})
+        if resp.status_code != 200:
+            logger.warning(f"[mb] get_artist_head {artist_mbid} → {resp.status_code}: {resp.text[:200]}")
+            return None
+        data = resp.json()
+        return {
+            "mbid": data["id"],
+            "name": data.get("name", "Unknown"),
+            "picture": None,
+            "banner": None,
+            "nb_fans": 0,
+            "top_tracks": [],
+        }
+    except Exception as exc:
+        logger.warning(f"[mb] get_artist_head {artist_mbid} exception: {exc}")
+        return None
+
+
 async def get_artist(artist_mbid: str) -> dict | None:
     artist_data = await _get_artist_head_data(artist_mbid)
     if artist_data is not None:
@@ -1785,80 +1826,64 @@ async def get_artist(artist_mbid: str) -> dict | None:
 
 
 async def get_artist_albums(artist_mbid: str) -> list[dict]:
-    """Artist discography (canonical/original ordering).
+    """Artist discography (album / EP / single release groups).
 
-    The UI wants "discography order" based on the *release-group's* first release date,
-    not the latest reissue/remaster date. We therefore browse release-groups and sort
-    by ``first-release-date`` (canonical), while still ensuring the group has at least
-    one Official release.
+    Uses MusicBrainz **release-group search** (Lucene) so we do not paginate thousands of
+    ``/release`` rows. Results are still filtered with the same credit / VA / title rules as
+    before (applied to each RG). Sorting uses ``first-release-date`` on the RG. Choosing the
+    canonical **release** inside a group remains the job of ``get_album`` / album routes.
     """
     try:
-        # Discography should include only release-groups that have at least one Official release.
-        # This avoids "unreleased project" noise (YANDHI, etc.) that otherwise appears as Album RGs.
-        #
-        # We crawl official releases and aggregate earliest known date per release-group to get a
-        # canonical/original-ish year, while still allowing collaborative albums (artist in primary
-        # credit, not necessarily first).
         rg_first: dict[str, tuple[tuple[int, int, int], dict]] = {}
 
+        query = _artist_discography_rg_search_query(artist_mbid)
         offset = 0
         page = 0
-        max_pages = 25  # larger than previous to handle prolific artists; cached by MetadataService
 
-        params_base = {
-            "artist": artist_mbid,
-            "inc": "release-groups+artist-credits",
-            "fmt": "json",
-            "limit": _MB_PAGE_SIZE,
-        }
-
-        while page < max_pages:
+        while page < _ARTIST_DISCOGRAPHY_RG_SEARCH_MAX_PAGES:
             if page:
                 await asyncio.sleep(_MB_PAGE_GAP_S)
             try:
                 resp = await _mb_get(
-                    f"{MUSICBRAINZ_API}/release",
-                    params={**params_base, "offset": offset},
+                    f"{MUSICBRAINZ_API}/release-group",
+                    params={
+                        "query": query,
+                        "fmt": "json",
+                        "limit": _ARTIST_DISCOGRAPHY_RG_SEARCH_LIMIT,
+                        "offset": offset,
+                    },
                 )
             except (httpx.TimeoutException, httpx.ConnectError, httpx.ReadError, httpx.RemoteProtocolError):
                 break
             if resp.status_code != 200:
                 break
             data = resp.json()
-            releases = data.get("releases", []) or []
-            if not releases:
+            rgs = data.get("release-groups") or []
+            if not rgs:
                 break
 
-            for rel in releases:
-                if rel.get("status") != "Official":
-                    continue
-                rg = rel.get("release-group")
+            total_hits = int(data.get("count") or 0)
+
+            for rg in rgs:
                 if not isinstance(rg, dict) or not rg.get("id"):
                     continue
+                if _rg_search_embeds_only_non_official(rg):
+                    continue
+
                 p_type = rg.get("primary-type")
                 s_types = rg.get("secondary-types") or []
                 if p_type not in ("Album", "Single", "EP") or len(s_types) > 0:
                     continue
-                # Credit strictness:
-                # - Albums: allow collaborative entries where artist is a primary credit (e.g. Watch the Throne).
-                # - EPs/Singles: require the artist to be the strict lead credit; avoids lots of relationship noise.
+
                 if p_type == "Album":
-                    if not _artist_is_primary_credit(rel, artist_mbid):
+                    if not _artist_is_primary_credit(rg, artist_mbid):
                         continue
                 else:
-                    if not _artist_is_strict_lead(rel, artist_mbid):
+                    if not _artist_is_strict_lead(rg, artist_mbid):
                         continue
 
-                # Exclude release-groups that are credited to Various Artists even if they show up
-                # under an artist via relationship quirks (e.g. label compilations).
                 _VA_ID = "89ad4ac3-39f7-470e-963a-56509c546377"
-                for c in rel.get("artist-credit") or []:
-                    if not isinstance(c, dict):
-                        continue
-                    a = c.get("artist")
-                    if isinstance(a, dict) and str(a.get("id") or "") == _VA_ID:
-                        continue  # ignore this credit; VA appears alone for actual VA releases
-                ac = rel.get("artist-credit") or []
+                ac = rg.get("artist-credit") or []
                 if (
                     isinstance(ac, list)
                     and len(ac) == 1
@@ -1868,24 +1893,20 @@ async def get_artist_albums(artist_mbid: str) -> list[dict]:
                 ):
                     continue
 
-                # Targeted noise filters seen on prolific artists (Ye/Kanye):
-                # "Kanye West Presents Good Music: Cruel Summer" is an official Various Artists compilation,
-                # but we don't want it in the artist's canonical album discography.
-                title_norm = str(rg.get("title") or rel.get("title") or "").strip().lower()
+                title_norm = str(rg.get("title") or "").strip().lower()
                 if "presents good music" in title_norm or "presents g.o.o.d." in title_norm:
                     continue
-                # G.O.O.D. Morning, G.O.O.D. Night is an official release but not a canonical Kanye studio album.
                 if title_norm.startswith("g.o.o.d. morning"):
                     continue
 
                 rg_id = str(rg["id"])
-                date_str = (rel.get("date") or rg.get("first-release-date") or "").strip()
+                date_str = (rg.get("first-release-date") or "").strip()
                 if not date_str:
                     continue
                 date_val = _parse_mb_date(date_str)
                 payload = {
                     "mb_release_group_id": rg_id,
-                    "title": rg.get("title") or rel.get("title", ""),
+                    "title": rg.get("title") or "",
                     "cover": None,
                     "release_date": date_str,
                     "type": p_type or "",
@@ -1893,10 +1914,11 @@ async def get_artist_albums(artist_mbid: str) -> list[dict]:
                 if rg_id not in rg_first or date_val < rg_first[rg_id][0]:
                     rg_first[rg_id] = (date_val, payload)
 
-            total = int(data.get("release-count", 0) or 0)
-            offset += len(releases)
+            offset += len(rgs)
             page += 1
-            if offset >= total:
+            if total_hits and offset >= total_hits:
+                break
+            if len(rgs) < _ARTIST_DISCOGRAPHY_RG_SEARCH_LIMIT:
                 break
 
         items = [v for (_d, v) in rg_first.values()]

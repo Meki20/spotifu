@@ -7,8 +7,6 @@ from models import User
 from services.providers import MetadataService
 from services.providers import musicbrainz
 from services.providers.musicbrainz import _caa_release_group_front_url, CAA_SIZE_LIST
-from services.track_cache_status import annotate_tracks_is_cached
-
 router = APIRouter(prefix="/artist", tags=["artist"])
 
 
@@ -107,16 +105,20 @@ async def get_artist_images(
 ):
     banner_idx, picture_idx = _load_idx(artist_id)
 
-    artist_name = None
+    artist_name: str | None = None
+    head = _get_cache("artist_head", artist_id)
+    if isinstance(head, dict) and (head.get("name") or "").strip():
+        artist_name = (head.get("name") or "").strip()
+
     svc = MetadataService(session)
-    async with musicbrainz.mb_interactive_calls():
-        mb = await svc.get_artist(artist_id)
-    if mb:
-        artist_name = mb.get("name")
     if not artist_name:
-        head = _get_cache("artist_head", artist_id)
-        if isinstance(head, dict):
-            artist_name = head.get("name")
+        async with musicbrainz.mb_interactive_calls():
+            mb = await svc.get_artist_head(artist_id)
+        if mb and (mb.get("name") or "").strip():
+            artist_name = (mb.get("name") or "").strip()
+
+    if artist_name:
+        await svc.load_artist_visuals(artist_id, artist_name=artist_name)
 
     banners = _all_banners(artist_id, artist_name)
     thumbs = _all_thumbs(artist_id, artist_name)
@@ -138,16 +140,20 @@ async def update_artist_images(
     session: Session = Depends(get_session),
     user: User = Depends(get_current_user),
 ):
-    artist_name = None
+    artist_name: str | None = None
+    head = _get_cache("artist_head", artist_id)
+    if isinstance(head, dict) and (head.get("name") or "").strip():
+        artist_name = (head.get("name") or "").strip()
+
     svc = MetadataService(session)
-    async with musicbrainz.mb_interactive_calls():
-        mb = await svc.get_artist(artist_id)
-    if mb:
-        artist_name = mb.get("name")
     if not artist_name:
-        head = _get_cache("artist_head", artist_id)
-        if isinstance(head, dict):
-            artist_name = head.get("name")
+        async with musicbrainz.mb_interactive_calls():
+            mb = await svc.get_artist_head(artist_id)
+        if mb and (mb.get("name") or "").strip():
+            artist_name = (mb.get("name") or "").strip()
+
+    if artist_name:
+        await svc.load_artist_visuals(artist_id, artist_name=artist_name)
 
     banners = _all_banners(artist_id, artist_name)
     thumbs = _all_thumbs(artist_id, artist_name)
@@ -203,7 +209,5 @@ async def get_artist(
         data = await svc.get_artist_head(artist_id)
     if not data:
         raise HTTPException(status_code=404, detail="Artist not found")
-    top = data.get("top_tracks")
-    if isinstance(top, list):
-        annotate_tracks_is_cached(session, top, artist_fallback=data.get("name"))
+    data["top_tracks"] = []
     return data

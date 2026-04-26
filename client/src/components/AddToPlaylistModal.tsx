@@ -11,6 +11,7 @@ const modalShell = {
 export type AddToPlaylistTrack = {
   title: string
   artist: string
+  artist_credit?: string | null
   album?: string
   album_cover?: string | null
   mb_id: string
@@ -24,7 +25,7 @@ function normalizeTrack(t: AddToPlaylistTrack) {
   if (!t.mb_id) throw new Error('This track is missing a MusicBrainz recording id (cannot add to playlist).')
   return {
     title: t.title,
-    artist: t.artist,
+    artist: (t.artist_credit || t.artist),
     album,
     mb_recording_id: t.mb_id,
     mb_artist_id: t.mb_artist_id ?? null,
@@ -148,7 +149,7 @@ export default function AddToPlaylistModal({
               Add to playlist
             </h2>
             <p className="text-xs truncate mt-0.5" style={{ color: '#9A8E84', fontFamily: "'Barlow Semi Condensed', sans-serif" }}>
-              {track.title} · {track.artist}
+              {track.title} · {(track.artist_credit || track.artist)}
             </p>
           </div>
           <button

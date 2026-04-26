@@ -1,5 +1,6 @@
 import { memo } from 'react'
 import { Play } from 'lucide-react'
+import { displayArtist } from '../utils/trackHelpers'
 
 interface TrackRowProps {
   track: any
@@ -87,7 +88,7 @@ const TrackRowImpl = ({
               }
             }}
           >
-            {track.artist}
+            {displayArtist(track)}
           </p>
         </div>
       </div>

@@ -8,6 +8,7 @@ export interface Track {
   track_id?: number
   title: string
   artist: string
+  artist_credit?: string | null
   album: string
   album_cover: string | null
   preview_url: string | null

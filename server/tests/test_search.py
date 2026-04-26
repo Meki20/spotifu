@@ -20,6 +20,7 @@ def test_local_search_respects_local_limit(client, session):
             session,
             title=f"hello song {i}",
             artist="LocalArtist",
+            artist_credit="LocalArtist, Guest",
             status=TrackStatus.READY,
         )
     r = client.get(
@@ -28,3 +29,6 @@ def test_local_search_respects_local_limit(client, session):
     )
     assert r.status_code == 200, r.text
     assert len(r.json()["tracks"]) <= 2
+    # Response includes artist_credit passthrough for local results
+    row = r.json()["tracks"][0]
+    assert "artist_credit" in row

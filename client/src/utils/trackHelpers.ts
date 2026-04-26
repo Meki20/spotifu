@@ -21,6 +21,7 @@ export function toTrack(raw: any, extras?: Partial<Track>): Track {
     track_id,
     title: raw.title ?? '',
     artist: raw.artist ?? '',
+    artist_credit: raw.artist_credit ?? null,
     album: raw.album ?? '',
     album_cover: raw.album_cover ?? raw.cover ?? null,
     preview_url: raw.preview_url ?? null,
@@ -31,6 +32,11 @@ export function toTrack(raw: any, extras?: Partial<Track>): Track {
     mb_artist_id: raw.mb_artist_id ?? null,
     ...extras,
   }
+}
+
+export function displayArtist(track: { artist: string; artist_credit?: string | null }): string {
+  const ac = (track.artist_credit || '').trim()
+  return ac || (track.artist || '')
 }
 
 export function formatDuration(secs: number): string {

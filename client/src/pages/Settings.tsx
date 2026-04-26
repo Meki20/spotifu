@@ -17,6 +17,7 @@ interface TrackConfig {
   id: number
   title: string
   artist: string
+  artist_credit?: string | null
   album: string
   status: string
   local_file_path: string | null
@@ -593,7 +594,7 @@ export default function Settings() {
                       </div>
                       <div className="min-w-0">
                         <p className="text-xs truncate" style={{ fontFamily: "'Barlow Semi Condensed', sans-serif", color: '#E8DDD0' }}>{track.title}</p>
-                        <p className="text-xs truncate" style={{ fontFamily: "'Barlow Semi Condensed', sans-serif", color: '#9A8E84' }}>{track.artist} — {track.album}</p>
+                        <p className="text-xs truncate" style={{ fontFamily: "'Barlow Semi Condensed', sans-serif", color: '#9A8E84' }}>{(track.artist_credit || track.artist)} — {track.album}</p>
                       </div>
                     </div>
                     <button

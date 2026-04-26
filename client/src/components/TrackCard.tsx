@@ -1,4 +1,5 @@
 import { memo } from 'react'
+import { displayArtist } from '../utils/trackHelpers'
 
 const BACKDROP_OPACITY = 0.14
 
@@ -67,7 +68,7 @@ const TrackCardImpl = ({ track, size = 96, onPlay, onHoverArtist, onContextMenu 
             className="text-xs truncate mt-0.5"
             style={{ fontFamily: "'Barlow Semi Condensed', sans-serif", color: '#9A8E84' }}
           >
-            {track.artist}
+            {displayArtist(track)}
           </p>
         </div>
       </div>

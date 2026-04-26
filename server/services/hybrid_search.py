@@ -134,6 +134,7 @@ _hybrid_bg_inflight: set[str] = set()
 def _row_to_result_dict(r) -> dict:
     return {
         "mbid": r.mb_id, "artist": r.artist, "title": r.title, "album": r.album,
+        "artist_credit": r.artist_credit,
         "album_cover": r.album_cover, "source": "musicbrainz", "preview_url": None,
         "mb_artist_id": r.mb_artist_id, "mb_release_id": r.mb_release_id,
         "mb_release_group_id": r.mb_release_group_id
@@ -177,6 +178,7 @@ def _save_to_cache(query_normalized: str, results: list[dict]) -> None:
             session.add(MBLookupCache(
                 query_normalized=query_normalized,
                 artist=r.get("artist", ""),
+                artist_credit=r.get("artist_credit"),
                 title=r.get("title", ""),
                 album=r.get("album", ""),
                 mb_id=mbid,
@@ -188,6 +190,7 @@ def _save_to_cache(query_normalized: str, results: list[dict]) -> None:
             ))
         else:
             row.artist = r.get("artist", "")
+            row.artist_credit = r.get("artist_credit")
             row.title = r.get("title", "")
             row.album = r.get("album", "")
             row.mb_id = mbid

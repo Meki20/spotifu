@@ -10,6 +10,7 @@ import {
 } from 'lucide-react'
 import type { RepeatMode } from '../stores/playerStore'
 import AddToPlaylistModal, { type AddToPlaylistTrack } from './AddToPlaylistModal'
+import { displayArtist } from '../utils/trackHelpers'
 
 interface ContextMenu {
   x: number
@@ -177,7 +178,7 @@ export default function PlayerBar() {
                 color: '#9A8E84',
               }}
             >
-              {currentTrack.artist}
+              {displayArtist(currentTrack)}
             </p>
           </div>
 
@@ -358,7 +359,7 @@ export default function PlayerBar() {
               if (!t.mb_id) return
               setAddPlTrack({
                 title: String(t.title ?? ''),
-                artist: String(t.artist ?? ''),
+                artist: String(t.artist_credit ?? t.artist ?? ''),
                 album: t.album != null ? String(t.album) : undefined,
                 album_cover: t.album_cover ?? null,
                 mb_id: t.mb_id,

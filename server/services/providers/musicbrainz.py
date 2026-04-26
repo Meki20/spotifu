@@ -359,18 +359,37 @@ def _first_artist_mbid_from_recording(recording: dict) -> str | None:
     return None
 
 
-def _artist_credit_string(recording: dict) -> str:
-    """Best-effort display string for all credited artists (no extra HTTP calls)."""
-    parts: list[str] = []
+def _artist_credit_names(recording: dict) -> list[str]:
+    """Ordered credited artist names (best-effort; no extra HTTP calls).
+
+    Uses artist-credit[].name (display name) and falls back to artist.name.
+    De-dupes exact repeats while preserving order.
+    """
+    out: list[str] = []
+    seen: set[str] = set()
     for c in recording.get("artist-credit") or []:
         if not isinstance(c, dict):
             continue
         name = (c.get("name") or "").strip()
-        join = (c.get("joinphrase") or "").strip()
-        if name:
-            parts.append(name + join)
-    out = "".join(parts).strip()
-    return out or (
+        if not name:
+            art = c.get("artist")
+            if isinstance(art, dict):
+                name = (art.get("name") or "").strip()
+        if not name:
+            continue
+        if name in seen:
+            continue
+        seen.add(name)
+        out.append(name)
+    return out
+
+
+def _artist_credit_string(recording: dict) -> str:
+    """Comma-separated artist credit display string (names only)."""
+    names = _artist_credit_names(recording)
+    if names:
+        return ", ".join(names)
+    return (
         recording.get("artist-credit", [{}])[0].get("name", "Unknown")
         if recording.get("artist-credit")
         else "Unknown"
@@ -1180,6 +1199,7 @@ def _metadata_dict_from_recording(recording: dict, album_hint: str | None) -> di
         if recording.get("artist-credit")
         else "Unknown"
     )
+    artist_credit = _artist_credit_string(recording)
     mb_artist_id = _first_artist_mbid_from_recording(recording)
     primary = _pick_primary_release_for_playlist(recording, album_hint)
     album_title = primary.get("title", "") if primary else ""
@@ -1189,6 +1209,7 @@ def _metadata_dict_from_recording(recording: dict, album_hint: str | None) -> di
         "mbid": str(rid),
         "title": recording.get("title", ""),
         "artist": artist_name,
+        "artist_credit": artist_credit,
         "album": album_title,
         "mb_artist_id": mb_artist_id,
         "mb_release_id": str(mb_release_id) if mb_release_id else None,
@@ -1620,6 +1641,7 @@ async def get_track(mbid: str, *, include_cover: bool = True) -> dict[str, Any] 
             if data.get("artist-credit")
             else "Unknown"
         )
+        artist_credit = _artist_credit_string(data)
         release_list = data.get("releases", [])
         official_pick = official_releases_latest_first(release_list)
         primary = official_pick[0] if official_pick else {}
@@ -1638,6 +1660,7 @@ async def get_track(mbid: str, *, include_cover: bool = True) -> dict[str, Any] 
             "mbid": data["id"],
             "title": data.get("title", ""),
             "artist": artist_name,
+            "artist_credit": artist_credit,
             "album": album_title,
             "album_cover": cover_url,
             "preview_url": None,

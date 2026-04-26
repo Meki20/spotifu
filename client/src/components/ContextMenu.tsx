@@ -1,5 +1,6 @@
 import { useLayoutEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
+import { displayArtist } from '../utils/trackHelpers'
 
 interface ContextMenuProps {
   x: number
@@ -99,7 +100,7 @@ export default function ContextMenu({
           className="text-xs truncate mt-0.5"
           style={{ fontFamily: "'Barlow Semi Condensed', sans-serif", color: '#9A8E84' }}
         >
-          {getStr(track, 'artist')}
+          {displayArtist({ artist: getStr(track, 'artist'), artist_credit: getStr(track, 'artist_credit') })}
         </p>
       </div>
       )}

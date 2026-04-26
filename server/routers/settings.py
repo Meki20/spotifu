@@ -125,6 +125,7 @@ def get_downloaded_tracks(
                 id=t.id,
                 title=t.title,
                 artist=t.artist,
+                artist_credit=t.artist_credit,
                 album=t.album,
                 status=t.status,
                 local_file_path=t.local_file_path,

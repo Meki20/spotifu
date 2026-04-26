@@ -23,6 +23,7 @@ class PlayResponse(BaseModel):
     preview_url: str | None
     title: str | None = None
     artist: str | None = None
+    artist_credit: str | None = None
     status: str
     mb_artist_id: str | None = None
     mb_release_id: str | None = None
@@ -61,6 +62,7 @@ def _get_or_create_track_by_mb(session: Session, mbid: str, meta: dict | None) -
         track = Track(
             title=meta.get("title", ""),
             artist=meta.get("artist", ""),
+            artist_credit=meta.get("artist_credit") or meta.get("artist", ""),
             album=meta.get("album", ""),
             album_cover=meta.get("album_cover"),
             mb_id=mbid,
@@ -84,6 +86,8 @@ def _get_or_create_track_by_mb(session: Session, mbid: str, meta: dict | None) -
     if track.status == TrackStatus.ERROR:
         track.status = TrackStatus.FETCHING
         track.local_file_path = None
+        if meta:
+            track.artist_credit = meta.get("artist_credit") or track.artist_credit or track.artist
         session.commit()
         session.refresh(track)
         return track, True
@@ -125,6 +129,7 @@ async def play(
             preview_url=None,
             title=track.title,
             artist=track.artist,
+            artist_credit=track.artist_credit,
             status=track.status.value,
             mb_artist_id=track.mb_artist_id,
             mb_release_id=track.mb_release_id,
@@ -169,6 +174,7 @@ async def play(
             preview_url=(meta or {}).get("preview_url"),
             title=track.title,
             artist=track.artist,
+            artist_credit=track.artist_credit or (meta or {}).get("artist_credit"),
             status=track.status.value,
             mb_artist_id=track.mb_artist_id,
             mb_release_id=track.mb_release_id,

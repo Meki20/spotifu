@@ -21,7 +21,7 @@ function toAddPayload(t: unknown): AddToPlaylistTrack | null {
   if (typeof mb !== 'string' || !mb) return null
   return {
     title: String(obj.title ?? ''),
-    artist: String(obj.artist ?? ''),
+    artist: String(obj.artist_credit ?? obj.artist ?? ''),
     album: obj.album != null ? String(obj.album) : undefined,
     album_cover: typeof obj.album_cover === 'string' ? obj.album_cover : (obj.album_cover == null ? null : String(obj.album_cover)),
     mb_id: mb,

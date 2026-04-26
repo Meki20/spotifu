@@ -26,6 +26,7 @@ def make_track(
     *,
     title: str = "T1",
     artist: str = "A1",
+    artist_credit: str | None = None,
     status=None,
     local_path: str | None = None,
 ) -> Track:
@@ -34,6 +35,7 @@ def make_track(
     t = Track(
         title=title,
         artist=artist,
+        artist_credit=artist_credit,
         album="Al1",
         status=status or TrackStatus.READY,
         local_file_path=local_path,

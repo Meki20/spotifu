@@ -75,6 +75,7 @@ def _track_to_out(t: dict, is_cached: bool = False) -> TrackOut:
         mb_id=t.get("mbid", ""),
         title=t.get("title", ""),
         artist=t.get("artist", ""),
+        artist_credit=t.get("artist_credit"),
         album=t.get("album", ""),
         album_cover=t.get("album_cover"),
         preview_url=t.get("preview_url"),
@@ -141,6 +142,7 @@ async def search(
             mb_id=mbid,
             title=r.get("title", ""),
             artist=r.get("artist", ""),
+            artist_credit=r.get("artist_credit"),
             album=r.get("album", ""),
             album_cover=r.get("album_cover"),
             preview_url=r.get("preview_url"),
@@ -214,6 +216,14 @@ async def stream_similar_tracks(
         if isinstance(cached, dict) and isinstance(cached.get("tracks"), list) and cached["tracks"]:
             cached_tracks: list[dict] = cached["tracks"]
             logger.debug("[similar] cache hit mbid=%s tracks=%d", mbid, len(cached_tracks))
+            # Cache entries from older versions may lack artist_credit; treat as stale and rebuild.
+            try:
+                if any(isinstance(t, dict) and t.get("mbid") and not t.get("artist_credit") for t in cached_tracks):
+                    cached = None
+                    cached_tracks = []
+                    logger.debug("[similar] cache stale (missing artist_credit); rebuilding mbid=%s", mbid)
+            except Exception:
+                pass
             # Refresh cached 'is_cached' flags on-demand (cheap DB check).
             for t in cached_tracks:
                 try:
@@ -427,6 +437,7 @@ async def _local_search(q: str, session: Session, local_limit: int) -> SearchRes
             track_id=t.id,
             title=t.title,
             artist=t.artist,
+            artist_credit=t.artist_credit,
             album=t.album,
             album_cover=t.album_cover,
             preview_url=None,

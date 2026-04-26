@@ -24,9 +24,11 @@ def create_db():
 
 def _migrate():
     migrations = [
+        "ALTER TABLE mb_lookup_cache ADD COLUMN IF NOT EXISTS artist_credit VARCHAR",
         "ALTER TABLE mb_lookup_cache ADD COLUMN IF NOT EXISTS mb_artist_id VARCHAR",
         "ALTER TABLE mb_lookup_cache ADD COLUMN IF NOT EXISTS mb_release_id VARCHAR",
         "ALTER TABLE mb_lookup_cache ADD COLUMN IF NOT EXISTS mb_release_group_id VARCHAR",
+        "ALTER TABLE tracks ADD COLUMN IF NOT EXISTS artist_credit VARCHAR",
         "ALTER TABLE tracks ADD COLUMN IF NOT EXISTS mb_artist_id VARCHAR",
         "ALTER TABLE tracks ADD COLUMN IF NOT EXISTS mb_release_id VARCHAR",
         "ALTER TABLE tracks ADD COLUMN IF NOT EXISTS mb_release_group_id VARCHAR",

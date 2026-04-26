@@ -8,6 +8,7 @@ class DownloadedTrackListItem(BaseModel):
     id: int
     title: str
     artist: str
+    artist_credit: str | None = None
     album: str
     status: TrackStatus
     local_file_path: str | None
@@ -24,6 +25,7 @@ class TrackOut(BaseModel):
     track_id: int | None = None
     title: str
     artist: str
+    artist_credit: str | None = None
     album: str
     album_cover: str | None = None
     preview_url: str | None = None

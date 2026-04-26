@@ -217,23 +217,24 @@ async def stream_similar_tracks(
             cached_tracks: list[dict] = cached["tracks"]
             logger.debug("[similar] cache hit mbid=%s tracks=%d", mbid, len(cached_tracks))
             # Cache entries from older versions may lack artist_credit; treat as stale and rebuild.
+            stale = False
             try:
                 if any(isinstance(t, dict) and t.get("mbid") and not t.get("artist_credit") for t in cached_tracks):
-                    cached = None
-                    cached_tracks = []
+                    stale = True
                     logger.debug("[similar] cache stale (missing artist_credit); rebuilding mbid=%s", mbid)
             except Exception:
                 pass
-            # Refresh cached 'is_cached' flags on-demand (cheap DB check).
-            for t in cached_tracks:
-                try:
-                    annotate_tracks_is_cached(session, [t])
-                except Exception:
-                    pass
-                out = _track_to_out(t, bool(t.get("is_cached", False)))
-                yield (json.dumps({"type": "track", "track": out.model_dump()}) + "\n").encode("utf-8")
-            yield (json.dumps({"type": "done", "cached": True}) + "\n").encode("utf-8")
-            return
+            if not stale:
+                # Refresh cached 'is_cached' flags on-demand (cheap DB check).
+                for t in cached_tracks:
+                    try:
+                        annotate_tracks_is_cached(session, [t])
+                    except Exception:
+                        pass
+                    out = _track_to_out(t, bool(t.get("is_cached", False)))
+                    yield (json.dumps({"type": "track", "track": out.model_dump()}) + "\n").encode("utf-8")
+                yield (json.dumps({"type": "done", "cached": True}) + "\n").encode("utf-8")
+                return
         logger.debug("[similar] cache miss mbid=%s", mbid)
 
         seed_title = ""

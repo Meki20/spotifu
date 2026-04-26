@@ -2,6 +2,7 @@ import asyncio
 import httpx
 import logging
 import re
+import random
 import time
 import unicodedata
 from collections import OrderedDict
@@ -79,21 +80,30 @@ _MB_PAGE_GAP_S = 0.25  # spacing between paginated /ws/2 calls (etiquette + fewe
 
 _MB_RETRY_STATUS = frozenset({408, 429, 500, 502, 503, 504})
 
-_MB_GLOBAL_CONCURRENCY = 3
-_MB_GLOBAL_GAP_S = 0.35  # extra spacing to avoid per-ip lua limiter
+# MusicBrainz etiquette: per-IP throttling is ~1 req/sec (see MB wiki rate limiting).
+# This server is deployed single-instance per IP, so this gate is globally sufficient.
+_MB_GLOBAL_CONCURRENCY = 1
+_MB_GLOBAL_GAP_S = 1.05
 _mb_global_sem = asyncio.Semaphore(_MB_GLOBAL_CONCURRENCY)
 _mb_gap_lock = asyncio.Lock()
 _mb_last_call_at = 0.0
+_mb_cooldown_until = 0.0
+
+
+def _jitter_s(base: float, pct: float = 0.15) -> float:
+    if base <= 0:
+        return 0.0
+    return base * random.uniform(1.0 - pct, 1.0 + pct)
 
 
 def _mb_retry_sleep_s(resp: httpx.Response, attempt: int) -> float:
     h = (resp.headers.get("Retry-After") or "").strip()
     if h.isdigit():
-        return min(float(h), _MB_MAX_BACKOFF_S)
+        return min(_jitter_s(float(h), pct=0.10), _MB_MAX_BACKOFF_S)
     base = min(0.55 * (2**attempt), _MB_MAX_BACKOFF_S)
     if resp.status_code == 429:
-        return max(1.0, base)
-    return base
+        base = max(1.0, base)
+    return _jitter_s(base, pct=0.20)
 
 
 async def _mb_get(path: str, params: dict[str, Any]) -> httpx.Response:
@@ -102,22 +112,30 @@ async def _mb_get(path: str, params: dict[str, Any]) -> httpx.Response:
     for attempt in range(_MB_GET_MAX_ATTEMPTS):
         async with _mb_global_sem:
             async with _mb_gap_lock:
-                global _mb_last_call_at
+                global _mb_last_call_at, _mb_cooldown_until
                 now = time.monotonic()
-                wait = _MB_GLOBAL_GAP_S - (now - _mb_last_call_at)
+                # Enforce a base global gap + any temporary cooldown (e.g. after repeated 503s).
+                wait_gap = _MB_GLOBAL_GAP_S - (now - _mb_last_call_at)
+                wait_cool = _mb_cooldown_until - now
+                wait = max(wait_gap, wait_cool)
                 if wait > 0:
-                    await asyncio.sleep(wait)
+                    await asyncio.sleep(_jitter_s(wait, pct=0.10))
                 _mb_last_call_at = time.monotonic()
         try:
             r = await MB_CLIENT.get(path, params=params)
         except (httpx.TimeoutException, httpx.ConnectError, httpx.ReadError, httpx.RemoteProtocolError):
             if attempt + 1 >= _MB_GET_MAX_ATTEMPTS:
                 raise
-            await asyncio.sleep(0.4 * (attempt + 1))
+            await asyncio.sleep(_jitter_s(0.4 * (attempt + 1), pct=0.20))
             continue
         last = r
         if r.status_code == 200 or r.status_code not in _MB_RETRY_STATUS:
             return r
+
+        # If MB is actively throttling us (503), slow down globally for a bit even if Retry-After is absent.
+        if r.status_code == 503:
+            cool = min(2.0 * (attempt + 1), _MB_MAX_BACKOFF_S)
+            _mb_cooldown_until = max(_mb_cooldown_until, time.monotonic() + _jitter_s(cool, pct=0.20))
         await asyncio.sleep(_mb_retry_sleep_s(r, attempt))
     assert last is not None
     return last
@@ -1628,13 +1646,14 @@ async def hydrate_track_album_cover_from_releases(track_id: int, release_mbids: 
 
 async def get_track(mbid: str, *, include_cover: bool = True) -> dict[str, Any] | None:
     try:
-        resp = await MB_CLIENT.get(
+        resp = await _mb_get(
             f"{MUSICBRAINZ_API}/recording/{mbid}",
             params={"fmt": "json", "inc": "artist-credits+releases+release-groups"},
         )
         if resp.status_code == 404:
             return None
-        resp.raise_for_status()
+        if resp.status_code != 200:
+            return None
         data = resp.json()
         artist_name = (
             data.get("artist-credit", [{}])[0].get("name", "Unknown")
@@ -1939,11 +1958,8 @@ async def _caa_artist_banner_url(artist_mbid: str, fallback_release_mbids: list[
 async def _get_artist_head_data(artist_mbid: str) -> dict | None:
     try:
         resp, recording_resp = await asyncio.gather(
-            MB_CLIENT.get(
-                f"{MUSICBRAINZ_API}/artist/{artist_mbid}",
-                params={"fmt": "json"},
-            ),
-            MB_CLIENT.get(
+            _mb_get(f"{MUSICBRAINZ_API}/artist/{artist_mbid}", params={"fmt": "json"}),
+            _mb_get(
                 f"{MUSICBRAINZ_API}/recording",
                 params={"query": f"arid:{artist_mbid}", "fmt": "json", "limit": 10, "sort": "desc"},
             ),
@@ -2118,10 +2134,7 @@ async def _releases_for_release_group(rg_mbid: str) -> list[dict]:
     if official_releases_latest_first(browsed):
         return browsed
 
-    resp = await MB_CLIENT.get(
-        f"{MUSICBRAINZ_API}/release-group/{rg_mbid}",
-        params={"fmt": "json", "inc": "releases"},
-    )
+    resp = await _mb_get(f"{MUSICBRAINZ_API}/release-group/{rg_mbid}", params={"fmt": "json", "inc": "releases"})
     embedded: list[dict] = []
     if resp.is_success and resp.status_code != 404:
         embedded = resp.json().get("releases", [])
@@ -2152,10 +2165,7 @@ async def _ordered_official_release_mbids_for_group(rg_mbid: str) -> list[str]:
         except Exception:
             return cached
 
-    rg_head = await MB_CLIENT.get(
-        f"{MUSICBRAINZ_API}/release-group/{rg_mbid}",
-        params={"fmt": "json"},
-    )
+    rg_head = await _mb_get(f"{MUSICBRAINZ_API}/release-group/{rg_mbid}", params={"fmt": "json"})
     if rg_head.status_code != 200:
         return []
     if not _strict_album_or_single_rg(rg_head.json()):
@@ -2198,13 +2208,14 @@ async def get_album(release_mbid: str) -> dict | None:
 
 async def _get_recording_with_releases(recording_mbid: str) -> dict | None:
     try:
-        resp = await MB_CLIENT.get(
+        resp = await _mb_get(
             f"{MUSICBRAINZ_API}/recording/{recording_mbid}",
             params={"fmt": "json", "inc": "artist-credits+releases+release-groups"},
         )
         if resp.status_code == 404:
             return None
-        resp.raise_for_status()
+        if resp.status_code != 200:
+            return None
         return resp.json()
     except Exception:
         return None
@@ -2218,13 +2229,14 @@ async def _get_release_with_tracks(release_mbid: str) -> dict | None:
     via a specific MBID they clicked — trust it.
     """
     try:
-        resp = await MB_CLIENT.get(
+        resp = await _mb_get(
             f"{MUSICBRAINZ_API}/release/{release_mbid}",
             params={"fmt": "json", "inc": "recordings+artists+release-groups"},
         )
         if resp.status_code == 404:
             return None
-        resp.raise_for_status()
+        if resp.status_code != 200:
+            return None
         data = resp.json()
 
         rg = data.get("release-group")

@@ -167,21 +167,26 @@ class MetadataService:
             return ("musicbrainz", PROVIDER_REGISTRY["musicbrainz"])
         return None
 
-    async def get_album(self, album_id: str) -> dict[str, Any] | None:
-        cached = _cache_get(_album_cache, "album", album_id)
-        if cached is not None:
-            return cached
-        logger.debug(f"[get_album] album_id={album_id!r}")
+    async def get_album(self, album_id: str, *, light: bool = False) -> dict[str, Any] | None:
+        """``light=True`` fetches tracklist without CAA cover HTTP; result is not persisted in album cache."""
+        if not light:
+            cached = _cache_get(_album_cache, "album", album_id)
+            if cached is not None:
+                return cached
+        logger.debug(f"[get_album] album_id={album_id!r} light={light}")
         detected = self._detect_provider(album_id)
         result: dict[str, Any] | None = None
         if detected:
             name, provider = detected
-            result = await provider.get_album(album_id)
+            fn = getattr(provider, "get_album", None)
+            if fn:
+                result = await fn(album_id, light=light)  # type: ignore[call-arg]
         else:
             provider = self._get_provider()
-            if hasattr(provider, "get_album"):
-                result = await provider.get_album(album_id)
-        if result:
+            fn = getattr(provider, "get_album", None)
+            if fn:
+                result = await fn(album_id, light=light)  # type: ignore[call-arg]
+        if result and not light:
             _cache_set(_album_cache, "album", album_id, result)
         return result
 

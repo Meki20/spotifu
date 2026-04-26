@@ -3,19 +3,86 @@ import { useQueryClient } from '@tanstack/react-query'
 import { useAuthStore } from '../stores/authStore'
 import { API } from '../api'
 
-const DRAIN_MS = 200
+const DEFAULT_DRAIN_MS = 280
+const PREFETCH_ALBUM_BATCH = 4
 
-export function useArtistPrefetch() {
+/** Serialize all prefetch POST work so MB queue is not flooded by parallel bodies. */
+let prefetchPostChain: Promise<void> = Promise.resolve()
+
+export type ArtistPrefetchOptions = {
+  /** Coalesce rapid hovers (e.g. search). Slightly slower first prefetch, fewer storms. */
+  drainMs?: number
+}
+
+function scheduleIdle(fn: () => void) {
+  const ric = (globalThis as unknown as { requestIdleCallback?: (cb: () => void, opts?: { timeout: number }) => number })
+    .requestIdleCallback
+  if (typeof ric === 'function') {
+    ric(fn, { timeout: 1200 })
+  } else {
+    setTimeout(fn, 400)
+  }
+}
+
+export function useArtistPrefetch(options?: ArtistPrefetchOptions) {
   const queryClient = useQueryClient()
   const token = useAuthStore((s) => s.token)
+  const drainMs = options?.drainMs ?? DEFAULT_DRAIN_MS
 
-  // artistId → set of albumIds accumulated since last drain
   const pendingRef = useRef<Map<string, Set<string>>>(new Map())
-  // Drain timer handle
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
+  const applyPrefetchResponse = useCallback(
+    (artistId: string, data: { artist?: unknown; albums?: { id: string; data: unknown }[] } | null) => {
+      if (!data) return
+      const { artist, albums } = data
+      if (artist) {
+        queryClient.setQueryData(['artist', artistId], artist)
+      }
+      for (const row of albums ?? []) {
+        if (row?.id && row.data) {
+          queryClient.setQueryData(['album', row.id], row.data)
+        }
+      }
+    },
+    [queryClient],
+  )
+
+  const queueAlbumPosts = useCallback(
+    (artistId: string, albumIds: string[]) => {
+      if (!token || albumIds.length === 0) return
+      const unique = [...new Set(albumIds)]
+      const run = async () => {
+        let rest = [...unique]
+        while (rest.length > 0) {
+          const chunk = rest.slice(0, PREFETCH_ALBUM_BATCH)
+          rest = rest.slice(PREFETCH_ALBUM_BATCH)
+          try {
+            const r = await fetch(`${API}/prefetch/artist`, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                ...(token ? { Authorization: `Bearer ${token}` } : {}),
+              },
+              body: JSON.stringify({ artist_id: artistId, album_ids: chunk }),
+            })
+            const data = r.ok ? await r.json() : null
+            applyPrefetchResponse(artistId, data)
+          } catch {
+            /* ignore */
+          }
+        }
+      }
+      prefetchPostChain = prefetchPostChain.then(run).catch(() => {})
+    },
+    [applyPrefetchResponse, token],
+  )
+
   const drain = useCallback(() => {
-    if (!token) return
+    if (!token) {
+      timerRef.current = null
+      return
+    }
 
     const pending = pendingRef.current
     if (pending.size === 0) {
@@ -23,20 +90,14 @@ export function useArtistPrefetch() {
       return
     }
 
-    // Flush pending to local var, clear ref immediately
     const toProcess = Array.from(pending.entries()).map(([artistId, albumIds]) => ({
       artistId,
       albumIds: Array.from(albumIds),
     }))
     pending.clear()
 
-    console.log(`[prefetch] draining ${toProcess.length} artist(s)`, 'color: #b4003e')
-
     for (const { artistId, albumIds } of toProcess) {
-      const uniqueAlbums = [...new Set(albumIds)]
-
-      // Fire artist head + albums immediately (cached reads, ~5ms)
-      queryClient.prefetchQuery({
+      void queryClient.prefetchQuery({
         queryKey: ['artist', artistId],
         queryFn: () =>
           fetch(`${API}/artist/${artistId}`, {
@@ -48,52 +109,28 @@ export function useArtistPrefetch() {
         staleTime: Infinity,
       })
 
-      queryClient.prefetchQuery({
+      void queryClient.prefetchQuery({
         queryKey: ['artist-albums', artistId],
-        queryFn: (): Promise<{ albums: any[] }> =>
+        queryFn: (): Promise<{ albums: unknown[] }> =>
           fetch(`${API}/artist/${artistId}/albums`, {
             headers: token ? { Authorization: `Bearer ${token}` } : {},
-          }).then((r) => r.ok ? r.json() : { albums: [] }),
+          }).then((r) => (r.ok ? r.json() : { albums: [] })),
         staleTime: Infinity,
       })
 
-      // Batch album tracklists — server returns ALL albums, not just these
-      // This gives us full discography cached after first hover
-      fetch(`${API}/prefetch/artist`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          ...(token ? { Authorization: `Bearer ${token}` } : {}),
-        },
-        body: JSON.stringify({ artist_id: artistId, album_ids: uniqueAlbums }),
-      })
-        .then((r) => r.ok ? r.json() : null)
-        .then((data) => {
-          if (!data) return
-          const { artist, albums } = data
-
-          if (artist) {
-            console.log(`[prefetch] artist ${artistId} cached, ${albums?.length ?? 0} album tracklists`, 'color: #b4003e')
-            queryClient.setQueryData(['artist', artistId], artist)
-          }
-
-          for (const { id, data: alb } of albums ?? []) {
-            if (alb) {
-              queryClient.setQueryData(['album', id], alb)
-            }
-          }
-        })
-        .catch(() => {})
+      if (albumIds.length > 0) {
+        queueAlbumPosts(artistId, albumIds)
+      }
     }
 
     timerRef.current = null
-  }, [queryClient, token])
+  }, [queryClient, queueAlbumPosts, token])
 
   const scheduleDrain = useCallback(() => {
     if (timerRef.current === null) {
-      timerRef.current = setTimeout(drain, DRAIN_MS)
+      timerRef.current = setTimeout(drain, drainMs)
     }
-  }, [drain])
+  }, [drain, drainMs])
 
   const enqueue = useCallback(
     (artistId: string, albumIds: string[] = []) => {
@@ -110,5 +147,14 @@ export function useArtistPrefetch() {
     [scheduleDrain],
   )
 
-  return { enqueue }
+  /** Defer album prefetch until the browser is idle (e.g. warm rest of discography after paint). */
+  const enqueueAlbumsIdle = useCallback(
+    (artistId: string, albumIds: string[]) => {
+      if (!artistId || albumIds.length === 0) return
+      scheduleIdle(() => enqueue(artistId, albumIds))
+    },
+    [enqueue],
+  )
+
+  return { enqueue, enqueueAlbumsIdle }
 }

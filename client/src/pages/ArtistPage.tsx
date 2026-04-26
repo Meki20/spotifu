@@ -35,21 +35,41 @@ function ArtistAlbumTile({
   album,
   covers,
   onClick,
-  onPrefetch,
+  onVisible,
   narrow,
 }: {
   album: any
   covers: Record<string, string> | undefined
   onClick: () => void
-  onPrefetch?: () => void
+  /** Fire once when the tile nears the viewport (avoids hover storms). */
+  onVisible?: () => void
   narrow?: boolean
 }) {
+  const rootRef = useRef<HTMLDivElement>(null)
+  const visibleFired = useRef(false)
+
+  useEffect(() => {
+    if (!onVisible) return
+    const el = rootRef.current
+    if (!el) return
+    const obs = new IntersectionObserver(
+      (entries) => {
+        if (!entries[0]?.isIntersecting || visibleFired.current) return
+        visibleFired.current = true
+        onVisible()
+      },
+      { root: null, rootMargin: '140px', threshold: 0.02 },
+    )
+    obs.observe(el)
+    return () => obs.disconnect()
+  }, [onVisible])
+
   const u = artistAlbumCoverUrl(album, covers)
   return (
     <div
+      ref={rootRef}
       className={`bg-[#181818] p-4 rounded-md cursor-pointer transition-colors group relative overflow-hidden hover:bg-[#202020] ${narrow ? 'shrink-0 w-44' : ''}`}
       onClick={onClick}
-      onMouseEnter={onPrefetch}
     >
       {u && (
         <div
@@ -75,7 +95,21 @@ function ArtistAlbumTile({
   )
 }
 
-function HorizontalAlbumStrip({ albums, navigate, isLoading, covers }: { albums: any[]; navigate: any; isLoading?: boolean; covers?: Record<string, string> }) {
+function HorizontalAlbumStrip({
+  albums,
+  navigate,
+  isLoading,
+  covers,
+  artistId,
+  onAlbumVisible,
+}: {
+  albums: any[]
+  navigate: any
+  isLoading?: boolean
+  covers?: Record<string, string>
+  artistId?: string
+  onAlbumVisible?: (albumMbid: string) => void
+}) {
   const scrollRef = useRef<HTMLDivElement>(null)
 
   const scroll = (dir: 'left' | 'right') => {
@@ -143,6 +177,14 @@ function HorizontalAlbumStrip({ albums, navigate, isLoading, covers }: { albums:
               const id = album.mb_id || album.mb_release_group_id
               if (id) navigate(`/album/${id}`)
             }}
+            onVisible={
+              artistId && onAlbumVisible
+                ? () => {
+                    const id = album.mb_id || album.mb_release_group_id
+                    if (id) onAlbumVisible(id)
+                  }
+                : undefined
+            }
           />
         ))}
       </div>
@@ -254,7 +296,16 @@ export default function ArtistPage() {
     return () => { cancelled = true }
   }, [albumsData, artistId])
 
-  const { enqueue } = useArtistPrefetch()
+  const { enqueue, enqueueAlbumsIdle } = useArtistPrefetch()
+
+  useEffect(() => {
+    if (!artistId || !albumsData?.albums?.length) return
+    const ids = (albumsData.albums as any[])
+      .map((a: any) => a.mb_id || a.mb_release_group_id)
+      .filter((x: any): x is string => typeof x === 'string' && x.length > 0)
+    if (!ids.length) return
+    enqueueAlbumsIdle(artistId, ids.slice(0, 8))
+  }, [artistId, albumsData?.albums, enqueueAlbumsIdle])
 
   function downloadTrack(track: any) {
     if (!track?.mb_id) return
@@ -443,9 +494,9 @@ export default function ArtistPage() {
                         const id = album.mb_id || album.mb_release_group_id
                         if (id) navigate(`/album/${id}`)
                       }}
-                      onPrefetch={() => {
+                      onVisible={() => {
                         const id = album.mb_id || album.mb_release_group_id
-                        if (id) enqueue(artistId!, [id])
+                        if (id && artistId) enqueue(artistId, [id])
                       }}
                     />
                   ))
@@ -458,7 +509,16 @@ export default function ArtistPage() {
         {(sortedEps.length > 0 || albumsLoading) && (
           <div className="mb-8">
             <h3 className="text-sm font-semibold text-[#b3b3b3] uppercase tracking-wider mb-3">EPs</h3>
-            <HorizontalAlbumStrip albums={sortedEps} navigate={navigate} isLoading={albumsLoading} covers={covers} />
+            <HorizontalAlbumStrip
+              albums={sortedEps}
+              navigate={navigate}
+              isLoading={albumsLoading}
+              covers={covers}
+              artistId={artistId ?? undefined}
+              onAlbumVisible={(id) => {
+                if (artistId) enqueue(artistId, [id])
+              }}
+            />
           </div>
         )}
 

@@ -99,7 +99,7 @@ export default function Search() {
 
   const { downloadStates, cachedMbIds } = useDownloadStates()
 
-  const { enqueue } = useArtistPrefetch()
+  const { enqueue } = useArtistPrefetch({ drainMs: 520 })
 
   const [cachedIds, setCachedIds] = useState<Set<string>>(new Set())
   const [recentSearches, setRecentSearches] = useState<string[]>([])

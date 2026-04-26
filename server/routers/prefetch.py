@@ -5,12 +5,17 @@ from typing import Optional
 from fastapi import APIRouter, Depends
 from pydantic import BaseModel
 from sqlmodel import Session
+
 from database import get_session
 from deps import get_current_user
 from models import User
 from services.providers import MetadataService
+from services.providers import musicbrainz
 
 logger = logging.getLogger(__name__)
+
+# Bound work per request: client chains multiple POSTs for large discographies.
+_PREFETCH_ALBUMS_PER_REQUEST = 4
 
 router = APIRouter(prefix="/prefetch", tags=["prefetch"])
 
@@ -26,44 +31,37 @@ async def prefetch_artist(
     session: Session = Depends(get_session),
     user: User = Depends(get_current_user),
 ):
-    """Batch prefetch: artist head, discography, and album tracklists in one call.
+    """Prefetch album tracklists only (light: no CAA), low MB priority.
 
-    All data is served from in-memory + DB cache — no MusicBrainz API calls needed
-    for cached artists.
+    Does **not** repeat artist head / discography fetches — the client should
+    warm those via ``GET /artist/{id}`` and ``GET /artist/{id}/albums`` so
+    this endpoint only pays for ``get_album`` (MusicBrainz release + tracks).
+
+    At most ``_PREFETCH_ALBUMS_PER_REQUEST`` albums per call; client batches the rest.
     """
     artist_id = body.artist_id
     album_ids = body.album_ids
     logger.debug("prefetch artist_id=%r album_ids=%s", artist_id, album_ids)
 
+    album_ids_to_fetch = (album_ids or [])[:_PREFETCH_ALBUMS_PER_REQUEST]
+    if not album_ids_to_fetch:
+        return {"artist": None, "albums": []}
+
     svc = MetadataService(session)
 
-    # Phase 1: artist head + albums (concurrent)
-    artist_task = svc.get_artist_head(artist_id)
-    albums_task = svc.get_artist_albums(artist_id)
+    async with musicbrainz.mb_prefetch_calls():
+        album_results = await asyncio.gather(
+            *[svc.get_album(aid, light=True) for aid in album_ids_to_fetch]
+        )
+    valid_albums = [
+        {"id": aid, "data": alb}
+        for aid, alb in zip(album_ids_to_fetch, album_results)
+        if alb
+    ]
 
-    artist_data, albums_list = await asyncio.gather(artist_task, albums_task)
-
-    logger.debug("artist head cached=%s, albums cached=%s count=%s", artist_data is not None, albums_list is not None, len(albums_list) if albums_list else 0)
-
-    # Phase 2: album tracklists (concurrent, top 10 to limit payload)
-    album_ids_to_fetch = (album_ids or [])[:10]
-
-    async def fetch_album(alb_id: str):
-        result = await svc.get_album(alb_id)
-        logger.debug("album %r cached=%s", alb_id, result is not None)
-        return result
-
-    album_results = []
-    if album_ids_to_fetch:
-        album_results = await asyncio.gather(*[
-            fetch_album(aid) for aid in album_ids_to_fetch
-        ])
-
-    valid_albums = [{"id": aid, "data": alb} for aid, alb in zip(album_ids_to_fetch, album_results) if alb]
-
-    logger.debug("returning artist=%s albums=%d", artist_data is not None, len(valid_albums))
+    logger.debug("prefetch albums done artist_id=%r count=%d", artist_id, len(valid_albums))
 
     return {
-        "artist": artist_data,
+        "artist": None,
         "albums": valid_albums,
     }

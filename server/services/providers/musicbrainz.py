@@ -1,11 +1,14 @@
 import asyncio
+import contextvars
 import httpx
+import itertools
 import logging
 import re
 import random
 import time
 import unicodedata
 from collections import OrderedDict
+from contextlib import asynccontextmanager
 from typing import Any
 from difflib import SequenceMatcher
 
@@ -82,12 +85,51 @@ _MB_RETRY_STATUS = frozenset({408, 429, 500, 502, 503, 504})
 
 # MusicBrainz etiquette: per-IP throttling is ~1 req/sec (see MB wiki rate limiting).
 # This server is deployed single-instance per IP, so this gate is globally sufficient.
-_MB_GLOBAL_CONCURRENCY = 1
 _MB_GLOBAL_GAP_S = 1.05
-_mb_global_sem = asyncio.Semaphore(_MB_GLOBAL_CONCURRENCY)
 _mb_gap_lock = asyncio.Lock()
 _mb_last_call_at = 0.0
 _mb_cooldown_until = 0.0
+
+# Lower number = higher priority. Interactive traffic should preempt prefetch.
+_MB_PRIO_INTERACTIVE = 0
+_MB_PRIO_PREFETCH = 50
+_mb_call_priority: contextvars.ContextVar[int] = contextvars.ContextVar(
+    "mb_call_priority", default=_MB_PRIO_INTERACTIVE
+)
+_mb_req_seq = itertools.count()
+_mb_pq: asyncio.PriorityQueue | None = None
+_mb_queue_worker: asyncio.Task[None] | None = None
+
+
+@asynccontextmanager
+async def mb_prefetch_calls():
+    """Mark MusicBrainz HTTP done during this block as low-priority (after interactive)."""
+    tok = _mb_call_priority.set(_MB_PRIO_PREFETCH)
+    try:
+        yield
+    finally:
+        _mb_call_priority.reset(tok)
+
+
+def _ensure_mb_queue_worker() -> None:
+    global _mb_pq, _mb_queue_worker
+    if _mb_pq is None:
+        _mb_pq = asyncio.PriorityQueue()
+    if _mb_queue_worker is None or _mb_queue_worker.done():
+        _mb_queue_worker = asyncio.create_task(_mb_queue_worker_loop(), name="musicbrainz-mb-queue")
+
+
+async def _mb_queue_worker_loop() -> None:
+    assert _mb_pq is not None
+    while True:
+        prio, seq, path, params, fut = await _mb_pq.get()
+        try:
+            resp = await _mb_get_serial(path, params)
+            if not fut.done():
+                fut.set_result(resp)
+        except Exception as exc:
+            if not fut.done():
+                fut.set_exception(exc)
 
 
 def _jitter_s(base: float, pct: float = 0.15) -> float:
@@ -106,21 +148,19 @@ def _mb_retry_sleep_s(resp: httpx.Response, attempt: int) -> float:
     return _jitter_s(base, pct=0.20)
 
 
-async def _mb_get(path: str, params: dict[str, Any]) -> httpx.Response:
-    """GET from MusicBrainz with transient-error retries. Returns last response if still non-OK."""
+async def _mb_get_serial(path: str, params: dict[str, Any]) -> httpx.Response:
+    """Single MB GET with gap + retries (runs under the global queue worker)."""
     last: httpx.Response | None = None
     for attempt in range(_MB_GET_MAX_ATTEMPTS):
-        async with _mb_global_sem:
-            async with _mb_gap_lock:
-                global _mb_last_call_at, _mb_cooldown_until
-                now = time.monotonic()
-                # Enforce a base global gap + any temporary cooldown (e.g. after repeated 503s).
-                wait_gap = _MB_GLOBAL_GAP_S - (now - _mb_last_call_at)
-                wait_cool = _mb_cooldown_until - now
-                wait = max(wait_gap, wait_cool)
-                if wait > 0:
-                    await asyncio.sleep(_jitter_s(wait, pct=0.10))
-                _mb_last_call_at = time.monotonic()
+        async with _mb_gap_lock:
+            global _mb_last_call_at, _mb_cooldown_until
+            now = time.monotonic()
+            wait_gap = _MB_GLOBAL_GAP_S - (now - _mb_last_call_at)
+            wait_cool = _mb_cooldown_until - now
+            wait = max(wait_gap, wait_cool)
+            if wait > 0:
+                await asyncio.sleep(_jitter_s(wait, pct=0.10))
+            _mb_last_call_at = time.monotonic()
         try:
             r = await MB_CLIENT.get(path, params=params)
         except (httpx.TimeoutException, httpx.ConnectError, httpx.ReadError, httpx.RemoteProtocolError):
@@ -132,13 +172,24 @@ async def _mb_get(path: str, params: dict[str, Any]) -> httpx.Response:
         if r.status_code == 200 or r.status_code not in _MB_RETRY_STATUS:
             return r
 
-        # If MB is actively throttling us (503), slow down globally for a bit even if Retry-After is absent.
         if r.status_code == 503:
             cool = min(2.0 * (attempt + 1), _MB_MAX_BACKOFF_S)
             _mb_cooldown_until = max(_mb_cooldown_until, time.monotonic() + _jitter_s(cool, pct=0.20))
         await asyncio.sleep(_mb_retry_sleep_s(r, attempt))
     assert last is not None
     return last
+
+
+async def _mb_get(path: str, params: dict[str, Any]) -> httpx.Response:
+    """GET from MusicBrainz (queued, priority-aware) with transient-error retries."""
+    _ensure_mb_queue_worker()
+    assert _mb_pq is not None
+    loop = asyncio.get_running_loop()
+    fut: asyncio.Future[httpx.Response] = loop.create_future()
+    prio = int(_mb_call_priority.get())
+    seq = next(_mb_req_seq)
+    await _mb_pq.put((prio, seq, path, params, fut))
+    return await fut
 
 
 def _artist_is_strict_lead(entity: dict, target_mbid: str) -> bool:
@@ -2184,8 +2235,11 @@ async def _resolve_release_from_release_group(rg_mbid: str) -> str | None:
         return None
 
 
-async def get_album(release_mbid: str) -> dict | None:
-    """Fetch a MusicBrainz release by MBID. Accepts release, recording, or release-group MBIDs."""
+async def get_album(release_mbid: str, *, light: bool = False) -> dict | None:
+    """Fetch a MusicBrainz release by MBID. Accepts release, recording, or release-group MBIDs.
+
+    ``light=True`` skips CAA cover HTTP (tracklist/metadata only) — use for background prefetch.
+    """
     recording_data = await _get_recording_with_releases(release_mbid)
     if recording_data is not None:
         release_list = recording_data.get("releases", [])
@@ -2194,15 +2248,15 @@ async def get_album(release_mbid: str) -> dict | None:
             return None
         actual_release_mbid = official_pick[0].get("id")
         if actual_release_mbid:
-            return await _get_release_with_tracks(actual_release_mbid)
+            return await _get_release_with_tracks(actual_release_mbid, light=light)
 
-    direct = await _get_release_with_tracks(release_mbid)
+    direct = await _get_release_with_tracks(release_mbid, light=light)
     if direct is not None:
         return direct
 
     from_rg = await _resolve_release_from_release_group(release_mbid)
     if from_rg:
-        return await _get_release_with_tracks(from_rg)
+        return await _get_release_with_tracks(from_rg, light=light)
     return None
 
 
@@ -2221,7 +2275,7 @@ async def _get_recording_with_releases(recording_mbid: str) -> dict | None:
         return None
 
 
-async def _get_release_with_tracks(release_mbid: str) -> dict | None:
+async def _get_release_with_tracks(release_mbid: str, *, light: bool = False) -> dict | None:
     """Fetch release with full tracklist.
 
     Upgrade to newest official release in the same RG is intentionally
@@ -2241,7 +2295,7 @@ async def _get_release_with_tracks(release_mbid: str) -> dict | None:
 
         rg = data.get("release-group")
         cover_url = None
-        if data.get("status") == "Official":
+        if not light and data.get("status") == "Official":
             memo: dict[str, str | None] = {}
             cover_url = await _first_cover_among_releases([data["id"]], CAA_SIZE_DETAIL, memo)
             if not cover_url and isinstance(rg, dict) and rg.get("id"):

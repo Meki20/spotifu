@@ -1,5 +1,9 @@
 # SpotiFU
 
+<p align="center">
+  <img src="client/public/assets/brand/polly_512x512.png" alt="Polly mascot" width="128" height="128" />
+</p>
+
 Soulseek music player with Spotify-like UI. Search and stream music from the Soulseek network.
 
 ## Architecture (high-level)

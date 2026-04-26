@@ -507,6 +507,26 @@ async def _caa_release_group_front_url(release_group_mbid: str, size: str = CAA_
     return None
 
 
+async def cover_url_for_release_or_rg(
+    *,
+    mb_release_id: str | None,
+    mb_release_group_id: str | None,
+    size: str = CAA_SIZE_LIST,
+) -> str | None:
+    """Best-effort cover URL for a release/release-group, backed by DB cache."""
+    rid = (mb_release_id or "").strip()
+    rgid = (mb_release_group_id or "").strip()
+    if rid:
+        url = await _caa_front_url(rid, size=size)
+        if url:
+            return url
+    if rgid:
+        url = await _caa_release_group_front_url(rgid, size=size)
+        if url:
+            return url
+    return None
+
+
 async def _first_cover_among_releases(
     ordered_release_mbids: list[str],
     size: str,

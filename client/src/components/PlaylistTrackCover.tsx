@@ -1,21 +1,53 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import type { PlaylistItemDTO } from '../api/playlists'
-import { fetchRecordingCoverFromMb } from '../api/playlists'
+import { fetchRecordingCoverFromMb, fetchReleaseCoverFromMb, fetchReleaseGroupCoverFromMb } from '../api/playlists'
 import { resolveTrackArtUrl } from '../utils/trackHelpers'
 
-export default function PlaylistTrackCover({ item }: { item: PlaylistItemDTO }) {
+export default function PlaylistTrackCover({
+  item,
+  onResolved,
+}: {
+  item: PlaylistItemDTO
+  onResolved?: (url: string) => void
+}) {
   const primary = resolveTrackArtUrl(item)
   const [primaryBroken, setPrimaryBroken] = useState(false)
   const [mbFailed, setMbFailed] = useState(false)
+  const lastEmittedSrcRef = useRef<string | null>(null)
+  const onResolvedRef = useRef<typeof onResolved>(onResolved)
   const needMb = Boolean(item.mb_recording_id) && (!primary || primaryBroken)
-  const { data: mbUrl, isLoading } = useQuery({
+
+  useEffect(() => {
+    onResolvedRef.current = onResolved
+  }, [onResolved])
+
+  const { data: releaseUrl } = useQuery({
+    queryKey: ['playlist-release-cover', item.mb_release_id],
+    queryFn: () => (item.mb_release_id ? fetchReleaseCoverFromMb(item.mb_release_id) : Promise.resolve(null)),
+    enabled: needMb && Boolean(item.mb_release_id),
+    staleTime: 30 * 24 * 60 * 60 * 1000,
+  })
+  const { data: rgUrl } = useQuery({
+    queryKey: ['playlist-rg-cover', item.mb_release_group_id],
+    queryFn: () => (item.mb_release_group_id ? fetchReleaseGroupCoverFromMb(item.mb_release_group_id) : Promise.resolve(null)),
+    enabled: needMb && !releaseUrl && Boolean(item.mb_release_group_id),
+    staleTime: 30 * 24 * 60 * 60 * 1000,
+  })
+  const { data: recUrl, isLoading } = useQuery({
     queryKey: ['playlist-recording-cover', item.mb_recording_id],
     queryFn: () => fetchRecordingCoverFromMb(item.mb_recording_id),
-    enabled: needMb,
+    enabled: needMb && !releaseUrl && !rgUrl,
     staleTime: 7 * 24 * 60 * 60 * 1000,
   })
-  const src = primary && !primaryBroken ? primary : mbUrl || undefined
+  const src = primary && !primaryBroken ? primary : releaseUrl || rgUrl || recUrl || undefined
+
+  useEffect(() => {
+    if (!src) return
+    if (lastEmittedSrcRef.current === src) return
+    lastEmittedSrcRef.current = src
+    onResolvedRef.current?.(src)
+  }, [src])
 
   if (!src || mbFailed) {
     if (needMb && isLoading) {

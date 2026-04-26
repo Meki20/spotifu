@@ -468,6 +468,30 @@ class RecordingCoverResponse(BaseModel):
     url: str | None = None
 
 
+@router.get("/releases/{release_mbid}/cover", response_model=RecordingCoverResponse)
+async def get_release_cover_url(
+    release_mbid: str,
+    user: User = Depends(get_current_user),
+):
+    url = await musicbrainz.cover_url_for_release_or_rg(
+        mb_release_id=release_mbid,
+        mb_release_group_id=None,
+    )
+    return RecordingCoverResponse(url=url if isinstance(url, str) else None)
+
+
+@router.get("/release-groups/{rg_mbid}/cover", response_model=RecordingCoverResponse)
+async def get_release_group_cover_url(
+    rg_mbid: str,
+    user: User = Depends(get_current_user),
+):
+    url = await musicbrainz.cover_url_for_release_or_rg(
+        mb_release_id=None,
+        mb_release_group_id=rg_mbid,
+    )
+    return RecordingCoverResponse(url=url if isinstance(url, str) else None)
+
+
 @router.get("/recordings/{recording_mbid}/cover", response_model=RecordingCoverResponse)
 async def get_recording_cover_url(
     recording_mbid: str,
@@ -504,6 +528,48 @@ def get_playlist(
         for i in items
     ]
     annotate_tracks_is_cached(session, shadow)
+    # Fill playlist item covers from DB-backed cover cache when possible (no network),
+    # but do it in a single batched DB read to avoid N+1 queries that slow the endpoint.
+    try:
+        from models import MBEntityCache
+        from sqlmodel import select as _select
+        import json as _json
+
+        want_release: dict[str, list[PlaylistItem]] = {}
+        want_rg: dict[str, list[PlaylistItem]] = {}
+        for it in items:
+            if it.album_cover:
+                continue
+            if it.mb_release_id:
+                want_release.setdefault(it.mb_release_id, []).append(it)
+            elif it.mb_release_group_id:
+                want_rg.setdefault(it.mb_release_group_id, []).append(it)
+
+        keys: list[str] = []
+        keys.extend([f"cover_release:{rid}" for rid in want_release.keys()])
+        keys.extend([f"cover_rg:{rgid}" for rgid in want_rg.keys()])
+        if keys:
+            rows = session.exec(_select(MBEntityCache).where(MBEntityCache.key.in_(keys))).all()
+            payload_by_key: dict[str, dict] = {}
+            for r in rows:
+                try:
+                    payload_by_key[r.key] = _json.loads(r.payload)
+                except Exception:
+                    continue
+
+            for rid, its in want_release.items():
+                p = payload_by_key.get(f"cover_release:{rid}") or {}
+                if p.get("found") is True and p.get("url"):
+                    for it in its:
+                        it.album_cover = str(p["url"])
+
+            for rgid, its in want_rg.items():
+                p = payload_by_key.get(f"cover_rg:{rgid}") or {}
+                if p.get("found") is True and p.get("url"):
+                    for it in its:
+                        it.album_cover = str(p["url"])
+    except Exception:
+        pass
     item_outs = [
         _playlist_item_to_out(
             row,
@@ -589,6 +655,20 @@ def add_playlist_item(
         album_cover=body.album_cover,
         track_id=track_id,
     )
+    # If cover wasn't provided, try DB-backed caches quickly (no network required).
+    if not row.album_cover:
+        try:
+            from services.providers import get_cached_cover
+            if row.mb_release_id:
+                found, url = get_cached_cover("cover_release", row.mb_release_id)
+                if found and url:
+                    row.album_cover = url
+            if not row.album_cover and row.mb_release_group_id:
+                found, url = get_cached_cover("cover_rg", row.mb_release_group_id)
+                if found and url:
+                    row.album_cover = url
+        except Exception:
+            pass
     session.add(row)
     session.commit()
     session.refresh(row)

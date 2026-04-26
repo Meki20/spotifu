@@ -83,6 +83,31 @@ export default function PlaylistPage() {
     enabled: Number.isFinite(id) && id > 0,
   })
 
+  function persistResolvedCover(itemId: number, mbid: string, url: string) {
+    // If the list already resolved an image URL (primary or fallback),
+    // persist it onto the playlist item so the player can reuse it without extra fetches.
+    queryClient.setQueryData(['playlist', id], (old: Awaited<ReturnType<typeof fetchPlaylistDetail>> | undefined) => {
+      if (!old) return old
+      const cur = old.items.find((it) => it.id === itemId)
+      if (cur?.album_cover === url) return old
+      return {
+        ...old,
+        items: old.items.map((it) => (it.id === itemId ? { ...it, album_cover: url } : it)),
+      }
+    })
+
+    usePlayerStore.setState((s) => {
+      const nextQueue = s.queue.map((t) =>
+        t.mb_id === mbid && t.album_cover !== url ? { ...t, album_cover: url } : t,
+      )
+      const nextCurrent =
+        s.currentTrack && s.currentTrack.mb_id === mbid && s.currentTrack.album_cover !== url
+          ? { ...s.currentTrack, album_cover: url }
+          : s.currentTrack
+      return { queue: nextQueue, currentTrack: nextCurrent }
+    })
+  }
+
   const renameMutation = useMutation({
     mutationFn: () =>
       updatePlaylist(id, {
@@ -416,7 +441,10 @@ export default function PlaylistPage() {
                     </span>
                   </div>
                   <div className="flex items-center justify-center shrink-0">
-                    <PlaylistTrackCover item={item} />
+                    <PlaylistTrackCover
+                      item={item}
+                      onResolved={(url) => persistResolvedCover(item.id, item.mb_recording_id, url)}
+                    />
                   </div>
                   <div className="min-w-0">
                     <p

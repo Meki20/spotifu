@@ -3,7 +3,7 @@ from pydantic import BaseModel
 from sqlmodel import Session, select, delete, func
 from database import get_session
 from deps import get_current_user
-from models import User, Track, MBLookupCache, MBEntityCache, PlaylistItem
+from models import User, Track, MBLookupCache, MBEntityCache, PlaylistItem, CoverLink, CoverAsset
 from schemas.track import DownloadedTrackListItem, DownloadedTracksListResponse
 from services.user_preferences import get_stored_prefetch_prefs, merge_prefetch_into_user, PREFETCH_DEFAULTS
 
@@ -258,11 +258,31 @@ def clear_thumbnail_cache(
     user: User = Depends(get_current_user),
     session: Session = Depends(get_session),
 ):
-    """Clear cached cover art (cover_rg, cover_release, cover_artist, cover_artist_banner, cover_fanart_artist from MBEntityCache)."""
+    """Clear cached thumbnails (covers + artist images).
+
+    Covers are now stored in normalized cover tables (cover_links/cover_assets),
+    but older installs may still have MBEntityCache cover_* entries.
+    """
     from services.providers import clear_memory_caches
     clear_memory_caches()
     kinds = ("cover_rg", "cover_release", "cover_artist", "cover_artist_banner", "cover_fanart_artist", "cover_audiodb_artist", "cover_ddg_thumb", "cover_ddg_banner")
     for kind in kinds:
         session.exec(delete(MBEntityCache).where(MBEntityCache.kind == kind))
+    # Normalized cover cache
+    session.exec(delete(CoverLink))
+    session.exec(delete(CoverAsset))
+    session.commit()
+    return {"status": "ok"}
+
+
+@router.post("/cache/covers")
+def clear_covers_cache(
+    user: User = Depends(get_current_user),
+    session: Session = Depends(get_session),
+):
+    """Clear normalized cover cache tables (cover_links + cover_assets)."""
+    # Delete links first (FK), then assets.
+    session.exec(delete(CoverLink))
+    session.exec(delete(CoverAsset))
     session.commit()
     return {"status": "ok"}

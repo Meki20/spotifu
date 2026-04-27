@@ -31,7 +31,7 @@ for _logger_name, _env_key in (
 logging.getLogger("aioslsk.network").setLevel(logging.CRITICAL)
 logging.getLogger("aioslsk").setLevel(logging.WARNING)
 from routers import (auth_router, search_router, play_router, stream_router,
-                     library_router, settings_router, artist_router, album_router, prefetch_router)
+                     library_router, settings_router, artist_router, album_router, prefetch_router, covers_router)
 
 logger = logging.getLogger(__name__)
 
@@ -151,6 +151,7 @@ app.include_router(settings_router)
 app.include_router(artist_router)
 app.include_router(album_router)
 app.include_router(prefetch_router)
+app.include_router(covers_router)
 
 
 @app.websocket("/ws")

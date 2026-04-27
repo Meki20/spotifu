@@ -398,7 +398,7 @@ def update_album_order(
 
 
 @router.get("/recently-added", response_model=list[TrackOut])
-def list_recently_added(
+async def list_recently_added(
     user: User = Depends(get_current_user),
     session: Session = Depends(get_session),
 ):
@@ -408,6 +408,32 @@ def list_recently_added(
         .order_by(Track.id.desc())
         .limit(20)
     ).all()
+    # Backfill covers from normalized cover cache (recording→release→rg), then fetch+write on miss.
+    from services.covers import lookup_cached_cover_best_effort, get_cover_url
+    dirty = False
+    for t in tracks:
+        if t.album_cover:
+            continue
+        rec = (t.mb_id or "").strip() or None
+        rel = (t.mb_release_id or "").strip() or None
+        rg = (t.mb_release_group_id or "").strip() or None
+        url = lookup_cached_cover_best_effort(session, recording_id=rec, release_id=rel, release_group_id=rg)
+        if not url and (rec or rel or rg):
+            if rec:
+                r = await get_cover_url("recording", rec)
+                url = r.url
+            elif rel:
+                r = await get_cover_url("release", rel)
+                url = r.url
+            elif rg:
+                r = await get_cover_url("release_group", rg)
+                url = r.url
+        if url:
+            t.album_cover = url
+            session.add(t)
+            dirty = True
+    if dirty:
+        session.commit()
     return [
         TrackOut(
             mb_id=t.mb_id or "",
@@ -431,7 +457,7 @@ def list_recently_added(
 
 
 @router.get("/recently-played", response_model=list[TrackOut])
-def list_recently_played(
+async def list_recently_played(
     user: User = Depends(get_current_user),
     session: Session = Depends(get_session),
 ):
@@ -442,6 +468,31 @@ def list_recently_played(
         .order_by(Track.last_played_at.desc())
         .limit(20)
     ).all()
+    from services.covers import lookup_cached_cover_best_effort, get_cover_url
+    dirty = False
+    for t in tracks:
+        if t.album_cover:
+            continue
+        rec = (t.mb_id or "").strip() or None
+        rel = (t.mb_release_id or "").strip() or None
+        rg = (t.mb_release_group_id or "").strip() or None
+        url = lookup_cached_cover_best_effort(session, recording_id=rec, release_id=rel, release_group_id=rg)
+        if not url and (rec or rel or rg):
+            if rec:
+                r = await get_cover_url("recording", rec)
+                url = r.url
+            elif rel:
+                r = await get_cover_url("release", rel)
+                url = r.url
+            elif rg:
+                r = await get_cover_url("release_group", rg)
+                url = r.url
+        if url:
+            t.album_cover = url
+            session.add(t)
+            dirty = True
+    if dirty:
+        session.commit()
     return [
         TrackOut(
             mb_id=t.mb_id or "",
@@ -476,12 +527,10 @@ async def get_release_cover_url(
     release_mbid: str,
     user: User = Depends(get_current_user),
 ):
-    async with musicbrainz.mb_interactive_calls():
-        url = await musicbrainz.cover_url_for_release_or_rg(
-            mb_release_id=release_mbid,
-            mb_release_group_id=None,
-        )
-    return RecordingCoverResponse(url=url if isinstance(url, str) else None)
+    # Deprecated: keep for backward compatibility. Prefer /covers/release-groups/*.
+    from services.covers import get_cover_url
+    r = await get_cover_url("release", release_mbid)
+    return RecordingCoverResponse(url=r.url)
 
 
 @router.get("/release-groups/{rg_mbid}/cover", response_model=RecordingCoverResponse)
@@ -489,12 +538,10 @@ async def get_release_group_cover_url(
     rg_mbid: str,
     user: User = Depends(get_current_user),
 ):
-    async with musicbrainz.mb_interactive_calls():
-        url = await musicbrainz.cover_url_for_release_or_rg(
-            mb_release_id=None,
-            mb_release_group_id=rg_mbid,
-        )
-    return RecordingCoverResponse(url=url if isinstance(url, str) else None)
+    # Deprecated: keep for backward compatibility. Prefer /covers/release-groups/*.
+    from services.covers import get_cover_url
+    r = await get_cover_url("release_group", rg_mbid)
+    return RecordingCoverResponse(url=r.url)
 
 
 @router.get("/recordings/{recording_mbid}/cover", response_model=RecordingCoverResponse)
@@ -502,20 +549,10 @@ async def get_recording_cover_url(
     recording_mbid: str,
     user: User = Depends(get_current_user),
 ):
-    # Cache recording cover lookups (including misses) so playlist pages
-    # don't refetch MusicBrainz on every render for missing covers.
-    from services.providers import get_cached_cover, set_cached_cover
-
-    found, cached_url = get_cached_cover("cover_recording", recording_mbid)
-    if found:
-        return RecordingCoverResponse(url=cached_url if isinstance(cached_url, str) else None)
-
-    async with musicbrainz.mb_interactive_calls():
-        meta = await musicbrainz.get_track(recording_mbid)
-    url = (meta or {}).get("album_cover")
-    url_str = url if isinstance(url, str) and url else None
-    set_cached_cover("cover_recording", recording_mbid, url_str)
-    return RecordingCoverResponse(url=url_str)
+    # Deprecated: keep for backward compatibility. Prefer /covers/recordings/*.
+    from services.covers import get_cover_url
+    r = await get_cover_url("recording", recording_mbid)
+    return RecordingCoverResponse(url=r.url)
 
 
 @router.get("/{playlist_id}", response_model=PlaylistDetailResponse)

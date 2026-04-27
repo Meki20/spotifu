@@ -121,6 +121,10 @@ def _cache_set(mem_store: OrderedDict[str, tuple[float, Any]], kind: str, key: s
 
 def get_cached_cover(kind: str, mbid: str) -> tuple[bool, str | None]:
     """Return (found_in_cache, url_or_None). found_in_cache=True even for known misses."""
+    # Covers for releases/recordings/RGs have moved to normalized cover tables (cover_links/cover_assets).
+    # Keep these MBEntityCache-backed cover kinds disabled so stale negative entries cannot block lookups.
+    if kind in ("cover_release", "cover_rg", "cover_recording"):
+        return False, None
     v = _db_get(kind, mbid)
     if v is None:
         return False, None
@@ -138,6 +142,10 @@ def get_cached_cover(kind: str, mbid: str) -> tuple[bool, str | None]:
 
 
 def set_cached_cover(kind: str, mbid: str, url: str | None) -> None:
+    # Covers for releases/recordings/RGs have moved to normalized cover tables (cover_links/cover_assets).
+    # Do not write these kinds into MBEntityCache.
+    if kind in ("cover_release", "cover_rg", "cover_recording"):
+        return
     if url:
         _db_set(kind, mbid, {"found": True, "url": url})
     else:

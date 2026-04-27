@@ -5,13 +5,14 @@ import { usePlayerStore } from '../stores/playerStore'
 import { useAuthStore } from '../stores/authStore'
 import { Play, ArrowLeft } from 'lucide-react'
 import * as controller from '../playback/controller'
-import { API, authFetch } from '../api'
+import { API } from '../api'
 import { requestMbDownload } from '../stores/downloadBusyStore'
 import { useDownloadStates } from '../hooks/useDownloadStates'
 import { useArtistPrefetch } from '../hooks/useArtistPrefetch'
 import ContextMenu from '../components/ContextMenu'
 import { toTrack, formatDuration } from '../utils/trackHelpers'
 import { PollyLoading } from '../components/PollyLoading'
+import { fetchReleaseGroupCover } from '../api/covers'
 
 interface ContextMenuState {
   x: number
@@ -58,19 +59,18 @@ export default function AlbumPage() {
       setCover(album.cover)
       return
     }
-    if (!albumId || !album?.artist_mb_id) return
+    if (!albumId) return
 
     let cancelled = false
-    authFetch(`/artist/${album.artist_mb_id}/albums/${albumId}/cover`)
-      .then(res => res.ok ? res.json() : null)
-      .then(data => {
+    fetchReleaseGroupCover(albumId)
+      .then((u) => {
         if (cancelled) return
-        if (data?.cover) setCover(data.cover)
+        if (u) setCover(u)
       })
       .catch(() => {})
 
     return () => { cancelled = true }
-  }, [album?.cover, albumId, album?.artist_mb_id])
+  }, [album?.cover, albumId])
 
   function downloadTrack(track: any) {
     if (!track?.mb_id) return

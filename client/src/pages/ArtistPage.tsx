@@ -7,6 +7,7 @@ import { API, authFetch } from '../api'
 import { useArtistPrefetch } from '../hooks/useArtistPrefetch'
 import ImagePickerModal from '../components/ImagePickerModal'
 import { PollyLoading } from '../components/PollyLoading'
+import { fetchReleaseGroupCover } from '../api/covers'
 
 function AlbumSkeleton() {
   return (
@@ -245,37 +246,26 @@ export default function ArtistPage() {
 
     let cancelled = false
 
-    async function fetchWithConcurrency(urls: string[], concurrency = 6): Promise<void> {
-      for (let i = 0; i < urls.length; i += concurrency) {
+    async function fetchWithConcurrency(mbids: string[], concurrency = 6): Promise<void> {
+      for (let i = 0; i < mbids.length; i += concurrency) {
         if (cancelled) break
-        const batch = urls.slice(i, i + concurrency)
-        await Promise.allSettled(
-          batch.map(async (url) => {
-            const res = await authFetch(url)
-            if (cancelled) return
-            if (res.ok) {
-              const data = await res.json()
-              if (data.cover) {
-                const mbid = missing.find((a: any) => url.includes(a.mb_release_group_id))?.mb_release_group_id
-                if (mbid && !cancelled) {
-                  setCovers(prev => ({ ...prev, [mbid]: data.cover }))
-                }
-              }
-            }
-          })
-        )
+        const batch = mbids.slice(i, i + concurrency)
+        const res = await Promise.allSettled(batch.map((id) => fetchReleaseGroupCover(id)))
+        if (cancelled) return
+        res.forEach((r, idx) => {
+          if (r.status !== 'fulfilled') return
+          const url = r.value
+          const id = batch[idx]
+          if (url && id && !cancelled) setCovers((prev) => ({ ...prev, [id]: url }))
+        })
       }
     }
 
-    const albumUrls = missing
-      .filter((a: any) => a.type?.toLowerCase() === 'album')
-      .map((a: any) => `/artist/${artistId}/albums/${a.mb_release_group_id}/cover`)
+    const ids = missing
+      .map((a: any) => a.mb_release_group_id)
+      .filter((x: any): x is string => typeof x === 'string' && x.length > 0)
 
-    const epSingleUrls = missing
-      .filter((a: any) => a.type?.toLowerCase() !== 'album')
-      .map((a: any) => `/artist/${artistId}/albums/${a.mb_release_group_id}/cover`)
-
-    fetchWithConcurrency([...albumUrls, ...epSingleUrls])
+    fetchWithConcurrency(ids)
 
     return () => { cancelled = true }
   }, [albumsData, artistId])

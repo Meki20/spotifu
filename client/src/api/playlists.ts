@@ -38,29 +38,7 @@ export async function fetchPlaylistDetail(id: number): Promise<PlaylistDetail> {
   return res.json()
 }
 
-export async function fetchRecordingCoverFromMb(recordingMbid: string): Promise<string | null> {
-  const enc = encodeURIComponent(recordingMbid)
-  const res = await authFetch(`/playlists/recordings/${enc}/cover`)
-  if (!res.ok) return null
-  const data = (await res.json()) as { url?: string | null }
-  return typeof data.url === 'string' && data.url ? data.url : null
-}
-
-export async function fetchReleaseCoverFromMb(releaseMbid: string): Promise<string | null> {
-  const enc = encodeURIComponent(releaseMbid)
-  const res = await authFetch(`/playlists/releases/${enc}/cover`)
-  if (!res.ok) return null
-  const data = (await res.json()) as { url?: string | null }
-  return typeof data.url === 'string' && data.url ? data.url : null
-}
-
-export async function fetchReleaseGroupCoverFromMb(rgMbid: string): Promise<string | null> {
-  const enc = encodeURIComponent(rgMbid)
-  const res = await authFetch(`/playlists/release-groups/${enc}/cover`)
-  if (!res.ok) return null
-  const data = (await res.json()) as { url?: string | null }
-  return typeof data.url === 'string' && data.url ? data.url : null
-}
+// Cover lookup moved to /covers/* APIs. See client/src/api/covers.ts.
 
 export async function createPlaylist(body: {
   title: string

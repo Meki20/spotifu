@@ -1,4 +1,4 @@
-from . import auth, search, play, stream, library, settings, artist, album, prefetch
+from . import auth, search, play, stream, library, settings, artist, album, prefetch, covers
 
 auth_router = auth.router
 search_router = search.router
@@ -9,3 +9,4 @@ settings_router = settings.router
 artist_router = artist.router
 album_router = album.router
 prefetch_router = prefetch.router
+covers_router = covers.router

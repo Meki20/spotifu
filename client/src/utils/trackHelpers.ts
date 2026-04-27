@@ -1,16 +1,12 @@
 import { type Track } from '../stores/playerStore'
 
-/** Cover Art Archive front image from stored URL or MB release / release-group id. */
+/** Cover URL from stored URL only (covers resolved server-side). */
 export function resolveTrackArtUrl(input: {
   album_cover?: string | null
   mb_release_id?: string | null
   mb_release_group_id?: string | null
 }): string | null {
   if (input.album_cover) return input.album_cover
-  const rid = input.mb_release_id
-  if (rid) return `https://coverartarchive.org/release/${rid}/front-250`
-  const rgid = input.mb_release_group_id
-  if (rgid) return `https://coverartarchive.org/release-group/${rgid}/front-250`
   return null
 }
 

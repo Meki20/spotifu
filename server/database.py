@@ -87,6 +87,90 @@ def _migrate():
         "CREATE INDEX IF NOT EXISTS ix_playlist_import_rows_query_normalized ON playlist_import_rows (query_normalized)",
         "CREATE INDEX IF NOT EXISTS ix_playlist_import_rows_state ON playlist_import_rows (state)",
         "ALTER TABLE users ADD COLUMN IF NOT EXISTS preferences_json VARCHAR(32768)",
+        # ------------------------------------------------------------------
+        # Normalized cover cache (deduplicated URLs + entity links)
+        # ------------------------------------------------------------------
+        """
+        CREATE TABLE IF NOT EXISTS cover_assets (
+            id BIGSERIAL PRIMARY KEY,
+            url VARCHAR(4096) NOT NULL UNIQUE,
+            created_at TIMESTAMP NOT NULL DEFAULT (CURRENT_TIMESTAMP AT TIME ZONE 'UTC')
+        )
+        """,
+        # Existing installs may have cover_assets created via SQLModel without a server default.
+        "ALTER TABLE cover_assets ADD COLUMN IF NOT EXISTS created_at TIMESTAMP",
+        "UPDATE cover_assets SET created_at = (CURRENT_TIMESTAMP AT TIME ZONE 'UTC') WHERE created_at IS NULL",
+        "ALTER TABLE cover_assets ALTER COLUMN created_at SET DEFAULT (CURRENT_TIMESTAMP AT TIME ZONE 'UTC')",
+        "ALTER TABLE cover_assets ALTER COLUMN created_at SET NOT NULL",
+        """
+        CREATE TABLE IF NOT EXISTS cover_links (
+            id BIGSERIAL PRIMARY KEY,
+            entity_kind VARCHAR(64) NOT NULL,
+            entity_id VARCHAR(128) NOT NULL,
+            asset_id BIGINT REFERENCES cover_assets(id),
+            found BOOLEAN NOT NULL DEFAULT FALSE,
+            fetched_at TIMESTAMP NOT NULL DEFAULT (CURRENT_TIMESTAMP AT TIME ZONE 'UTC'),
+            CONSTRAINT ux_cover_links_entity UNIQUE (entity_kind, entity_id)
+        )
+        """,
+        "CREATE INDEX IF NOT EXISTS ix_cover_links_asset_id ON cover_links (asset_id)",
+        "CREATE INDEX IF NOT EXISTS ix_cover_links_kind_fetched_at ON cover_links (entity_kind, fetched_at)",
+        # Backfill from MBEntityCache cover kinds (no network calls).
+        # Note: payload is JSON string; use jsonb ops to extract url/found.
+        """
+        WITH src AS (
+            SELECT
+                kind,
+                split_part(key, ':', 2) AS entity_id,
+                (payload::jsonb ->> 'url') AS url,
+                (payload::jsonb ->> 'found') AS found_str,
+                fetched_at
+            FROM mb_entity_cache
+            WHERE kind IN ('cover_recording', 'cover_release', 'cover_rg')
+        ),
+        mapped AS (
+            SELECT
+                CASE
+                    WHEN kind = 'cover_recording' THEN 'recording'
+                    WHEN kind = 'cover_release' THEN 'release'
+                    WHEN kind = 'cover_rg' THEN 'release_group'
+                    ELSE kind
+                END AS entity_kind,
+                entity_id,
+                url,
+                (found_str = 'true') AS found,
+                fetched_at
+            FROM src
+            WHERE entity_id IS NOT NULL AND entity_id <> ''
+        ),
+        ins_assets AS (
+            INSERT INTO cover_assets (url, created_at)
+            SELECT DISTINCT url
+                 , (CURRENT_TIMESTAMP AT TIME ZONE 'UTC')
+            FROM mapped
+            WHERE found = TRUE AND url IS NOT NULL AND url <> ''
+            ON CONFLICT (url) DO NOTHING
+            RETURNING id, url
+        ),
+        all_assets AS (
+            SELECT id, url FROM ins_assets
+            UNION ALL
+            SELECT id, url FROM cover_assets WHERE url IN (SELECT DISTINCT url FROM mapped WHERE found = TRUE AND url IS NOT NULL AND url <> '')
+        )
+        INSERT INTO cover_links (entity_kind, entity_id, asset_id, found, fetched_at)
+        SELECT
+            m.entity_kind,
+            m.entity_id,
+            a.id,
+            m.found,
+            COALESCE(m.fetched_at, (CURRENT_TIMESTAMP AT TIME ZONE 'UTC'))
+        FROM mapped m
+        LEFT JOIN all_assets a ON a.url = m.url
+        ON CONFLICT (entity_kind, entity_id) DO UPDATE SET
+            asset_id = EXCLUDED.asset_id,
+            found = EXCLUDED.found,
+            fetched_at = EXCLUDED.fetched_at
+        """,
     ]
     with engine.connect() as conn:
         for sql in migrations:

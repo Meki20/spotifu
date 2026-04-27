@@ -152,3 +152,23 @@ class MBEntityCache(SQLModel, table=True):
     payload: str  # JSON blob
     fetched_at: datetime = Field(default_factory=datetime.utcnow, index=True)
     etag: Optional[str] = None
+
+
+class CoverAsset(SQLModel, table=True):
+    __tablename__ = "cover_assets"
+    id: Optional[int] = Field(default=None, primary_key=True)
+    url: str = Field(unique=True, index=True, max_length=4096)
+    created_at: datetime = Field(default_factory=datetime.utcnow, index=True)
+
+
+class CoverLink(SQLModel, table=True):
+    __tablename__ = "cover_links"
+    id: Optional[int] = Field(default=None, primary_key=True)
+    entity_kind: str = Field(index=True, max_length=64)
+    entity_id: str = Field(index=True, max_length=128)
+    asset_id: Optional[int] = Field(default=None, foreign_key="cover_assets.id", index=True)
+    found: bool = Field(default=False, index=True)
+    fetched_at: datetime = Field(default_factory=datetime.utcnow, index=True)
+    __table_args__ = (
+        Index("ux_cover_links_entity", "entity_kind", "entity_id", unique=True),
+    )

@@ -1,6 +1,7 @@
 import { Outlet, Link, useLocation } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import PlayerBar from './PlayerBar'
+import NotificationCenter from './NotificationCenter'
 import { useAudioPlayer } from '../hooks/useAudioPlayer'
 import { ChevronLeft, ChevronRight, Home, Library, Search, Settings } from 'lucide-react'
 import { useAuthStore } from '../stores/authStore'
@@ -392,6 +393,7 @@ export default function MainLayout() {
         </main>
       </div>
 
+      <NotificationCenter />
       <PlayerBar />
     </div>
   )

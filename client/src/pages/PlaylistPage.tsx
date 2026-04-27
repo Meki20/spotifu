@@ -98,14 +98,17 @@ export default function PlaylistPage() {
     })
 
     usePlayerStore.setState((s) => {
-      const nextQueue = s.queue.map((t) =>
+      const nextUserQueue = (s.userQueue || []).map((t) =>
+        t.mb_id === mbid && t.album_cover !== url ? { ...t, album_cover: url } : t,
+      )
+      const nextSystemList = (s.systemList || []).map((t) =>
         t.mb_id === mbid && t.album_cover !== url ? { ...t, album_cover: url } : t,
       )
       const nextCurrent =
         s.currentTrack && s.currentTrack.mb_id === mbid && s.currentTrack.album_cover !== url
           ? { ...s.currentTrack, album_cover: url }
           : s.currentTrack
-      return { queue: nextQueue, currentTrack: nextCurrent }
+      return { userQueue: nextUserQueue, systemList: nextSystemList, currentTrack: nextCurrent }
     })
   }
 
@@ -187,14 +190,16 @@ export default function PlaylistPage() {
   function playItem(item: PlaylistItemDTO) {
     if (!playlist) return
     const cover = playlist.cover_image_url ?? null
-    controller.play(itemToPlayableTrack(item, cover, cachedMbIds))
+    const tracks = playlist.items.map((it) => itemToPlayableTrack(it, cover, cachedMbIds))
+    const idx = Math.max(0, playlist.items.findIndex((it) => it.id === item.id))
+    controller.setSystemAndPlay(tracks, idx, { kind: 'playlist', id, title: playlist?.title })
   }
 
   function playAll() {
     if (!playlist?.items?.length) return
     const cover = playlist.cover_image_url ?? null
     const tracks = playlist.items.map((it) => itemToPlayableTrack(it, cover, cachedMbIds))
-    controller.setQueueAndPlay(tracks, 0)
+    controller.setSystemAndPlay(tracks, 0, { kind: 'playlist', id, title: playlist?.title })
   }
 
   function downloadItem(item: PlaylistItemDTO) {

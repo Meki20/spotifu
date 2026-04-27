@@ -2,6 +2,7 @@ import { Outlet, Link, useLocation } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import PlayerBar from './PlayerBar'
 import NotificationCenter from './NotificationCenter'
+import QueuePanel from './QueuePanel'
 import { useAudioPlayer } from '../hooks/useAudioPlayer'
 import { ChevronLeft, ChevronRight, Home, Library, Search, Settings } from 'lucide-react'
 import { useAuthStore } from '../stores/authStore'
@@ -22,6 +23,7 @@ export default function MainLayout() {
   const location = useLocation()
   const token = useAuthStore((s) => s.token)
   const [collapsed, setCollapsed] = useState(false)
+  const [queueCollapsed, setQueueCollapsed] = useState(false)
 
   useEffect(() => {
     try {
@@ -39,6 +41,23 @@ export default function MainLayout() {
       // ignore
     }
   }, [collapsed])
+
+  useEffect(() => {
+    try {
+      const v = localStorage.getItem('spotifu.queueCollapsed')
+      if (v === '1') setQueueCollapsed(true)
+    } catch {
+      // ignore
+    }
+  }, [])
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('spotifu.queueCollapsed', queueCollapsed ? '1' : '0')
+    } catch {
+      // ignore
+    }
+  }, [queueCollapsed])
 
   const { data: sidebarPlaylists } = useQuery({
     queryKey: ['playlists'],
@@ -391,6 +410,9 @@ export default function MainLayout() {
         <main className="flex-1 overflow-y-auto bg-[#0C0906]">
           <Outlet />
         </main>
+
+        {/* Right queue strip */}
+        <QueuePanel collapsed={queueCollapsed} setCollapsed={setQueueCollapsed} />
       </div>
 
       <NotificationCenter />

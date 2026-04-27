@@ -1,4 +1,4 @@
-import { usePlayerStore, type Track, type RepeatMode } from '../stores/playerStore'
+import { usePlayerStore, type Track, type RepeatMode, type SystemSource } from '../stores/playerStore'
 import { subscribeSpotifuWebSocket } from '../spotifuWebSocket'
 import { API, authFetch } from '../api'
 import { queryClient } from '../queryClient'
@@ -7,8 +7,7 @@ class PlaybackController {
   private _audio: HTMLAudioElement
   private _currentTrackId: number | null = null
   private _currentMbId: string | null = null
-  private _history: Track[] = []
-  private _shuffleOrder: number[] | null = null
+  private _systemOriginIndexAtPlay: number = 0
   private _initialized = false
   private _playTimeout: ReturnType<typeof setTimeout> | null = null
 
@@ -78,7 +77,7 @@ class PlaybackController {
       return
     }
 
-    this._skipNextInternal(true)
+    this._advance(true)
   }
 
   private _matchesCurrent(data: Record<string, unknown>): boolean {
@@ -219,59 +218,41 @@ class PlaybackController {
       })
   }
 
-  private _generateShuffleOrder(length: number, currentIndex: number): number[] {
-    const rest = Array.from({ length }, (_, i) => i).filter(i => i !== currentIndex)
-    for (let i = rest.length - 1; i > 0; i--) {
-      const j = Math.floor(Math.random() * (i + 1));
-      [rest[i], rest[j]] = [rest[j], rest[i]]
+  private _advance(autoAdvance: boolean) {
+    const state = usePlayerStore.getState()
+    const { userQueue, systemList, systemIndex, repeat } = state
+
+    // 1) User queue always wins for next-track selection.
+    if (userQueue.length > 0) {
+      const next = userQueue[0]
+      usePlayerStore.setState({ userQueue: userQueue.slice(1) })
+      this._playTrack(next)
+      return
     }
-    return [currentIndex, ...rest]
-  }
 
-  private _skipNextInternal(autoAdvance: boolean) {
-    const { queue, queueIndex, repeat, shuffle } = usePlayerStore.getState()
-
-    if (queue.length === 0) {
+    if (!systemList.length) {
       usePlayerStore.setState({ isPlaying: false, phase: 'idle' })
       return
     }
 
-    let nextIndex: number | null = null
-
-    if (shuffle && this._shuffleOrder) {
-      const curPos = this._shuffleOrder.indexOf(queueIndex)
-      const nextPos = curPos + 1
-      if (nextPos < this._shuffleOrder.length) {
-        nextIndex = this._shuffleOrder[nextPos]
-      } else if (repeat === 'all' && autoAdvance) {
-        this._shuffleOrder = this._generateShuffleOrder(queue.length, 0)
-        nextIndex = this._shuffleOrder[0]
-      }
-    } else {
-      if (queueIndex + 1 < queue.length) {
-        nextIndex = queueIndex + 1
-      } else if (repeat === 'all' && autoAdvance) {
-        nextIndex = 0
+    // 2) Advance within system list.
+    let nextSystemIndex = systemIndex + 1
+    if (nextSystemIndex >= systemList.length) {
+      if (repeat === 'all' && autoAdvance) nextSystemIndex = 0
+      else {
+        usePlayerStore.setState({ isPlaying: false })
+        return
       }
     }
 
-    if (nextIndex === null) {
-      usePlayerStore.setState({ isPlaying: false })
-      return
-    }
-
-    const ct = usePlayerStore.getState().currentTrack
-    if (ct) this._history = [...this._history.slice(-49), ct]
-
-    usePlayerStore.setState({ queueIndex: nextIndex })
-    this._playTrack(queue[nextIndex])
+    usePlayerStore.getState().setSystemIndex(nextSystemIndex)
+    this._systemOriginIndexAtPlay = nextSystemIndex
+    this._playTrack(systemList[nextSystemIndex])
   }
 
   // --- Public API ---
 
   play(track: Track): void {
-    const { currentTrack } = usePlayerStore.getState()
-    if (currentTrack) this._history = [...this._history.slice(-49), currentTrack]
     this._playTrack(track)
   }
 
@@ -306,44 +287,19 @@ class PlaybackController {
   }
 
   addToQueue(track: Track): void {
-    const { queue } = usePlayerStore.getState()
-    if (this._shuffleOrder) {
-      this._shuffleOrder.push(queue.length)
-    }
-    usePlayerStore.setState({ queue: [...queue, track] })
+    usePlayerStore.getState().enqueueUser(track)
   }
 
-  insertNext(track: Track): void {
-    const { queue, queueIndex } = usePlayerStore.getState()
-    const insertAt = queueIndex + 1
-    const newQueue = [...queue.slice(0, insertAt), track, ...queue.slice(insertAt)]
-    if (this._shuffleOrder) {
-      const curShufflePos = this._shuffleOrder.indexOf(queueIndex)
-      const shifted = this._shuffleOrder.map(i => i >= insertAt ? i + 1 : i)
-      shifted.splice(curShufflePos + 1, 0, insertAt)
-      this._shuffleOrder = shifted
-    }
-    usePlayerStore.setState({ queue: newQueue })
+  removeFromUserQueue(index: number): void {
+    usePlayerStore.getState().removeFromUserQueue(index)
   }
 
-  removeFromQueue(index: number): void {
-    const { queue, queueIndex } = usePlayerStore.getState()
-    const newQueue = queue.filter((_, i) => i !== index)
-    let newIndex = queueIndex
-    if (index < queueIndex) newIndex--
-    if (this._shuffleOrder) {
-      this._shuffleOrder = this._generateShuffleOrder(newQueue.length, newIndex)
-    }
-    usePlayerStore.setState({ queue: newQueue, queueIndex: newIndex })
-  }
-
-  clearQueue(): void {
-    usePlayerStore.setState({ queue: [], queueIndex: 0 })
-    this._shuffleOrder = null
+  clearUserQueue(): void {
+    usePlayerStore.getState().clearUserQueue()
   }
 
   skipNext(): void {
-    this._skipNextInternal(false)
+    this._advance(false)
   }
 
   skipPrev(): void {
@@ -353,16 +309,16 @@ class PlaybackController {
       usePlayerStore.setState({ currentTime: 0 })
       return
     }
-    if (this._history.length > 0) {
-      const prev = this._history[this._history.length - 1]
-      this._history = this._history.slice(0, -1)
-      this._playTrack(prev)
-    }
+
+    const { systemList, systemIndex } = usePlayerStore.getState()
+    if (!systemList.length) return
+    const prevIndex = Math.max(0, systemIndex - 1)
+    usePlayerStore.getState().setSystemIndex(prevIndex)
+    this._systemOriginIndexAtPlay = prevIndex
+    this._playTrack(systemList[prevIndex])
   }
 
   setShuffle(on: boolean): void {
-    const { queueIndex, queue } = usePlayerStore.getState()
-    this._shuffleOrder = on ? this._generateShuffleOrder(queue.length, queueIndex) : null
     usePlayerStore.setState({ shuffle: on })
   }
 
@@ -370,9 +326,9 @@ class PlaybackController {
     usePlayerStore.setState({ repeat: mode })
   }
 
-  setQueueAndPlay(tracks: Track[], startIndex = 0): void {
-    usePlayerStore.setState({ queue: tracks, queueIndex: startIndex })
-    this._shuffleOrder = null
+  setSystemAndPlay(tracks: Track[], startIndex = 0, source: SystemSource | null = null): void {
+    usePlayerStore.getState().setSystem(tracks, startIndex, source)
+    this._systemOriginIndexAtPlay = startIndex
     if (tracks.length > 0) this.play(tracks[startIndex])
   }
 }
@@ -407,14 +363,11 @@ export function setVolume(vol: number): void {
 export function addToQueue(track: Track): void {
   controller.addToQueue(track)
 }
-export function insertNext(track: Track): void {
-  controller.insertNext(track)
+export function removeFromUserQueue(index: number): void {
+  controller.removeFromUserQueue(index)
 }
-export function removeFromQueue(index: number): void {
-  controller.removeFromQueue(index)
-}
-export function clearQueue(): void {
-  controller.clearQueue()
+export function clearUserQueue(): void {
+  controller.clearUserQueue()
 }
 export function skipNext(): void {
   controller.skipNext()
@@ -428,6 +381,6 @@ export function setShuffle(on: boolean): void {
 export function setRepeat(mode: RepeatMode): void {
   controller.setRepeat(mode)
 }
-export function setQueueAndPlay(tracks: Track[], startIndex = 0): void {
-  controller.setQueueAndPlay(tracks, startIndex)
+export function setSystemAndPlay(tracks: Track[], startIndex = 0, source: SystemSource | null = null): void {
+  controller.setSystemAndPlay(tracks, startIndex, source)
 }

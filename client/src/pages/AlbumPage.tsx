@@ -86,13 +86,15 @@ export default function AlbumPage() {
 
   function playTrack(track: any) {
     if (!album) return
-    controller.play(albumTrackToControllerTrack(track, album, displayCover))
+    const tracks = (album.tracks || []).map((t: any) => albumTrackToControllerTrack(t, album, displayCover))
+    const idx = Math.max(0, (album.tracks || []).findIndex((t: any) => t?.mb_id && t.mb_id === track?.mb_id))
+    controller.setSystemAndPlay(tracks, idx, { kind: 'album', id: String(albumId || ''), title: album?.title })
   }
 
   function playAlbumFromStart() {
     if (!album?.tracks?.length) return
     const tracks = album.tracks.map((t: any) => albumTrackToControllerTrack(t, album, displayCover))
-    controller.setQueueAndPlay(tracks, 0)
+    controller.setSystemAndPlay(tracks, 0, { kind: 'album', id: String(albumId || ''), title: album?.title })
   }
 
   if (isLoading) {

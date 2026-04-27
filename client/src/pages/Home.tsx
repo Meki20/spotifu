@@ -68,6 +68,18 @@ export default function Home() {
     controller.play(toTrack(track))
   }
 
+  function playFromRecentlyAdded(track: any) {
+    const list = (recentlyAdded || []).map((t) => toTrack(t))
+    const idx = Math.max(0, (recentlyAdded || []).findIndex((t) => (t?.mb_id || t?.mbid) === (track?.mb_id || track?.mbid)))
+    controller.setSystemAndPlay(list, idx, { kind: 'recently-added' })
+  }
+
+  function playFromRecentlyPlayed(track: any) {
+    const list = (recentlyPlayed || []).map((t) => toTrack(t))
+    const idx = Math.max(0, (recentlyPlayed || []).findIndex((t) => (t?.mb_id || t?.mbid) === (track?.mb_id || track?.mbid)))
+    controller.setSystemAndPlay(list, idx, { kind: 'recently-played' })
+  }
+
   function handleRecentlyAddedContextMenu(e: React.MouseEvent, track: any) {
     e.preventDefault()
     e.stopPropagation()
@@ -164,7 +176,7 @@ export default function Home() {
         >
           {recentlyAdded && recentlyAdded.length > 0 ? (
             recentlyAdded.map((track) => (
-              <TrackCard key={track.track_id} track={track} onPlay={playTrack} onHoverArtist={(aid, albs) => enqueue(aid, albs)} onContextMenu={(e) => handleRecentlyAddedContextMenu(e, track)} />
+              <TrackCard key={track.track_id} track={track} onPlay={playFromRecentlyAdded} onHoverArtist={(aid, albs) => enqueue(aid, albs)} onContextMenu={(e) => handleRecentlyAddedContextMenu(e, track)} />
             ))
           ) : (
             <p className="text-sm" style={{ color: '#4A413C', fontFamily: "'Barlow Semi Condensed', sans-serif" }}>no tracks added yet</p>
@@ -200,7 +212,7 @@ export default function Home() {
                 <TrackRow
                   track={track}
                   isCached={track.is_cached}
-                  onPlay={playTrack}
+                  onPlay={playFromRecentlyPlayed}
                   onHoverArtist={(aid, albs) => enqueue(aid, albs)}
                   onContextMenu={handleRecentlyPlayedContextMenu}
                   style={{ padding: '8px 16px 8px 0' }}

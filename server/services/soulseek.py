@@ -43,8 +43,8 @@ _EXCELLENT_MIN_SPEED = 10_000_000   # bytes/sec: 10MB/s for truly "excellent"
 
 # Download stall: if bytes_transfered is still 0 for this many consecutive progress polls
 # (poll every 0.5s in download_file) → abort and let download.py try the next candidate.
-# 12 ≈ 6s of "stuck at 0%" with no data moving.
-_STALL_MAX_ZERO_BYTE_TICKS = 12
+# 16 ticks at 0.5s ≈ 8s of "stuck at 0%" with no data moving.
+_STALL_MAX_ZERO_BYTE_TICKS = 16
 
 # Module state
 _client = None                       # type: Optional["SoulSeekClient"]
@@ -877,11 +877,28 @@ async def search_soulseek(
             if best_excellent is not None:
                 score, user, path, size = best_excellent
                 akey_log = _availability_key(path or "")
+                # For debugging: include queue size + speed to understand "stuck in queue" cases.
+                # Note: We only early-exit on queue_size==0 + free slots + high speed, but still log.
+                speed_log = 0
+                queue_log = 0
+                free_log = False
+                for r, f, _size, _ext, _akey in _candidate_rows:
+                    if r.username == user and (f.filename or "") == (path or ""):
+                        speed_log = int(getattr(r, "avg_speed", 0) or 0)
+                        try:
+                            queue_log = int(getattr(r, "queue_size", 0) or 0)
+                        except Exception:
+                            queue_log = 0
+                        free_log = bool(getattr(r, "has_free_slots", False))
+                        break
                 logger.info(
-                    "EXCELLENT result: score=%.3f elapsed=%.2fs user=%r ext=%r availability=%d path=%r size=%d",
+                    "EXCELLENT result: score=%.3f elapsed=%.2fs user=%r ext=%r availability=%d avg_speed=%dB/s queue_size=%d free_slots=%s path=%r size=%d",
                     score, elapsed, user,
                     (path.rsplit(".", 1)[-1].lower() if "." in path else ""),
                     int(avail_by_key[akey_log] or 1),
+                    speed_log,
+                    queue_log,
+                    free_log,
                     path, size,
                 )
                 excellent_result = [(user, path, size)]
@@ -915,13 +932,19 @@ async def search_soulseek(
 
     # Final ranking from the same candidate list (no second full scan of raw results).
     _ingest_new_results()
-    _scored_hits: List[Tuple[float, str, str, int]] = []
+    _scored_hits: List[Tuple[float, str, str, int, int, int, bool, int]] = []
     for r, f, size, _ext, akey in _candidate_rows:
         availability = int(avail_by_key[akey] or 1)
         score = _score_file(r, f, artist, title, album, availability=availability)
-        _scored_hits.append((score, r.username, f.filename, size))
+        speed = int(getattr(r, "avg_speed", 0) or 0)
+        try:
+            q = int(getattr(r, "queue_size", 0) or 0)
+        except Exception:
+            q = 0
+        has_free = bool(getattr(r, "has_free_slots", False))
+        _scored_hits.append((score, r.username, f.filename, size, speed, q, has_free, availability))
     _scored_hits.sort(key=lambda x: x[0], reverse=True)
-    hits_all = [(u, p, s) for _sc, u, p, s in _scored_hits]
+    hits_all = [(u, p, s) for _sc, u, p, s, _speed, _q, _has_free, _av in _scored_hits]
     hits_flac = [(u, p, s) for (u, p, s) in hits_all if (p or "").lower().endswith(".flac")]
     # MP3 should be last resort: if we have any FLAC candidates, prefer them exclusively.
     # Slow/queued behavior is handled by speed/slot gating and (optionally) future mid-download aborts.
@@ -932,8 +955,19 @@ async def search_soulseek(
         query, len(request.results), len(hits),
     )
     logger.debug("Raw results: %d peers responded, after ranking/filtering: %d candidates", len(request.results), len(hits))
-    for i, (_sc, u, p, sz) in enumerate(_scored_hits[:10]):
-        logger.debug("  [%d] score=%.3f user=%r path=%r size=%d", i+1, _sc, u, p, sz)
+    for i, (_sc, u, p, sz, speed, q, has_free, av) in enumerate(_scored_hits[:10]):
+        logger.debug(
+            "  [%d] score=%.3f user=%r path=%r size=%d availability=%d avg_speed=%dB/s queue_size=%d free_slots=%s",
+            i + 1,
+            _sc,
+            u,
+            p,
+            sz,
+            av,
+            speed,
+            q,
+            has_free,
+        )
     return hits
 
 
@@ -976,45 +1010,75 @@ async def download_file(
 
     async with _download_gate:
         logger.info("Soulseek download start: %s/%s", username, remote_path)
-        transfer = await _client.transfers.download(username, remote_path)
+        # aioslsk can sometimes hang inside `download()` (e.g. NAT/UPnP/socket issues).
+        # If we never get a Transfer object back, our stall detection can't run.
+        try:
+            transfer = await asyncio.wait_for(_client.transfers.download(username, remote_path), timeout=min(30.0, timeout))
+        except asyncio.TimeoutError:
+            logger.error("Soulseek transfer create timed out (no Transfer returned) for %s/%s", username, remote_path)
+            raise
+        except Exception:
+            logger.warning("Soulseek transfer create failed for %s/%s", username, remote_path, exc_info=True)
+            raise
+
+        try:
+            st = getattr(getattr(transfer, "state", None), "VALUE", None)
+        except Exception:
+            st = None
+        logger.info(
+            "Soulseek transfer created: state=%r bytes=%r/%r local_path=%r",
+            st,
+            getattr(transfer, "bytes_transfered", None),
+            getattr(transfer, "filesize", None),
+            getattr(transfer, "local_path", None),
+        )
 
         poll_task: Optional[asyncio.Task] = None
         no_progress_event = asyncio.Event()
-        if track_id is not None:
-            async def _poll_progress(tid: int) -> None:
-                last_progress_monotonic = asyncio.get_event_loop().time()
-                no_progress_ticks = 0
-                while not transfer.is_finalized():
-                    await asyncio.sleep(0.5)
-                    cb = _progress_by_track.get(tid)
-                    if cb is None:
-                        continue
-                    filesize = transfer.filesize or 1
-                    bytes_done = transfer.bytes_transfered or 0
-                    if abort_on_no_progress and bytes_done <= 0:
-                        no_progress_ticks += 1
-                        if no_progress_ticks >= _STALL_MAX_ZERO_BYTE_TICKS:
-                            logger.warning(
-                                "No-progress stall detected (consecutive 0%% ticks=%d, max=%d); "
-                                "aborting download to try next candidate: %s/%s",
-                                no_progress_ticks, _STALL_MAX_ZERO_BYTE_TICKS, username, remote_path
-                            )
-                            no_progress_event.set()
-                            try:
-                                abort_fn = getattr(transfer, "abort", None)
-                                if abort_fn is not None:
-                                    res = abort_fn("no_progress")
-                                    if asyncio.iscoroutine(res):
-                                        await res
-                            except Exception:
-                                logger.debug("transfer abort no_progress (ignored)", exc_info=True)
-                            break
-                    elif bytes_done > 0:
-                        no_progress_ticks = 0
-                        last_progress_monotonic = asyncio.get_event_loop().time()
-                    now = asyncio.get_event_loop().time()
-                    if abort_on_no_progress and (now - last_progress_monotonic) > 30.0:
-                        logger.warning("30s stall detected (no bytes progressed); aborting download to try next candidate: %s/%s", username, remote_path)
+        async def _poll_progress(tid: int | None) -> None:
+            created_at = asyncio.get_event_loop().time()
+            last_progress_monotonic = created_at
+            no_progress_ticks = 0
+            while not transfer.is_finalized():
+                await asyncio.sleep(0.5)
+                cb = _progress_by_track.get(tid) if tid is not None else None
+                filesize = transfer.filesize or 1
+                bytes_done = transfer.bytes_transfered or 0
+                now = asyncio.get_event_loop().time()
+
+                # Always-on "didn't start" guard:
+                # If we don't get *any* bytes within ~8s of transfer creation, move on.
+                if bytes_done <= 0 and (now - created_at) >= 8.0:
+                    logger.warning(
+                        "No-start detected (state=%s bytes=0 for %.1fs); aborting to try next candidate: %s/%s",
+                        getattr(getattr(transfer, "state", None), "VALUE", None),
+                        (now - created_at),
+                        username,
+                        remote_path,
+                    )
+                    no_progress_event.set()
+                    try:
+                        abort_fn = getattr(transfer, "abort", None)
+                        if abort_fn is not None:
+                            res = abort_fn("no_start")
+                            if asyncio.iscoroutine(res):
+                                await res
+                    except Exception:
+                        logger.debug("transfer abort no_start (ignored)", exc_info=True)
+                    break
+
+                if abort_on_no_progress and bytes_done <= 0:
+                    no_progress_ticks += 1
+                    if no_progress_ticks >= _STALL_MAX_ZERO_BYTE_TICKS:
+                        logger.warning(
+                            "No-progress stall detected (state=%s consecutive 0%% ticks=%d, max=%d); "
+                            "aborting download to try next candidate: %s/%s",
+                            getattr(getattr(transfer, "state", None), "VALUE", None),
+                            no_progress_ticks,
+                            _STALL_MAX_ZERO_BYTE_TICKS,
+                            username,
+                            remote_path,
+                        )
                         no_progress_event.set()
                         try:
                             abort_fn = getattr(transfer, "abort", None)
@@ -1023,24 +1087,48 @@ async def download_file(
                                 if asyncio.iscoroutine(res):
                                     await res
                         except Exception:
-                            logger.debug("transfer abort 30s stall (ignored)", exc_info=True)
+                            logger.debug("transfer abort no_progress (ignored)", exc_info=True)
                         break
-                    if bytes_done > 0 and tid not in _inflight_paths and transfer.local_path:
-                        async with _inflight_lock:
-                            _inflight_paths[tid] = str(transfer.local_path)
-                            if filesize > 1:
-                                _inflight_filesizes[tid] = filesize
-                    percent = int(min(bytes_done / filesize * 100, 100))
-                    elapsed = now - last_progress_monotonic
-                    speed = (bytes_done) / elapsed if elapsed > 0 else 0.0
-                    fs: int | None = int(filesize) if filesize and filesize > 1 else None
+                elif bytes_done > 0:
+                    no_progress_ticks = 0
+                    last_progress_monotonic = now
+
+                if abort_on_no_progress and (now - last_progress_monotonic) > 30.0:
+                    logger.warning(
+                        "30s stall detected (no bytes progressed); aborting download to try next candidate: %s/%s",
+                        username,
+                        remote_path,
+                    )
+                    no_progress_event.set()
+                    try:
+                        abort_fn = getattr(transfer, "abort", None)
+                        if abort_fn is not None:
+                            res = abort_fn("no_progress")
+                            if asyncio.iscoroutine(res):
+                                await res
+                    except Exception:
+                        logger.debug("transfer abort 30s stall (ignored)", exc_info=True)
+                    break
+
+                if tid is not None and bytes_done > 0 and tid not in _inflight_paths and transfer.local_path:
+                    async with _inflight_lock:
+                        _inflight_paths[tid] = str(transfer.local_path)
+                        if filesize > 1:
+                            _inflight_filesizes[tid] = filesize
+
+                percent = int(min(bytes_done / filesize * 100, 100))
+                elapsed = now - last_progress_monotonic
+                speed = (bytes_done) / elapsed if elapsed > 0 else 0.0
+                fs: int | None = int(filesize) if filesize and filesize > 1 else None
+                if cb is not None:
                     try:
                         result = cb(percent, bytes_done, speed, fs)
                         if asyncio.iscoroutine(result):
                             await result
                     except Exception as e:
                         logger.debug("progress callback error: %s", e)
-            poll_task = asyncio.create_task(_poll_progress(track_id))
+
+        poll_task = asyncio.create_task(_poll_progress(track_id))
 
         result_path: Optional[str] = None
         try:

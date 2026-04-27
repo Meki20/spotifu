@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
 from sqlmodel import Session
 from database import get_session
@@ -100,15 +100,16 @@ def _load_idx(artist_id: str) -> tuple[int, int]:
 @router.get("/{artist_id}/images")
 async def get_artist_images(
     artist_id: str,
+    artist_name: str | None = Query(default=None),
     session: Session = Depends(get_session),
     user: User = Depends(get_current_user),
 ):
     banner_idx, picture_idx = _load_idx(artist_id)
 
-    artist_name: str | None = None
+    artist_name = (artist_name or "").strip() or None
     head = _get_cache("artist_head", artist_id)
     if isinstance(head, dict) and (head.get("name") or "").strip():
-        artist_name = (head.get("name") or "").strip()
+        artist_name = artist_name or (head.get("name") or "").strip()
 
     svc = MetadataService(session)
     if not artist_name:

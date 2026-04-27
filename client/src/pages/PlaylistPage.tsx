@@ -31,7 +31,10 @@ function itemToPlayableTrack(
   const serverCached = Boolean(item.is_cached)
   const wsOverlay = Boolean(mbid && cachedMbIds.has(mbid))
   const isCached = serverCached || wsOverlay
-  const art = resolveTrackArtUrl(item) ?? playlistCover
+  // Important: do NOT fall back to playlist cover here.
+  // If we do, that "infects" the player/system list with the playlist image and can
+  // mask real per-track cached covers (especially for not-yet-downloaded tracks).
+  const art = resolveTrackArtUrl(item) ?? null
   const streamOnlyWhenReady = isCached && item.track_id
   return toTrack(
     {

@@ -1,8 +1,54 @@
 import { X, ListMusic } from 'lucide-react'
 import { useEffect, useMemo, useState, type ReactNode } from 'react'
+import { useQuery } from '@tanstack/react-query'
+import { Link } from 'react-router-dom'
 import { useShallow } from 'zustand/react/shallow'
 import { usePlayerStore, type Track } from '../stores/playerStore'
 import * as controller from '../playback/controller'
+import { authFetch } from '../api'
+
+function NowPlayingCard({ track }: { track: Track }) {
+  return (
+    <div className="w-full">
+      <button
+        type="button"
+        className="w-full text-left"
+        onClick={() => controller.play(track)}
+        aria-label="Play now playing"
+      >
+        <div
+          className="w-full aspect-square rounded-md overflow-hidden"
+          style={{
+            background: '#231815',
+            boxShadow: '0 14px 40px rgba(0,0,0,0.55), 0 2px 0 rgba(255,255,255,0.03) inset',
+          }}
+        >
+          {track.album_cover ? (
+            <img src={track.album_cover} alt="" className="w-full h-full object-cover block" />
+          ) : null}
+        </div>
+      </button>
+
+      <div className="pt-3">
+        <div
+          className="text-sm font-semibold leading-snug"
+          style={{
+            fontFamily: "'Barlow Semi Condensed', sans-serif",
+            color: '#E8DDD0',
+          }}
+        >
+          {track.title}
+        </div>
+        <div className="text-[11px] mt-1" style={{ fontFamily: "'Space Mono', monospace", color: 'rgba(232,221,208,0.70)' }}>
+          {track.artist}
+        </div>
+        <div className="text-[11px] mt-0.5 truncate" style={{ fontFamily: "'Space Mono', monospace", color: 'rgba(232,221,208,0.50)' }}>
+          {track.album}
+        </div>
+      </div>
+    </div>
+  )
+}
 
 function TrackRow({
   track,
@@ -106,6 +152,34 @@ export default function QueuePanel(_: QueuePanelProps) {
     })),
   )
 
+  const isEmpty = !currentTrack && userQueue.length === 0 && systemLookahead.length === 0
+
+  const aboutArtist = useMemo(() => {
+    const t = currentTrack
+    if (!t) return null
+    const raw = (t.artist_credit || t.artist || '').trim()
+    const first = raw.split(',')[0]?.split('&')[0]?.split(' feat. ')[0]?.split(' ft. ')[0]?.trim() || raw || 'Unknown artist'
+    return {
+      id: t.mb_artist_id || null,
+      name: first,
+    }
+  }, [currentTrack])
+
+  const { data: artistImages } = useQuery({
+    queryKey: ['queue-artist-images', aboutArtist?.id, aboutArtist?.name],
+    queryFn: async () => {
+      if (!aboutArtist?.id) return { banner: null as string | null }
+      const qs = aboutArtist.name ? `?artist_name=${encodeURIComponent(aboutArtist.name)}` : ''
+      const res = await authFetch(`/artist/${aboutArtist.id}/images${qs}`)
+      if (!res.ok) return { banner: null as string | null }
+      return res.json() as Promise<{ banner?: string | null }>
+    },
+    enabled: !!aboutArtist?.id,
+    staleTime: 1000 * 60 * 10,
+    gcTime: 1000 * 60 * 30,
+    refetchOnWindowFocus: false,
+  })
+
   const sourceLabel = useMemo(() => {
     if (!systemSource) return 'Next from system'
     if (systemSource.kind === 'album') return systemSource.title ? `Next from album • ${systemSource.title}` : 'Next from album'
@@ -183,27 +257,93 @@ export default function QueuePanel(_: QueuePanelProps) {
           </div>
         </div>
 
-        <div className="px-4 pb-3 pt-3">
-          <div className="text-xs mb-2" style={{ fontFamily: "'Barlow Condensed', sans-serif", color: '#4A413C', letterSpacing: '0.14em', fontWeight: 800, textTransform: 'uppercase' }}>
-            Now playing
-          </div>
-          {currentTrack ? (
-            <TrackRow
-              track={currentTrack}
-              right={
-                <div className="text-[10px]" style={{ fontFamily: "'Space Mono', monospace", color: 'rgba(232,221,208,0.5)' }}>
-                  now
+        {/* Scrollable content */}
+        <div className="flex-1 overflow-y-auto" style={{ overscrollBehavior: 'contain' }}>
+          {isEmpty ? (
+            <div className="px-4 py-6">
+              <div className="w-full aspect-square rounded-md overflow-hidden" style={{ background: 'rgba(26,18,16,0.35)', border: '1px solid rgba(61,40,32,0.45)' }}>
+                <div className="w-full h-full grid place-items-center">
+                  <img
+                    src="/assets/brand/polly_512x512.png"
+                    alt=""
+                    aria-hidden
+                    className="select-none w-[82%] h-[82%]"
+                    draggable={false}
+                    style={{ objectFit: 'contain' }}
+                  />
                 </div>
-              }
-            />
-          ) : (
-            <div className="text-xs" style={{ fontFamily: "'Space Mono', monospace", color: 'rgba(232,221,208,0.45)' }}>
-              Nothing playing
+              </div>
+              <div
+                className="mt-4 text-center text-sm"
+                style={{ fontFamily: "'Barlow Semi Condensed', sans-serif", color: 'rgba(232,221,208,0.70)' }}
+              >
+                Queue is empty
+              </div>
             </div>
-          )}
-        </div>
+          ) : (
+            <div>
+              <div className="px-4 pb-3 pt-3">
+                <div className="text-xs mb-2" style={{ fontFamily: "'Barlow Condensed', sans-serif", color: '#4A413C', letterSpacing: '0.14em', fontWeight: 800, textTransform: 'uppercase' }}>
+                  Now playing
+                </div>
+                {currentTrack ? (
+                  <NowPlayingCard track={currentTrack} />
+                ) : (
+                  <div className="text-xs" style={{ fontFamily: "'Space Mono', monospace", color: 'rgba(232,221,208,0.45)' }}>
+                    Nothing playing
+                  </div>
+                )}
+              </div>
 
-        <div className="px-4 pb-3">
+              <div className="px-4 pb-3">
+            <div
+              className="text-xs mb-2"
+              style={{
+                fontFamily: "'Barlow Condensed', sans-serif",
+                color: '#4A413C',
+                letterSpacing: '0.14em',
+                fontWeight: 800,
+                textTransform: 'uppercase',
+              }}
+            >
+              About the artist
+            </div>
+
+            <div className="rounded-md overflow-hidden" style={{ border: '1px solid rgba(61,40,32,0.5)', background: 'rgba(26,18,16,0.35)' }}>
+              <div className="w-full" style={{ height: 92, background: '#16100B' }}>
+                {artistImages?.banner ? (
+                  <img src={artistImages.banner} alt="" className="w-full h-full object-cover block" loading="lazy" />
+                ) : (
+                  <div className="w-full h-full animate-pulse" style={{ background: 'linear-gradient(90deg, rgba(22,16,11,1) 0%, rgba(28,20,16,1) 50%, rgba(22,16,11,1) 100%)' }} />
+                )}
+              </div>
+
+              <div className="px-3 pt-3 pb-3">
+                {aboutArtist?.id ? (
+                  <Link
+                    to={`/artist/${aboutArtist.id}`}
+                    className="inline-block font-semibold"
+                    style={{ fontFamily: "'Barlow Semi Condensed', sans-serif", color: '#E8DDD0' }}
+                  >
+                    {aboutArtist.name}
+                  </Link>
+                ) : (
+                  <div className="font-semibold" style={{ fontFamily: "'Barlow Semi Condensed', sans-serif", color: '#E8DDD0' }}>
+                    {aboutArtist?.name || 'Unknown artist'}
+                  </div>
+                )}
+
+                {/* Placeholder description skeleton (intentional infinite loading for now). */}
+                <div className="mt-2 flex flex-col gap-2">
+                  <div className="h-2 rounded animate-pulse" style={{ background: 'rgba(232,221,208,0.10)' }} />
+                  <div className="h-2 rounded animate-pulse" style={{ background: 'rgba(232,221,208,0.10)', width: '92%' }} />
+                  <div className="h-2 rounded animate-pulse" style={{ background: 'rgba(232,221,208,0.10)', width: '78%' }} />
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div className="px-4 pb-3">
           <div className="flex items-center justify-between mb-2">
             <div className="text-xs" style={{ fontFamily: "'Barlow Condensed', sans-serif", color: '#4A413C', letterSpacing: '0.14em', fontWeight: 800, textTransform: 'uppercase' }}>
               Up next (your queue)
@@ -235,9 +375,9 @@ export default function QueuePanel(_: QueuePanelProps) {
               ))
             )}
           </div>
-        </div>
+          </div>
 
-        <div className="px-4 pb-6">
+          <div className="px-4 pb-6">
           <div className="text-xs mb-2" style={{ fontFamily: "'Barlow Condensed', sans-serif", color: '#4A413C', letterSpacing: '0.14em', fontWeight: 800, textTransform: 'uppercase' }}>
             {sourceLabel}
           </div>
@@ -262,6 +402,9 @@ export default function QueuePanel(_: QueuePanelProps) {
               })
             )}
           </div>
+          </div>
+            </div>
+          )}
         </div>
       </div>
     </div>

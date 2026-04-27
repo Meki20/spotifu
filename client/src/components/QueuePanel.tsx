@@ -1,4 +1,4 @@
-import { X, ChevronLeft, ChevronRight, ListMusic } from 'lucide-react'
+import { X, ListMusic } from 'lucide-react'
 import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import { useShallow } from 'zustand/react/shallow'
 import { usePlayerStore, type Track } from '../stores/playerStore'
@@ -62,33 +62,32 @@ function TrackRow({
 }
 
 export type QueuePanelProps = {
-  collapsed?: boolean
-  setCollapsed?: (v: boolean) => void
+  // No user controls; visibility is derived from layout state.
 }
 
-const QueuePanel = ({ collapsed: collapsedProp, setCollapsed: setCollapsedProp }: QueuePanelProps) => {
-  const [collapsedLocal, setCollapsedLocal] = useState(false)
-  const collapsed = collapsedProp ?? collapsedLocal
-  const setCollapsed = setCollapsedProp ?? ((v: boolean) => setCollapsedLocal(v))
+export default function QueuePanel(_: QueuePanelProps) {
+  const [isVisible, setIsVisible] = useState(true)
 
   useEffect(() => {
-    if (collapsedProp !== undefined) return
-    try {
-      const v = localStorage.getItem('spotifu.queueCollapsed')
-      if (v === '1') setCollapsedLocal(true)
-    } catch {
-      // ignore
+    const compute = () => {
+      const appW = window.innerWidth || 0
+      const screenW = window.screen?.availWidth || window.screen?.width || 0
+      const widerThanHalfScreen = screenW > 0 ? appW > screenW * 0.5 : appW >= 1100
+      const sidebarCollapsed = document.documentElement.dataset.sidebarCollapsed === '1'
+      setIsVisible(widerThanHalfScreen || sidebarCollapsed)
     }
-  }, [collapsedProp])
 
-  useEffect(() => {
-    if (collapsedProp !== undefined) return
-    try {
-      localStorage.setItem('spotifu.queueCollapsed', collapsedLocal ? '1' : '0')
-    } catch {
-      // ignore
+    compute()
+    window.addEventListener('resize', compute)
+
+    const obs = new MutationObserver(compute)
+    obs.observe(document.documentElement, { attributes: true, attributeFilter: ['data-sidebar-collapsed'] })
+
+    return () => {
+      window.removeEventListener('resize', compute)
+      obs.disconnect()
     }
-  }, [collapsedLocal, collapsedProp])
+  }, [])
   const {
     currentTrack,
     userQueue,
@@ -117,17 +116,18 @@ const QueuePanel = ({ collapsed: collapsedProp, setCollapsed: setCollapsedProp }
     return systemSource.title ? `Next from • ${systemSource.title}` : 'Next from system'
   }, [systemSource])
 
-  const widthPx = collapsed ? 60 : 320
+  const widthPx = isVisible ? 320 : 0
 
   return (
     <div
       className="flex flex-col h-full relative shrink-0 overflow-hidden"
       style={{
         width: widthPx,
-        background: '#231815',
-        borderLeft: '1px solid #3D2820',
-        transition: 'width 220ms cubic-bezier(0.2, 0.9, 0.2, 1)',
-        willChange: 'width',
+        opacity: isVisible ? 1 : 0,
+        background: '#0C0906',
+        borderLeft: '1px solid #1C1410',
+        transition: 'width 220ms cubic-bezier(0.2, 0.9, 0.2, 1), opacity 120ms ease',
+        willChange: 'width, opacity',
       }}
     >
       {/* Grain overlay */}
@@ -148,81 +148,41 @@ const QueuePanel = ({ collapsed: collapsedProp, setCollapsed: setCollapsedProp }
       />
 
       <div className="relative z-10 flex flex-col h-full overflow-hidden">
-        {/* Header / toggle */}
+        {/* Header */}
         <div
           className="pt-4 pb-3"
           style={{
             borderBottom: '1px solid #261A14',
-            paddingLeft: collapsed ? 0 : 16,
-            paddingRight: collapsed ? 0 : 16,
+            paddingLeft: 16,
+            paddingRight: 16,
             transition: 'padding 220ms cubic-bezier(0.2, 0.9, 0.2, 1)',
           }}
         >
-          {collapsed ? (
-            <div className="flex flex-col items-center justify-center gap-2">
-              <div
-                className="w-9 h-9 rounded-sm grid place-items-center"
-                style={{ border: '1px solid #3D2820', background: 'transparent', color: '#9A8E84' }}
-                aria-hidden
-              >
-                <ListMusic size={18} />
-              </div>
-              <button
-                type="button"
-                onClick={() => setCollapsed(false)}
-                className="w-9 h-9 rounded flex items-center justify-center transition-colors hover:border-[#b4003e]"
-                style={{ border: '1px solid #3D2820', background: 'transparent', color: '#9A8E84' }}
-                aria-label="Expand queue"
-                title="Expand"
-              >
-                <ChevronLeft size={18} />
-              </button>
+          <div className="flex items-center gap-2">
+            <div
+              className="w-8 h-8 rounded-sm grid place-items-center shrink-0"
+              style={{ border: '1px solid #3D2820', color: '#9A8E84' }}
+              aria-hidden
+            >
+              <ListMusic size={16} />
             </div>
-          ) : (
-            <div className="flex items-center gap-2">
-              <div
-                className="w-8 h-8 rounded-sm grid place-items-center shrink-0"
-                style={{ border: '1px solid #3D2820', color: '#9A8E84' }}
-                aria-hidden
-              >
-                <ListMusic size={16} />
-              </div>
-              <div
-                className="text-2xl font-bold tracking-wide"
-                style={{
-                  fontFamily: "'Barlow Condensed', sans-serif",
-                  fontWeight: 800,
-                  textTransform: 'uppercase',
-                  letterSpacing: '0.05em',
-                  color: '#E8DDD0',
-                  lineHeight: 1,
-                  whiteSpace: 'nowrap',
-                }}
-              >
-                Queue
-              </div>
-              <button
-                type="button"
-                onClick={() => setCollapsed(true)}
-                className="ml-auto w-9 h-9 rounded flex items-center justify-center transition-colors hover:border-[#b4003e]"
-                style={{ border: '1px solid #3D2820', background: 'transparent', color: '#9A8E84' }}
-                aria-label="Collapse queue"
-                title="Collapse"
-              >
-                <ChevronRight size={18} />
-              </button>
+            <div
+              className="text-2xl font-bold tracking-wide"
+              style={{
+                fontFamily: "'Barlow Condensed', sans-serif",
+                fontWeight: 800,
+                textTransform: 'uppercase',
+                letterSpacing: '0.05em',
+                color: '#E8DDD0',
+                lineHeight: 1,
+                whiteSpace: 'nowrap',
+              }}
+            >
+              Queue
             </div>
-          )}
+          </div>
         </div>
 
-        {/* Body */}
-        <div
-          style={{
-            opacity: collapsed ? 0 : 1,
-            pointerEvents: collapsed ? 'none' : 'auto',
-            transition: 'opacity 120ms ease',
-          }}
-        >
         <div className="px-4 pb-3 pt-3">
           <div className="text-xs mb-2" style={{ fontFamily: "'Barlow Condensed', sans-serif", color: '#4A413C', letterSpacing: '0.14em', fontWeight: 800, textTransform: 'uppercase' }}>
             Now playing
@@ -303,11 +263,8 @@ const QueuePanel = ({ collapsed: collapsedProp, setCollapsed: setCollapsedProp }
             )}
           </div>
         </div>
-        </div>
       </div>
     </div>
   )
 }
-
-export default QueuePanel
 

@@ -23,7 +23,7 @@ export default function MainLayout() {
   const location = useLocation()
   const token = useAuthStore((s) => s.token)
   const [collapsed, setCollapsed] = useState(false)
-  const [queueCollapsed, setQueueCollapsed] = useState(false)
+  const [queueVisible, setQueueVisible] = useState(true)
 
   useEffect(() => {
     try {
@@ -43,21 +43,23 @@ export default function MainLayout() {
   }, [collapsed])
 
   useEffect(() => {
-    try {
-      const v = localStorage.getItem('spotifu.queueCollapsed')
-      if (v === '1') setQueueCollapsed(true)
-    } catch {
-      // ignore
+    const compute = () => {
+      // Show both panels when app is wider than half the physical screen.
+      // Otherwise, show queue only when left sidebar is collapsed.
+      const appW = window.innerWidth || 0
+      const screenW = window.screen?.availWidth || window.screen?.width || 0
+      const widerThanHalfScreen = screenW > 0 ? appW > screenW * 0.5 : appW >= 1100
+      setQueueVisible(widerThanHalfScreen || collapsed)
     }
-  }, [])
+    compute()
+    window.addEventListener('resize', compute)
+    return () => window.removeEventListener('resize', compute)
+  }, [collapsed])
 
   useEffect(() => {
-    try {
-      localStorage.setItem('spotifu.queueCollapsed', queueCollapsed ? '1' : '0')
-    } catch {
-      // ignore
-    }
-  }, [queueCollapsed])
+    document.documentElement.dataset.sidebarCollapsed = collapsed ? '1' : '0'
+    document.documentElement.dataset.queueVisible = queueVisible ? '1' : '0'
+  }, [collapsed, queueVisible])
 
   const { data: sidebarPlaylists } = useQuery({
     queryKey: ['playlists'],
@@ -96,7 +98,7 @@ export default function MainLayout() {
   }
 
   return (
-    <div className="flex flex-col h-screen w-screen overflow-hidden bg-[#0C0906]">
+    <div className="flex flex-col h-screen w-screen overflow-hidden bg-[#100B04]">
       <div className="flex flex-1 overflow-hidden">
         {/* Sidebar */}
         <aside
@@ -407,12 +409,12 @@ export default function MainLayout() {
         </aside>
 
         {/* Main content */}
-        <main className="flex-1 overflow-y-auto bg-[#0C0906]">
+        <main className="flex-1 overflow-y-auto bg-[#100B04]">
           <Outlet />
         </main>
 
-        {/* Right queue strip */}
-        <QueuePanel collapsed={queueCollapsed} setCollapsed={setQueueCollapsed} />
+        {/* Right queue strip (reactive, not user-toggleable) */}
+        <QueuePanel />
       </div>
 
       <NotificationCenter />

@@ -310,6 +310,17 @@ export default function MainLayout() {
                       title={pl.title}
                       aria-label={collapsed ? pl.title : undefined}
                     >
+                      {cover && !collapsed && (
+                        <div
+                          className="absolute inset-0 pointer-events-none"
+                          style={{
+                            backgroundImage: `url(${cover})`,
+                            backgroundSize: 'cover',
+                            backgroundPosition: 'center',
+                            opacity: 0.12,
+                          }}
+                        />
+                      )}
                       {/* Cover / initial */}
                       <div
                         className="relative shrink-0 overflow-hidden"

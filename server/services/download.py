@@ -203,6 +203,9 @@ async def _run_download(track_id: int, title: str, artist: str, album: str = "",
         await remove_progress_callback(track_id)
 
     mb_id_for_ws: str | None = None
+    mb_recording_id_for_cover: str | None = None
+    mb_release_id_for_cover: str | None = None
+    mb_rg_id_for_cover: str | None = None
     with Session(engine) as session:
         track = session.get(Track, track_id)
         if track:
@@ -223,8 +226,24 @@ async def _run_download(track_id: int, title: str, artist: str, album: str = "",
                         mb_id_for_ws = mb_id_resolved
                 except Exception:
                     logger.exception("mb resolve_id after download for track_id=%s", track_id)
+            mb_recording_id_for_cover = track.mb_id
+            mb_release_id_for_cover = track.mb_release_id
+            mb_rg_id_for_cover = track.mb_release_group_id
             session.add(track)
             session.commit()
+
+    if status == TrackStatus.READY and local_path:
+        from services.covers import upsert_local_cover
+        try:
+            await upsert_local_cover(
+                local_path,
+                track_id,
+                recording_id=mb_recording_id_for_cover,
+                release_id=mb_release_id_for_cover,
+                release_group_id=mb_rg_id_for_cover,
+            )
+        except Exception:
+            logger.debug("Local cover upsert failed for track_id=%s", track_id, exc_info=True)
 
     if status == TrackStatus.READY:
         payload: dict = {

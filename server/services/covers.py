@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import logging
+import os
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 from typing import Any, Literal
@@ -99,16 +100,18 @@ def _upsert_link(
     asset_id: int | None,
     found: bool,
     fetched_at: datetime | None = None,
+    source: str = "musicbrainz",
 ) -> None:
     session.exec(
         text(
             """
-            INSERT INTO cover_links (entity_kind, entity_id, asset_id, found, fetched_at)
-            VALUES (:kind, :eid, :asset_id, :found, :fetched_at)
+            INSERT INTO cover_links (entity_kind, entity_id, asset_id, found, fetched_at, source)
+            VALUES (:kind, :eid, :asset_id, :found, :fetched_at, :source)
             ON CONFLICT (entity_kind, entity_id) DO UPDATE SET
                 asset_id = EXCLUDED.asset_id,
                 found = EXCLUDED.found,
-                fetched_at = EXCLUDED.fetched_at
+                fetched_at = EXCLUDED.fetched_at,
+                source = EXCLUDED.source
             """
         ),
         params={
@@ -117,6 +120,7 @@ def _upsert_link(
             "asset_id": asset_id,
             "found": bool(found),
             "fetched_at": fetched_at or _now_utc(),
+            "source": source,
         },
     )
 
@@ -203,7 +207,144 @@ async def _fetch_cover_url(kind: EntityKind, entity_id: str) -> tuple[str | None
                         url_str = u
         except Exception:
             pass
+
+    # Final fallback: extract cover art from the downloaded local audio file.
+    if not url_str:
+        try:
+            from models import Track, TrackStatus
+            from sqlmodel import select as sa_select
+
+            with Session(engine) as _s:
+                _track = _s.exec(
+                    sa_select(Track).where(
+                        Track.mb_id == entity_id,
+                        Track.status == TrackStatus.READY,
+                        Track.local_file_path.isnot(None),  # type: ignore[union-attr]
+                    ).limit(1)
+                ).first()
+            if _track and _track.local_file_path and _track.id is not None:
+                url_str = _extract_local_cover(_track.local_file_path, _track.id)
+        except Exception:
+            logger.debug("Local cover fallback failed for recording %s", entity_id, exc_info=True)
+
     return url_str, (meta_ids or None)
+
+
+def _extract_local_cover(local_file_path: str, track_id: int) -> str | None:
+    """Extract embedded artwork from audio file, save to cache, return serve URL or None."""
+    try:
+        from mutagen import File as MutagenFile
+        from mutagen.mp4 import MP4Cover
+    except ImportError:
+        logger.warning("mutagen not installed; cannot extract local cover art")
+        return None
+
+    try:
+        audio = MutagenFile(local_file_path, easy=False)
+        if audio is None:
+            return None
+
+        img_data: bytes | None = None
+        img_mime = "image/jpeg"
+
+        # FLAC: .pictures list
+        if hasattr(audio, "pictures") and audio.pictures:
+            pic = audio.pictures[0]
+            img_data = pic.data
+            img_mime = getattr(pic, "mime", "image/jpeg") or "image/jpeg"
+
+        # ID3 (MP3, AIFF, etc.): APIC frames
+        if img_data is None and hasattr(audio, "tags") and audio.tags is not None:
+            try:
+                frames = audio.tags.getall("APIC")
+                if frames:
+                    img_data = frames[0].data
+                    img_mime = getattr(frames[0], "mime", "image/jpeg") or "image/jpeg"
+            except AttributeError:
+                pass
+
+        # M4A/AAC: covr atom
+        if img_data is None and hasattr(audio, "tags") and audio.tags is not None:
+            covr = (audio.tags or {}).get("covr")
+            if covr:
+                raw = covr[0]
+                img_data = bytes(raw)
+                img_mime = (
+                    "image/png"
+                    if getattr(raw, "imageformat", None) == MP4Cover.FORMAT_PNG
+                    else "image/jpeg"
+                )
+
+        if not img_data:
+            return None
+
+        ext = ".png" if "png" in img_mime else ".jpg"
+        cache_dir = os.environ.get("CACHE_DIR") or "/home/lukaarch/Documents/src/SpotiFU/cache"
+        covers_dir = os.path.join(cache_dir, "covers")
+        os.makedirs(covers_dir, exist_ok=True)
+        filename = f"track_{track_id}{ext}"
+        with open(os.path.join(covers_dir, filename), "wb") as f:
+            f.write(img_data)
+        logger.debug("Extracted local cover art: %s", filename)
+        api_base = (os.environ.get("API_BASE_URL") or "http://localhost:1985").rstrip("/")
+        return f"{api_base}/covers/local/{filename}"
+    except Exception:
+        logger.debug("Local cover extraction failed for %s", local_file_path, exc_info=True)
+        return None
+
+
+async def upsert_local_cover(
+    local_file_path: str,
+    track_id: int,
+    recording_id: str | None,
+    release_id: str | None,
+    release_group_id: str | None,
+) -> None:
+    """Extract cover from downloaded audio file and store for all available entity IDs.
+
+    Only runs if none of the provided entity IDs already have a positive cover.
+    """
+    entities = [
+        ("recording", recording_id),
+        ("release", release_id),
+        ("release_group", release_group_id),
+    ]
+    entity_pairs = [(k, v) for k, v in entities if v]
+    if not entity_pairs:
+        return
+
+    with Session(engine) as session:
+        clauses = []
+        params: dict[str, str] = {}
+        for kind, eid in entity_pairs:
+            key = f"eid_{kind}"
+            clauses.append(f"(entity_kind = '{kind}' AND entity_id = :{key})")
+            params[key] = eid  # type: ignore[assignment]
+        where = " OR ".join(clauses)
+        row = session.exec(
+            text(f"SELECT 1 FROM cover_links WHERE found = TRUE AND ({where}) LIMIT 1"),
+            params=params,
+        ).first()
+        if row:
+            return  # already have a cover
+
+    url = _extract_local_cover(local_file_path, track_id)
+    if not url:
+        return
+
+    with Session(engine) as session:
+        asset_id = _upsert_asset(session, url=url)
+        for kind, eid in entity_pairs:
+            _upsert_link(
+                session,
+                entity_kind=kind,  # type: ignore[arg-type]
+                entity_id=eid,
+                asset_id=asset_id,
+                found=True,
+                source="local",
+            )
+        session.commit()
+    logger.info("Stored local cover art for track_id=%s url=%s", track_id, url)
 
 
 async def get_cover_url(entity_kind: EntityKind, entity_id: str) -> CoverResult:

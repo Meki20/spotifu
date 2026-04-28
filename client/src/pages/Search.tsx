@@ -460,7 +460,7 @@ export default function Search() {
       {isLoading && (
         <div className="flex items-center gap-3 py-2">
           <PollyLoading size={36} />
-          <span className="text-sm" style={{ color: '#4A413C', fontFamily: "'Space Mono', monospace" }}>
+          <span className="text-sm" style={{ color: '#4A413C', fontFamily: "'Barlow Semi Condensed', sans-serif" }}>
             searching…
           </span>
         </div>
@@ -468,7 +468,7 @@ export default function Search() {
       {!isLoading && similarStreamPending && !localOnly && bestMatchMbid && (
         <div className="flex items-center gap-3 py-2 mb-1">
           <PollyLoading size={32} />
-          <span className="text-sm" style={{ color: '#4A413C', fontFamily: "'Space Mono', monospace" }}>
+          <span className="text-sm" style={{ color: '#4A413C', fontFamily: "'Barlow Semi Condensed', sans-serif" }}>
             similar tracks…
           </span>
         </div>
@@ -477,7 +477,7 @@ export default function Search() {
         <div className="text-base" style={{ color: '#b4003e' }}>Error: {String(error)}</div>
       )}
       {!isLoading && results?.length === 0 && debouncedQuery.length > 2 && (
-        <div className="text-base" style={{ color: '#4A413C', fontFamily: "'Space Mono', monospace" }}>
+        <div className="text-base" style={{ color: '#4A413C', fontFamily: "'Barlow Semi Condensed', sans-serif" }}>
           no tracks found
         </div>
       )}

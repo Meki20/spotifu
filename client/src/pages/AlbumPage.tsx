@@ -99,7 +99,7 @@ export default function AlbumPage() {
 
   if (isLoading) {
     return (
-      <div className="p-6 flex flex-col items-center gap-3" style={{ color: '#4A413C', fontFamily: "'Space Mono', monospace" }}>
+      <div className="p-6 flex flex-col items-center gap-3" style={{ color: '#4A413C', fontFamily: "'Barlow Semi Condensed', sans-serif" }}>
         <PollyLoading size={48} />
         <span className="text-sm">loading…</span>
       </div>

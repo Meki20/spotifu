@@ -45,7 +45,7 @@ html, body, #root {
 body {
   background: var(--bg-base);
   color: var(--text-primary);
-  font-family: 'Barlow Semi Condensed', 'Space Mono', monospace;
+  font-family: 'Barlow Semi Condensed', sans-serif;
   font-size: 18px;
   -webkit-font-smoothing: antialiased;
 }

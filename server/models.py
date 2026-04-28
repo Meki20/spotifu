@@ -171,6 +171,7 @@ class CoverLink(SQLModel, table=True):
     asset_id: Optional[int] = Field(default=None, foreign_key="cover_assets.id", index=True)
     found: bool = Field(default=False, index=True)
     fetched_at: datetime = Field(default_factory=datetime.utcnow, index=True)
+    source: str = Field(default="musicbrainz", max_length=64)
     __table_args__ = (
         Index("ux_cover_links_entity", "entity_kind", "entity_id", unique=True),
     )

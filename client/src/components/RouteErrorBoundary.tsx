@@ -22,7 +22,7 @@ export default class RouteErrorBoundary extends Component<P, S> {
       return (
         <div
           className="flex flex-col items-center justify-center h-full p-8 gap-4"
-          style={{ color: '#4A413C', fontFamily: "'Space Mono', monospace" }}
+          style={{ color: '#4A413C', fontFamily: "'Barlow Semi Condensed', sans-serif" }}
         >
           <p className="text-sm">Something went wrong{this.props.name ? ` in ${this.props.name}` : ''}.</p>
           <p className="text-xs text-[#9A8E84] max-w-md break-words">{this.state.err.message}</p>

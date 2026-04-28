@@ -137,7 +137,7 @@ function NotificationToast({ item }: { item: NotificationItem }) {
               <div
                 className="text-xs mt-1 leading-snug"
                 style={{
-                  fontFamily: "'Space Mono', monospace",
+                  fontFamily: "'Barlow Semi Condensed', sans-serif",
                   color: 'rgba(232,221,208,0.72)',
                 }}
               >

@@ -1,33 +1,31 @@
 import { X, ListMusic } from 'lucide-react'
 import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { useShallow } from 'zustand/react/shallow'
 import { usePlayerStore, type Track } from '../stores/playerStore'
 import * as controller from '../playback/controller'
 import { authFetch } from '../api'
 
 function NowPlayingCard({ track }: { track: Track }) {
+  const navigate = useNavigate()
+  const displayStr = (track.artist_credit || track.artist || '').trim()
+  const artists = displayStr.split(',').map((s) => s.trim()).filter(Boolean)
+  const mainArtistName = artists[0] || ''
+  const extraArtists = artists.slice(1)
   return (
     <div className="w-full">
-      <button
-        type="button"
-        className="w-full text-left"
-        onClick={() => controller.play(track)}
-        aria-label="Play now playing"
+      <div
+        className="w-full aspect-square rounded-md overflow-hidden"
+        style={{
+          background: '#231815',
+          boxShadow: '0 14px 40px rgba(0,0,0,0.55), 0 2px 0 rgba(255,255,255,0.03) inset',
+        }}
       >
-        <div
-          className="w-full aspect-square rounded-md overflow-hidden"
-          style={{
-            background: '#231815',
-            boxShadow: '0 14px 40px rgba(0,0,0,0.55), 0 2px 0 rgba(255,255,255,0.03) inset',
-          }}
-        >
-          {track.album_cover ? (
-            <img src={track.album_cover} alt="" className="w-full h-full object-cover block" />
-          ) : null}
-        </div>
-      </button>
+        {track.album_cover ? (
+          <img src={track.album_cover} alt="" className="w-full h-full object-cover block" />
+        ) : null}
+      </div>
 
       <div className="pt-3">
         <div
@@ -39,10 +37,22 @@ function NowPlayingCard({ track }: { track: Track }) {
         >
           {track.title}
         </div>
-        <div className="text-[11px] mt-1" style={{ fontFamily: "'Space Mono', monospace", color: 'rgba(232,221,208,0.70)' }}>
-          {track.artist}
+        <div className="text-[11px] mt-1" style={{ fontFamily: "'Barlow Semi Condensed', sans-serif", color: 'rgba(232,221,208,0.70)' }}>
+          <span
+            className={track.mb_artist_id ? 'hover:underline cursor-pointer' : 'cursor-default'}
+            style={{ color: 'rgba(232,221,208,0.70)' }}
+            onClick={(e) => {
+              e.stopPropagation()
+              track.mb_artist_id && navigate(`/artist/${track.mb_artist_id}`)
+            }}
+          >
+            {mainArtistName}
+          </span>
+          {extraArtists.map((name, i) => (
+            <span key={i} style={{ color: 'rgba(232,221,208,0.70)' }}>{`, ${name}`}</span>
+          ))}
         </div>
-        <div className="text-[11px] mt-0.5 truncate" style={{ fontFamily: "'Space Mono', monospace", color: 'rgba(232,221,208,0.50)' }}>
+        <div className="text-[11px] mt-0.5 truncate" style={{ fontFamily: "'Barlow Semi Condensed', sans-serif", color: 'rgba(232,221,208,0.50)' }}>
           {track.album}
         </div>
       </div>
@@ -82,7 +92,7 @@ function TrackRow({
         <div className="text-xs font-semibold truncate" style={{ fontFamily: "'Barlow Semi Condensed', sans-serif", color: '#E8DDD0' }}>
           {track.title}
         </div>
-        <div className="text-[11px] truncate" style={{ fontFamily: "'Space Mono', monospace", color: 'rgba(232,221,208,0.65)' }}>
+        <div className="text-[11px] truncate" style={{ fontFamily: "'Barlow Semi Condensed', sans-serif", color: 'rgba(232,221,208,0.65)' }}>
           {track.artist}
         </div>
       </div>
@@ -289,7 +299,7 @@ export default function QueuePanel(_: QueuePanelProps) {
                 {currentTrack ? (
                   <NowPlayingCard track={currentTrack} />
                 ) : (
-                  <div className="text-xs" style={{ fontFamily: "'Space Mono', monospace", color: 'rgba(232,221,208,0.45)' }}>
+                  <div className="text-xs" style={{ fontFamily: "'Barlow Semi Condensed', sans-serif", color: 'rgba(232,221,208,0.45)' }}>
                     Nothing playing
                   </div>
                 )}
@@ -361,7 +371,7 @@ export default function QueuePanel(_: QueuePanelProps) {
           </div>
           <div className="flex flex-col gap-2">
             {userQueue.length === 0 ? (
-              <div className="text-xs" style={{ fontFamily: "'Space Mono', monospace", color: 'rgba(232,221,208,0.45)' }}>
+              <div className="text-xs" style={{ fontFamily: "'Barlow Semi Condensed', sans-serif", color: 'rgba(232,221,208,0.45)' }}>
                 No queued tracks
               </div>
             ) : (
@@ -383,7 +393,7 @@ export default function QueuePanel(_: QueuePanelProps) {
           </div>
           <div className="flex flex-col gap-2">
             {systemLookahead.length === 0 ? (
-              <div className="text-xs" style={{ fontFamily: "'Space Mono', monospace", color: 'rgba(232,221,208,0.45)' }}>
+              <div className="text-xs" style={{ fontFamily: "'Barlow Semi Condensed', sans-serif", color: 'rgba(232,221,208,0.45)' }}>
                 Nothing queued from system
               </div>
             ) : (

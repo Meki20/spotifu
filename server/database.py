@@ -207,6 +207,8 @@ def _migrate():
         "CREATE INDEX IF NOT EXISTS ix_mb_artist_aliases_artist_mbid ON mb_artist_aliases (artist_mbid)",
         "CREATE INDEX IF NOT EXISTS ix_mb_artist_aliases_is_manual ON mb_artist_aliases (is_manual)",
         "CREATE INDEX IF NOT EXISTS ix_mb_artist_aliases_last_seen_at ON mb_artist_aliases (last_seen_at)",
+        # Source tracking on cover_links: 'musicbrainz' | 'local'
+        "ALTER TABLE cover_links ADD COLUMN IF NOT EXISTS source VARCHAR(64) NOT NULL DEFAULT 'musicbrainz'",
     ]
     with engine.connect() as conn:
         for sql in migrations:

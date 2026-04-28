@@ -201,7 +201,7 @@ export default function AddToPlaylistModal({
         )}
         <ul className="max-h-72 overflow-y-auto py-1">
           {isLoading && (
-            <li className="px-4 py-3 flex items-center gap-2 text-sm" style={{ color: '#4A413C', fontFamily: "'Space Mono', monospace" }}>
+            <li className="px-4 py-3 flex items-center gap-2 text-sm" style={{ color: '#4A413C', fontFamily: "'Barlow Semi Condensed', sans-serif" }}>
               <PollyLoading size={24} />
               <span>loading…</span>
             </li>

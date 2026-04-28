@@ -285,7 +285,7 @@ export default function ArtistPage() {
     return (
       <div className="p-6 flex flex-col items-center gap-3 text-[#b3b3b3]">
         <PollyLoading size={48} />
-        <span className="text-sm" style={{ fontFamily: "'Space Mono', monospace" }}>loading…</span>
+        <span className="text-sm" style={{ fontFamily: "'Barlow Semi Condensed', sans-serif" }}>loading…</span>
       </div>
     )
   }

@@ -252,12 +252,12 @@ export default function Library() {
           )}
         </div>
         {!libraryAlbums ? (
-          <div className="flex items-center gap-2 text-sm" style={{ color: '#4A413C', fontFamily: "'Space Mono', monospace" }}>
+          <div className="flex items-center gap-2 text-sm" style={{ color: '#4A413C', fontFamily: "'Barlow Semi Condensed', sans-serif" }}>
             <PollyLoading size={28} />
             <span>loading…</span>
           </div>
         ) : libraryAlbums.length === 0 ? (
-          <div className="text-sm" style={{ color: '#4A413C', fontFamily: "'Space Mono', monospace" }}>no cached albums yet</div>
+          <div className="text-sm" style={{ color: '#4A413C', fontFamily: "'Barlow Semi Condensed', sans-serif" }}>no cached albums yet</div>
         ) : (
           <LibraryDiscStrip
             albums={libraryAlbums}
@@ -350,13 +350,13 @@ export default function Library() {
         )}
 
         {loadingPlaylists && (
-          <div className="flex items-center gap-2 text-sm mb-2" style={{ color: '#4A413C', fontFamily: "'Space Mono', monospace" }}>
+          <div className="flex items-center gap-2 text-sm mb-2" style={{ color: '#4A413C', fontFamily: "'Barlow Semi Condensed', sans-serif" }}>
             <PollyLoading size={28} />
             <span>loading…</span>
           </div>
         )}
         {!loadingPlaylists && playlists?.length === 0 && (
-          <div className="text-sm" style={{ color: '#4A413C', fontFamily: "'Space Mono', monospace" }}>no playlists yet</div>
+          <div className="text-sm" style={{ color: '#4A413C', fontFamily: "'Barlow Semi Condensed', sans-serif" }}>no playlists yet</div>
         )}
         <div className="grid grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
           {playlists?.map((pl) => (

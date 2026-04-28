@@ -113,7 +113,7 @@ export default function PlayerBar() {
           borderTop: '1px solid #3D2820',
         }}
       >
-        <div className="text-sm" style={{ color: '#4A413C', fontFamily: "'Space Mono', monospace" }}>
+        <div className="text-sm" style={{ color: '#4A413C', fontFamily: "'Barlow Semi Condensed', sans-serif" }}>
           no track playing
         </div>
       </div>

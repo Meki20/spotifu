@@ -28,7 +28,7 @@ function ContextMenuLayer() {
 
 function LoadingSpinner() {
   return (
-    <div className="flex flex-col items-center justify-center gap-3 h-full" style={{ color: '#4A413C', fontFamily: "'Space Mono', monospace" }}>
+    <div className="flex flex-col items-center justify-center gap-3 h-full" style={{ color: '#4A413C', fontFamily: "'Barlow Semi Condensed', sans-serif" }}>
       <PollyLoading size={56} />
       <span className="text-xs">loading…</span>
     </div>

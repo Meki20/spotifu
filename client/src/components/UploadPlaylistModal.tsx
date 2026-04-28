@@ -484,7 +484,7 @@ export default function UploadPlaylistModal({
                                   <span style={{ color: '#C4B8A8' }}>suggested</span>{' '}
                                   <span style={{ color: '#E8DDD0' }}>{suggestedArtist || '—'} — {suggestedTitle || '—'}</span>{' '}
                                   <span style={{ color: '#6B5E56' }}>·</span>{' '}
-                                  <span style={{ fontFamily: "'Space Mono', monospace", color: '#C4B8A8' }}>
+                                  <span style={{ fontFamily: "'Barlow Semi Condensed', sans-serif", color: '#C4B8A8' }}>
                                     {suggestedMbid}
                                   </span>
                                 </>
@@ -540,14 +540,14 @@ export default function UploadPlaylistModal({
                     background: '#231815',
                     border: '1px solid #3D2820',
                     color: '#9A8E84',
-                    fontFamily: "'Space Mono', monospace",
+                    fontFamily: "'Barlow Semi Condensed', sans-serif",
                   }}
                 >
                   {message}
                 </pre>
               )}
               {!busy && jobId != null && (
-                <div className="text-[11px] mt-1" style={{ color: '#6B5E56', fontFamily: "'Space Mono', monospace" }}>
+                <div className="text-[11px] mt-1" style={{ color: '#6B5E56', fontFamily: "'Barlow Semi Condensed', sans-serif" }}>
                   Import job: {jobId}
                 </div>
               )}
@@ -684,7 +684,7 @@ export default function UploadPlaylistModal({
                                   background: '#1A1210',
                                   border: '1px solid #3D2820',
                                   color: '#E8DDD0',
-                                  fontFamily: "'Space Mono', monospace",
+                                  fontFamily: "'Barlow Semi Condensed', sans-serif",
                                 }}
                                 onKeyDown={(e) => {
                                   if (e.key === 'Enter') {

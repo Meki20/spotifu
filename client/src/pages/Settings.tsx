@@ -760,7 +760,7 @@ export default function Settings() {
                   Cached {kind.charAt(0).toUpperCase() + kind.slice(1)}
                 </p>
                 <p className="text-xs" style={{ fontFamily: "'Barlow Semi Condensed', sans-serif", color: '#4A413C', fontSize: 18 }}>
-                  {kind === 'searches' ? 'MusicBrainz search results stored locally' :
+                  {kind === 'searches' ? 'Hybrid best-match + similar-tracks (per recording) cache' :
                    kind === 'discography' ? 'Artist data, album lists, and ordering' :
                    'Cover art from Cover Art Archive and fanart.tv artist images'}
                 </p>

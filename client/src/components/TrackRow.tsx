@@ -2,6 +2,7 @@ import { memo } from 'react'
 import { Play } from 'lucide-react'
 import { displayArtist } from '../utils/trackHelpers'
 import { PollyLoading } from './PollyLoading'
+import PlaylistTrackCover from './PlaylistTrackCover'
 
 interface TrackRowProps {
   track: any
@@ -9,6 +10,11 @@ interface TrackRowProps {
   showAlbum?: boolean
   showStatus?: boolean
   showCover?: boolean
+  /** Pulse placeholder while batch cover URLs are still loading (``mb_id`` but no ``album_cover``). */
+  coverBatchLoading?: boolean
+  /** Same per-row cover resolution as playlist (``resolveTrackArtUrl`` + ``GET /covers/recordings`` + img fallback). */
+  playlistStyleCover?: boolean
+  onCoverResolved?: (recordingMbid: string, url: string) => void
   isPlaying?: boolean
   isCached?: boolean
   downloadState?: { status: string; percent?: number }
@@ -24,6 +30,9 @@ const TrackRowImpl = ({
   showAlbum = false,
   showStatus = false,
   showCover = true,
+  coverBatchLoading = false,
+  playlistStyleCover = false,
+  onCoverResolved,
   isPlaying = false,
   isCached = false,
   downloadState,
@@ -65,13 +74,33 @@ const TrackRowImpl = ({
 
       {/* Title + artist + cover */}
       <div className="flex items-center gap-2.5 min-w-0">
-        {showCover && track.album_cover && (
+        {showCover && playlistStyleCover && (track.mb_id || track.mb_recording_id) && (
+          <PlaylistTrackCover
+            item={track}
+            className="w-8 h-8 rounded shrink-0"
+            onResolved={
+              onCoverResolved
+                ? (url) => {
+                    const id = String(track.mb_recording_id || track.mb_id || '').trim()
+                    if (id) onCoverResolved(id, url)
+                  }
+                : undefined
+            }
+          />
+        )}
+        {showCover && !playlistStyleCover && track.album_cover && (
           <img
             src={track.album_cover}
             alt={track.album || ''}
             className="w-8 h-8 rounded shrink-0"
             loading="lazy"
           />
+        )}
+        {showCover && !playlistStyleCover && !track.album_cover && track.mb_id && coverBatchLoading && (
+          <div className="w-8 h-8 rounded shrink-0 animate-pulse bg-[#231815]" aria-hidden />
+        )}
+        {showCover && !playlistStyleCover && !track.album_cover && track.mb_id && !coverBatchLoading && (
+          <div className="w-8 h-8 rounded shrink-0 bg-[#231815]" aria-hidden />
         )}
         <div className="min-w-0">
           <p
@@ -130,6 +159,10 @@ export default memo(TrackRowImpl, (prev, next) => {
   return (
     prev.track?.mb_id === next.track?.mb_id &&
     prev.track?.track_id === next.track?.track_id &&
+    prev.track?.album_cover === next.track?.album_cover &&
+    prev.coverBatchLoading === next.coverBatchLoading &&
+    prev.playlistStyleCover === next.playlistStyleCover &&
+    prev.onCoverResolved === next.onCoverResolved &&
     prev.downloadState?.status === next.downloadState?.status &&
     prev.downloadState?.percent === next.downloadState?.percent &&
     prev.isPlaying === next.isPlaying &&

@@ -581,48 +581,9 @@ def get_playlist(
         for i in items
     ]
     annotate_tracks_is_cached(session, shadow)
-    # Fill playlist item covers from DB-backed cover cache when possible (no network),
-    # but do it in a single batched DB read to avoid N+1 queries that slow the endpoint.
-    try:
-        from models import MBEntityCache
-        from sqlmodel import select as _select
-        import json as _json
+    from services.covers import attach_playlist_style_covers_mbentity_cache
 
-        want_release: dict[str, list[PlaylistItem]] = {}
-        want_rg: dict[str, list[PlaylistItem]] = {}
-        for it in items:
-            if it.album_cover:
-                continue
-            if it.mb_release_id:
-                want_release.setdefault(it.mb_release_id, []).append(it)
-            elif it.mb_release_group_id:
-                want_rg.setdefault(it.mb_release_group_id, []).append(it)
-
-        keys: list[str] = []
-        keys.extend([f"cover_release:{rid}" for rid in want_release.keys()])
-        keys.extend([f"cover_rg:{rgid}" for rgid in want_rg.keys()])
-        if keys:
-            rows = session.exec(_select(MBEntityCache).where(MBEntityCache.key.in_(keys))).all()
-            payload_by_key: dict[str, dict] = {}
-            for r in rows:
-                try:
-                    payload_by_key[r.key] = _json.loads(r.payload)
-                except Exception:
-                    continue
-
-            for rid, its in want_release.items():
-                p = payload_by_key.get(f"cover_release:{rid}") or {}
-                if p.get("found") is True and p.get("url"):
-                    for it in its:
-                        it.album_cover = str(p["url"])
-
-            for rgid, its in want_rg.items():
-                p = payload_by_key.get(f"cover_rg:{rgid}") or {}
-                if p.get("found") is True and p.get("url"):
-                    for it in its:
-                        it.album_cover = str(p["url"])
-    except Exception:
-        pass
+    attach_playlist_style_covers_mbentity_cache(session, list(items))
     item_outs = [
         _playlist_item_to_out(
             row,

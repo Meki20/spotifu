@@ -137,6 +137,8 @@ class MBLookupCache(SQLModel, table=True):
     mb_release_id: Optional[str] = Field(default=None, max_length=64)
     mb_release_group_id: Optional[str] = Field(default=None, max_length=64)
     fetched_at: Optional[datetime] = Field(default=None, index=True)
+    related_mb_ids: Optional[str] = Field(default=None)
+    top_mb_ids: Optional[str] = Field(default=None)
 
 
 class MBEntityCache(SQLModel, table=True):
@@ -172,3 +174,42 @@ class CoverLink(SQLModel, table=True):
     __table_args__ = (
         Index("ux_cover_links_entity", "entity_kind", "entity_id", unique=True),
     )
+
+
+class MbArtist(SQLModel, table=True):
+    """MusicBrainz artist identity cache (canonical name + metadata).
+
+    This is intentionally separate from ``tracks``/library concepts: it exists to speed up
+    alias normalization and stable artist surface forms across the app.
+    """
+
+    __tablename__ = "mb_artists"
+
+    artist_mbid: str = Field(primary_key=True, max_length=64)
+    canonical_name: str = Field(max_length=512, index=True)
+    sort_name: Optional[str] = Field(default=None, max_length=512)
+
+    source: str = Field(default="musicbrainz", max_length=64)
+    is_manual: bool = Field(default=False, index=True)
+
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+    updated_at: datetime = Field(default_factory=datetime.utcnow)
+    last_fetched_at: Optional[datetime] = Field(default=None, index=True)
+
+
+class MbArtistAlias(SQLModel, table=True):
+    """Maps a normalized alias string to a MusicBrainz artist MBID."""
+
+    __tablename__ = "mb_artist_aliases"
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    alias_norm: str = Field(index=True, unique=True, max_length=512)
+    alias_raw: Optional[str] = Field(default=None, max_length=512)
+
+    artist_mbid: str = Field(foreign_key="mb_artists.artist_mbid", index=True, max_length=64)
+
+    source: str = Field(default="musicbrainz", max_length=64)
+    is_manual: bool = Field(default=False, index=True)
+
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+    last_seen_at: datetime = Field(default_factory=datetime.utcnow, index=True)

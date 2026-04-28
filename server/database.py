@@ -40,6 +40,9 @@ def _migrate():
         "DROP TABLE IF EXISTS playlist_tracks CASCADE",
         "ALTER TABLE mb_lookup_cache ADD COLUMN IF NOT EXISTS fetched_at TIMESTAMP",
         "UPDATE mb_lookup_cache SET fetched_at = (CURRENT_TIMESTAMP AT TIME ZONE 'UTC') WHERE fetched_at IS NULL",
+        "ALTER TABLE mb_lookup_cache ADD COLUMN IF NOT EXISTS related_mb_ids VARCHAR",
+        "ALTER TABLE mb_lookup_cache ADD COLUMN IF NOT EXISTS top_mb_ids VARCHAR",
+        "DELETE FROM mb_entity_cache WHERE kind = 'similar_tracks'",
         "CREATE INDEX IF NOT EXISTS ix_tracks_status_added_at ON tracks (status, added_at)",
         "CREATE INDEX IF NOT EXISTS ix_mb_lookup_fetched_at ON mb_lookup_cache (fetched_at)",
         """
@@ -171,6 +174,39 @@ def _migrate():
             found = EXCLUDED.found,
             fetched_at = EXCLUDED.fetched_at
         """,
+        # ------------------------------------------------------------------
+        # MusicBrainz artist alias cache (mbid anchor + alias rows)
+        # ------------------------------------------------------------------
+        """
+        CREATE TABLE IF NOT EXISTS mb_artists (
+            artist_mbid VARCHAR(64) PRIMARY KEY,
+            canonical_name VARCHAR(512) NOT NULL,
+            sort_name VARCHAR(512),
+            source VARCHAR(64) NOT NULL DEFAULT 'musicbrainz',
+            is_manual BOOLEAN NOT NULL DEFAULT FALSE,
+            created_at TIMESTAMP NOT NULL DEFAULT (CURRENT_TIMESTAMP AT TIME ZONE 'UTC'),
+            updated_at TIMESTAMP NOT NULL DEFAULT (CURRENT_TIMESTAMP AT TIME ZONE 'UTC'),
+            last_fetched_at TIMESTAMP
+        )
+        """,
+        "CREATE INDEX IF NOT EXISTS ix_mb_artists_canonical_name ON mb_artists (canonical_name)",
+        "CREATE INDEX IF NOT EXISTS ix_mb_artists_is_manual ON mb_artists (is_manual)",
+        "CREATE INDEX IF NOT EXISTS ix_mb_artists_last_fetched_at ON mb_artists (last_fetched_at)",
+        """
+        CREATE TABLE IF NOT EXISTS mb_artist_aliases (
+            id SERIAL PRIMARY KEY,
+            alias_norm VARCHAR(512) NOT NULL UNIQUE,
+            alias_raw VARCHAR(512),
+            artist_mbid VARCHAR(64) NOT NULL REFERENCES mb_artists(artist_mbid) ON DELETE CASCADE,
+            source VARCHAR(64) NOT NULL DEFAULT 'musicbrainz',
+            is_manual BOOLEAN NOT NULL DEFAULT FALSE,
+            created_at TIMESTAMP NOT NULL DEFAULT (CURRENT_TIMESTAMP AT TIME ZONE 'UTC'),
+            last_seen_at TIMESTAMP NOT NULL DEFAULT (CURRENT_TIMESTAMP AT TIME ZONE 'UTC')
+        )
+        """,
+        "CREATE INDEX IF NOT EXISTS ix_mb_artist_aliases_artist_mbid ON mb_artist_aliases (artist_mbid)",
+        "CREATE INDEX IF NOT EXISTS ix_mb_artist_aliases_is_manual ON mb_artist_aliases (is_manual)",
+        "CREATE INDEX IF NOT EXISTS ix_mb_artist_aliases_last_seen_at ON mb_artist_aliases (last_seen_at)",
     ]
     with engine.connect() as conn:
         for sql in migrations:

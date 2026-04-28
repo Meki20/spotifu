@@ -1,12 +1,13 @@
 from __future__ import annotations
 
+import json
 import logging
 from dataclasses import dataclass
 from datetime import datetime, timedelta
-from typing import Literal
+from typing import Any, Literal
 
 from sqlalchemy import text
-from sqlmodel import Session
+from sqlmodel import Session, select
 
 from database import engine
 
@@ -315,3 +316,69 @@ def lookup_cached_cover_best_effort(
     url = row[0]
     return str(url) if url else None
 
+
+def attach_playlist_style_covers_mbentity_cache(session: Session, rows: list[Any]) -> None:
+    """Fill ``album_cover`` in-memory like playlist GET: MBEntityCache ``cover_release`` / ``cover_rg`` only (no network).
+
+    Accepts row dicts (hybrid/search) or ORM objects (``PlaylistItem``) with ``album_cover``, ``mb_release_id``,
+    ``mb_release_group_id``.
+    """
+    from models import MBEntityCache
+
+    def _cover(r: Any) -> Any:
+        return r.get("album_cover") if isinstance(r, dict) else getattr(r, "album_cover", None)
+
+    def _rel(r: Any) -> str | None:
+        v = r.get("mb_release_id") if isinstance(r, dict) else getattr(r, "mb_release_id", None)
+        return str(v).strip() if v else None
+
+    def _rg(r: Any) -> str | None:
+        v = r.get("mb_release_group_id") if isinstance(r, dict) else getattr(r, "mb_release_group_id", None)
+        return str(v).strip() if v else None
+
+    def _set_cover(r: Any, url: str) -> None:
+        if isinstance(r, dict):
+            r["album_cover"] = url
+        else:
+            r.album_cover = url
+
+    want_release: dict[str, list[Any]] = {}
+    want_rg: dict[str, list[Any]] = {}
+    for r in rows:
+        if not r or _cover(r):
+            continue
+        rel, rg = _rel(r), _rg(r)
+        if rel:
+            want_release.setdefault(rel, []).append(r)
+        elif rg:
+            want_rg.setdefault(rg, []).append(r)
+
+    keys: list[str] = []
+    keys.extend([f"cover_release:{rid}" for rid in want_release.keys()])
+    keys.extend([f"cover_rg:{rgid}" for rgid in want_rg.keys()])
+    if not keys:
+        return
+    try:
+        rows_cache = session.exec(select(MBEntityCache).where(MBEntityCache.key.in_(keys))).all()
+        payload_by_key: dict[str, dict] = {}
+        for ent in rows_cache:
+            try:
+                payload_by_key[ent.key] = json.loads(ent.payload)
+            except Exception:
+                continue
+
+        for rid, its in want_release.items():
+            p = payload_by_key.get(f"cover_release:{rid}") or {}
+            if p.get("found") is True and p.get("url"):
+                u = str(p["url"])
+                for it in its:
+                    _set_cover(it, u)
+
+        for rgid, its in want_rg.items():
+            p = payload_by_key.get(f"cover_rg:{rgid}") or {}
+            if p.get("found") is True and p.get("url"):
+                u = str(p["url"])
+                for it in its:
+                    _set_cover(it, u)
+    except Exception:
+        pass

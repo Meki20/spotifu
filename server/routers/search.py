@@ -2,7 +2,8 @@ import difflib
 import json
 import logging
 import time
-from fastapi import APIRouter, Query, Depends
+import asyncio
+from fastapi import APIRouter, Query, Depends, Request
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 from sqlmodel import Session, select
@@ -10,6 +11,7 @@ from database import get_session
 from deps import get_current_user
 from models import Track, TrackStatus, User
 from schemas import TrackOut
+from services.covers import attach_playlist_style_covers_mbentity_cache
 from services.providers.musicbrainz import official_releases_latest_first
 
 router = APIRouter(prefix="/search", tags=["search"])
@@ -87,6 +89,7 @@ def _track_to_out(t: dict, is_cached: bool = False) -> TrackOut:
 
 @router.get("/hybrid", response_model=HybridSearchResponse)
 async def hybrid_search(
+    request: Request,
     q: str = Query(..., min_length=1, max_length=500),
     session: Session = Depends(get_session),
     user: User = Depends(get_current_user),
@@ -98,11 +101,15 @@ async def hybrid_search(
 
     svc = HybridSearchService()
     pf = get_prefetch_prefs(user)
-    async with musicbrainz.mb_interactive_calls():
-        raw = await svc.search(q, prefetch_prefs=pf)
+    try:
+        async with musicbrainz.mb_interactive_calls():
+            raw = await svc.search(q, prefetch_prefs=pf, is_cancelled=request.is_disconnected)
+    except asyncio.CancelledError:
+        return HybridSearchResponse(intent="track", sections=[])
 
     all_tracks = [t for sec in raw["sections"] for t in sec["tracks"]]
     annotate_tracks_is_cached(session, all_tracks)
+    attach_playlist_style_covers_mbentity_cache(session, all_tracks)
 
     sections = [
         TrackSection(type=sec["type"], label=sec["label"], tracks=[_track_to_out(t, t.get("is_cached", False)) for t in sec["tracks"]])
@@ -173,43 +180,33 @@ async def stream_similar_tracks(
     from services.providers import lastfm
     from services.providers import musicbrainz
     from services.track_cache_status import annotate_tracks_is_cached
-    import services.providers as providers
+    from services.hybrid_search import _get_cache_with_meta, _save_to_cache
+
+    cache_key = f"sim:{mbid}"
 
     async def _ndjson_core():
         logger.debug("[similar] stream start mbid=%s", mbid)
         t0 = time.monotonic()
 
         # ------------------------------------------------------------------
-        # Cache: return previously resolved similar tracks immediately.
+        # Cache: related MBIDs in mb_lookup_cache.related_mb_ids; rows in mb_entity_cache.
         # ------------------------------------------------------------------
-        cache_kind = "similar_tracks"
-        cached = None
         try:
-            cached = providers._db_get(cache_kind, mbid)  # type: ignore[attr-defined]
+            _cached_top, cached_related, _fetched_at = _get_cache_with_meta(cache_key)
         except Exception:
-            cached = None
-        if isinstance(cached, dict) and isinstance(cached.get("tracks"), list) and cached["tracks"]:
-            cached_tracks: list[dict] = cached["tracks"]
-            logger.debug("[similar] cache hit mbid=%s tracks=%d", mbid, len(cached_tracks))
-            # Cache entries from older versions may lack artist_credit; treat as stale and rebuild.
-            stale = False
-            try:
-                if any(isinstance(t, dict) and t.get("mbid") and not t.get("artist_credit") for t in cached_tracks):
-                    stale = True
-                    logger.debug("[similar] cache stale (missing artist_credit); rebuilding mbid=%s", mbid)
-            except Exception:
-                pass
-            if not stale:
-                # Refresh cached 'is_cached' flags on-demand (cheap DB check).
-                for t in cached_tracks:
-                    try:
-                        annotate_tracks_is_cached(session, [t])
-                    except Exception:
-                        pass
-                    out = _track_to_out(t, bool(t.get("is_cached", False)))
-                    yield (json.dumps({"type": "track", "track": out.model_dump()}) + "\n").encode("utf-8")
-                yield (json.dumps({"type": "done", "cached": True}) + "\n").encode("utf-8")
-                return
+            cached_related = []
+        if cached_related:
+            logger.debug("[similar] cache hit mbid=%s tracks=%d", mbid, len(cached_related))
+            attach_playlist_style_covers_mbentity_cache(session, cached_related)
+            for t in cached_related:
+                try:
+                    annotate_tracks_is_cached(session, [t])
+                except Exception:
+                    pass
+                out = _track_to_out(t, bool(t.get("is_cached", False)))
+                yield (json.dumps({"type": "track", "track": out.model_dump()}) + "\n").encode("utf-8")
+            yield (json.dumps({"type": "done", "cached": True}) + "\n").encode("utf-8")
+            return
         logger.debug("[similar] cache miss mbid=%s", mbid)
 
         seed_title = ""
@@ -302,12 +299,8 @@ async def stream_similar_tracks(
                     continue
                 picked.append(best_row)
 
-            # Hydrate covers for picked rows in parallel (CAA).
-            try:
-                if picked:
-                    await musicbrainz._hydrate_release_covers(picked, size=musicbrainz.CAA_SIZE_LIST)
-            except Exception:
-                pass
+            if picked:
+                attach_playlist_style_covers_mbentity_cache(session, picked)
 
             # Now yield picked rows.
             for row in picked:
@@ -329,10 +322,21 @@ async def stream_similar_tracks(
 
         logger.debug("[similar] stream done mbid=%s yielded=%d", mbid, yielded_count)
         logger.debug("[similar] total stream time mbid=%s %.2fs", mbid, time.monotonic() - t0)
-        # Persist cache for instant next-time results.
+        # Persist: seed row in mb_lookup_cache + each related recording in mb_entity_cache.
         try:
             if yielded_rows_for_cache:
-                providers._db_set(cache_kind, mbid, {"tracks": yielded_rows_for_cache})  # type: ignore[attr-defined]
+                seed_top = [{
+                    "mbid": mbid,
+                    "artist": seed_artist,
+                    "title": seed_title,
+                    "album": "",
+                    "artist_credit": None,
+                    "album_cover": None,
+                    "mb_artist_id": None,
+                    "mb_release_id": None,
+                    "mb_release_group_id": None,
+                }]
+                _save_to_cache(cache_key, seed_top, yielded_rows_for_cache)
                 logger.debug("[similar] cache saved mbid=%s tracks=%d", mbid, len(yielded_rows_for_cache))
         except Exception:
             logger.debug("[similar] cache save failed", exc_info=True)

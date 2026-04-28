@@ -74,9 +74,11 @@ export async function authFetch(path: string, options: RequestInit = {}): Promis
     if (err instanceof DOMException && err.name === 'TimeoutError') {
       throw new Error(`Request timed out after 15s: ${path}`)
     }
-    // Retry GETs once on network error
+    // Retry GETs once on network error, but not intentional aborts
     if (!isMutation && (err instanceof TypeError || (err instanceof DOMException && err.name === 'AbortError'))) {
-      const retrySignal = mergeFetchSignal(options.signal as AbortSignal | undefined)
+      const userSignal = options.signal as AbortSignal | undefined
+      if (userSignal?.aborted) throw err
+      const retrySignal = mergeFetchSignal(userSignal)
       try {
         const res = await _doFetch(path, { ...options, headers }, retrySignal)
         if (res.status === 401) {

@@ -65,11 +65,13 @@ class LastfmTrack:
     playcount: int | None = None
     listeners: int | None = None
     match: float | None = None  # used by getSimilar
+    album: str | None = None
 
     def to_dict(self) -> dict[str, Any]:
         return {
             "name": self.name,
             "artist": self.artist,
+            "album": self.album,
             "url": self.url,
             "mbid": self.mbid,
             "playcount": self.playcount,
@@ -214,6 +216,15 @@ def _pick_artist_name(node: Any) -> str:
     return str(node).strip()
 
 
+def _pick_album_title(node: Any) -> str:
+    if node is None:
+        return ""
+    if isinstance(node, dict):
+        v = node.get("#text") or node.get("name") or ""
+        return str(v).strip()
+    return str(node).strip()
+
+
 def _extract_tracks(raw: Any, *, default_artist: str = "") -> list[LastfmTrack]:
     out: list[LastfmTrack] = []
     if not raw:
@@ -227,6 +238,7 @@ def _extract_tracks(raw: Any, *, default_artist: str = "") -> list[LastfmTrack]:
         if not name:
             continue
         artist = _pick_artist_name(t.get("artist")) or default_artist
+        album_raw = _pick_album_title(t.get("album")) or None
         mbid = (t.get("mbid") or "").strip() or None
         url = (t.get("url") or "").strip() or None
         playcount = _as_int(t.get("playcount"))
@@ -241,9 +253,34 @@ def _extract_tracks(raw: Any, *, default_artist: str = "") -> list[LastfmTrack]:
                 playcount=playcount,
                 listeners=listeners,
                 match=match,
+                album=album_raw,
             )
         )
     return out
+
+
+async def track_search(*, query: str, limit: int = 5) -> list[dict[str, Any]]:
+    """Search tracks by user query (Last.fm `track.search`).
+
+    Returns a list of dicts with at least: {name, artist, album?, mbid?, url?, listeners?}.
+    """
+    q = (query or "").strip()
+    if not q:
+        return []
+    p: dict[str, Any] = {
+        "method": "track.search",
+        "track": q,
+        "limit": max(1, min(int(limit), 50)),
+    }
+    try:
+        payload = await _get(p)
+    except LastFMError as e:
+        logger.debug("[lastfm] track_search failed (%s): %s", p, e)
+        return []
+    results = payload.get("results") or {}
+    matches = (results.get("trackmatches") if isinstance(results, dict) else None) or {}
+    tracks = _extract_tracks((matches.get("track") if isinstance(matches, dict) else None))
+    return [t.to_dict() for t in tracks]
 
 
 def _extract_tags(raw: Any) -> list[LastfmTag]:

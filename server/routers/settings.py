@@ -229,11 +229,15 @@ def clear_search_cache(
     user: User = Depends(get_current_user),
     session: Session = Depends(get_session),
 ):
-    """Clear all cached search results (MBLookupCache table)."""
-    count = session.exec(select(func.count()).select_from(MBLookupCache)).one()
+    """Clear hybrid + similar caches: MBLookupCache rows and MBEntityCache recording entries."""
+    mb_count = session.exec(select(func.count()).select_from(MBLookupCache)).one()
+    sim_count = session.exec(
+        select(func.count()).select_from(MBEntityCache).where(MBEntityCache.kind == "recording")
+    ).one()
     session.exec(delete(MBLookupCache))
+    session.exec(delete(MBEntityCache).where(MBEntityCache.kind == "recording"))
     session.commit()
-    return {"status": "ok", "cleared": count}
+    return {"status": "ok", "cleared": mb_count, "similar_tracks_cleared": sim_count}
 
 
 @router.post("/cache/discography")

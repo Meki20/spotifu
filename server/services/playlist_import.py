@@ -88,6 +88,8 @@ class ImportInputRow:
     album: str
     duration_ms: int
     query_normalized: str
+    #: When set (hybrid search), Lucene uses ``(artist:canonical OR artist:alt)`` if alt differs from ``artist``.
+    artist_lucene_alt: str | None = None
 
 
 @dataclass(frozen=True)
@@ -176,6 +178,10 @@ def _lucene_escape_phrase(s: str) -> str:
     return musicbrainz._lucene_escape_phrase(s)  # type: ignore[attr-defined]
 
 
+# Suffix for batch recording Lucene (hybrid search + import passes 1–3): official releases only.
+_BATCH_RECORDING_LUCENE_SUFFIX = " AND status:official"
+
+
 def _build_batch_recording_query(
     rows: list[ImportInputRow],
     *,
@@ -184,13 +190,165 @@ def _build_batch_recording_query(
     parts: list[str] = []
     for r in rows:
         a = _lucene_escape_phrase(r.artist)
+        alt_raw = (r.artist_lucene_alt or "").strip()
+        if alt_raw and alt_raw.casefold() != (r.artist or "").strip().casefold():
+            ap = _lucene_escape_phrase(alt_raw)
+            artist_clause = f'(artist:"{a}" OR artist:"{ap}")'
+        else:
+            artist_clause = f'artist:"{a}"'
         t = _lucene_escape_phrase(r.title)
         if include_release:
             alb = _lucene_escape_phrase(r.album)
-            parts.append(f'(artist:"{a}" AND release:"{alb}" AND ({t}))')
+            parts.append(f'({artist_clause} AND release:"{alb}" AND recording:({t}))')
         else:
-            parts.append(f'(artist:"{a}" AND ({t}))')
-    return " OR ".join(parts)
+            parts.append(f'({artist_clause} AND recording:({t}))')
+    if not parts:
+        return ""
+    core = " OR ".join(parts)
+    return f"({core}){_BATCH_RECORDING_LUCENE_SUFFIX}"
+
+
+# Primary-type preference for MB metadata scoring: album > single > EP (per product choice).
+_MB_PRIMARY_RANK: dict[str, int] = {"Album": 3, "Single": 2, "EP": 1}
+_MB_PRIMARY_BONUS: dict[str, float] = {"Album": 0.055, "Single": 0.04, "EP": 0.022}
+
+
+def _mb_primary_rank(primary_type: str | None) -> int:
+    if not primary_type:
+        return 0
+    return _MB_PRIMARY_RANK.get(str(primary_type), 0)
+
+
+def _release_track_count_mb(rel: dict) -> int:
+    n = 0
+    for m in rel.get("media") or []:
+        if not isinstance(m, dict):
+            continue
+        try:
+            n += int(m.get("track-count") or 0)
+        except (TypeError, ValueError):
+            continue
+    return n
+
+
+def _recording_has_isrc_mb(rec: dict) -> bool:
+    iscs = rec.get("isrcs")
+    if isinstance(iscs, list) and len(iscs) > 0:
+        return True
+    il = rec.get("isrc-list")
+    if isinstance(il, list) and len(il) > 0:
+        return True
+    return False
+
+
+def _compare_official_release_tiebreak(a: dict, b: dict) -> int:
+    """> 0 if ``a`` is better than ``b`` for tie-breaking (primary type, track count)."""
+    pa = _mb_primary_rank(musicbrainz._release_rg_primary_type(a))
+    pb = _mb_primary_rank(musicbrainz._release_rg_primary_type(b))
+    if pa != pb:
+        return pa - pb
+    return _release_track_count_mb(a) - _release_track_count_mb(b)
+
+
+def _mb_pick_representative_official_release(releases: list[dict], album_s: str) -> dict | None:
+    """Pick one official release to score metadata: best album-title match, or best primary type + track count."""
+    official = musicbrainz._only_official_releases([r for r in releases if isinstance(r, dict)])
+    if not official:
+        return None
+    alb = (album_s or "").strip()
+    if alb:
+        best = official[0]
+        bt0 = (best.get("title") or "").strip()
+        best_ar = _ratio(alb, bt0) if bt0 else 0.0
+        for rel in official[1:]:
+            rt = (rel.get("title") or "").strip()
+            ar = _ratio(alb, rt) if rt else 0.0
+            if ar > best_ar + 1e-9:
+                best_ar, best = ar, rel
+            elif abs(ar - best_ar) <= 1e-9 and _compare_official_release_tiebreak(rel, best) > 0:
+                best = rel
+        return best
+    best = official[0]
+    best_key = (-1, -1)
+    for rel in official:
+        pr = _mb_primary_rank(musicbrainz._release_rg_primary_type(rel))
+        tc = _release_track_count_mb(rel)
+        key = (pr, tc)
+        if key > best_key:
+            best_key, best = key, rel
+    return best
+
+
+def _mb_recording_meta_score_bonus(candidate: dict, row: ImportInputRow) -> float:
+    """Extra score from MB official release / RG shape, ISRC, disambiguation, track count."""
+    b = 0.0
+    rel_pick = _mb_pick_representative_official_release(
+        [x for x in (candidate.get("releases") or []) if isinstance(x, dict)],
+        row.album,
+    )
+    if rel_pick is None:
+        b -= 0.09
+    else:
+        pt = musicbrainz._release_rg_primary_type(rel_pick) or ""
+        b += _MB_PRIMARY_BONUS.get(pt, 0.0)
+        rg = rel_pick.get("release-group")
+        if isinstance(rg, dict):
+            secs = rg.get("secondary-types") or []
+            if isinstance(secs, list) and len(secs) > 0:
+                b -= 0.055 * len(secs)
+        b += min(0.032, 0.00085 * _release_track_count_mb(rel_pick))
+
+    if _recording_has_isrc_mb(candidate):
+        b += 0.03
+
+    d = (candidate.get("disambiguation") or "").strip().lower()
+    if not d:
+        b += 0.01
+    elif "explicit" in d:
+        b += 0.025
+    elif "clean" in d:
+        b += 0.004
+    else:
+        b -= 0.06
+
+    return max(-0.2, min(0.18, b))
+
+
+# Each pattern is one junk *category*. Penalize only when the candidate matches but the
+# import row title does not (so e.g. "Song (live)" queries are not punished for live takes).
+_CANDIDATE_TITLE_JUNK_SPECS: tuple[tuple[str, re.Pattern[str]], ...] = (
+    ("remix", re.compile(r"(?i)\bremix\b")),
+    ("live", re.compile(r"(?i)\blive\b")),
+    ("acapella", re.compile(r"(?i)\b(?:acapella|a\s*cappella)\b")),
+    ("karaoke", re.compile(r"(?i)\bkaraoke\b")),
+    ("instrumental", re.compile(r"(?i)\binstrumental\b")),
+    ("demo", re.compile(r"(?i)\bdemo\b")),
+    ("rehearsal", re.compile(r"(?i)\brehearsal\b")),
+    ("bootleg", re.compile(r"(?i)\bbootleg\b")),
+    ("soundcheck", re.compile(r"(?i)\bsoundcheck\b")),
+    ("audience", re.compile(r"(?i)\baudience\b")),
+    ("field_recording", re.compile(r"(?i)\bfield\s*recording\b")),
+    ("rough_mix", re.compile(r"(?i)\brough\s+mix\b")),
+    ("work_in_progress", re.compile(r"(?i)\bwork\s*in\s*progress\b")),
+    ("wip", re.compile(r"(?i)\bwip\b")),
+)
+
+
+def _candidate_title_junk_penalty(candidate_title: str, original_title: str) -> float:
+    """Down-rank MB recordings whose titles add alternate takes / bootlegs / demos vs. the query."""
+    if not (candidate_title or "").strip():
+        return 0.0
+    orig = original_title or ""
+    hits = 0
+    for _name, pat in _CANDIDATE_TITLE_JUNK_SPECS:
+        if not pat.search(candidate_title):
+            continue
+        if pat.search(orig):
+            continue
+        hits += 1
+    if not hits:
+        return 0.0
+    return -min(0.14, 0.038 * hits)
 
 
 def _pick_best_unique_matches(
@@ -224,11 +382,14 @@ def _pick_best_unique_matches(
                     if n2:
                         best_a = max(best_a, _ratio(r.artist, n2))
 
-            # best release title match across all embedded releases
+            # best release title match across embedded releases (prefer official when matching album)
+            rels_for_album = [rel for rel in (c.get("releases") or []) if isinstance(rel, dict)]
+            if require_release:
+                rels_off = musicbrainz._only_official_releases(rels_for_album)
+                if rels_off:
+                    rels_for_album = rels_off
             best_r = 0.0
-            for rel in c.get("releases") or []:
-                if not isinstance(rel, dict):
-                    continue
+            for rel in rels_for_album:
                 rt = (rel.get("title") or "").strip()
                 if rt:
                     best_r = max(best_r, _ratio(r.album, rt))
@@ -263,7 +424,9 @@ def _pick_best_unique_matches(
                         dur_bonus = 0.15
                     elif diff <= 6000:
                         dur_bonus = 0.08
-            score = (t_s * 0.84) + (best_a * 0.10) + (best_r * 0.06) + dur_bonus
+            mb_meta = _mb_recording_meta_score_bonus(c, r)
+            junk = _candidate_title_junk_penalty(ct, r.title)
+            score = (t_s * 0.84) + (best_a * 0.10) + (best_r * 0.06) + dur_bonus + mb_meta + junk
             scored.append((score, ri, ci))
 
     scored.sort(key=lambda x: x[0], reverse=True)
@@ -321,7 +484,7 @@ def _pick_best_title_album_duration(
                     dur_bonus = 0.10
                 elif diff <= 15000:
                     dur_bonus = 0.04
-        score = (t_s * 0.62) + (best_r * 0.30) + dur_bonus
+        score = (t_s * 0.62) + (best_r * 0.30) + dur_bonus + _candidate_title_junk_penalty(ct, row.title)
         if score > best_s:
             best_s = score
             best = c

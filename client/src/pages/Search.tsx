@@ -1,7 +1,7 @@
-import { useState, useEffect, useRef, useMemo } from 'react'
+import { useState, useEffect, useRef, useMemo, useCallback } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useVirtualizer } from '@tanstack/react-virtual'
-import { type Track } from '../stores/playerStore'
+import { type Track, usePlayerStore } from '../stores/playerStore'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { subscribeSpotifuWebSocket } from '../spotifuWebSocket'
 import { API, authFetch } from '../api'
@@ -31,6 +31,10 @@ interface HybridSearchResponse {
   sections: TrackSection[]
 }
 
+type SearchListRow =
+  | { kind: 'track'; track: Track; playIdx: number }
+  | { kind: 'sep'; label: string }
+
 const SEARCH_QUERY_MAX_LEN = 200
 
 function isPlausibleSearchQuery(q: string): boolean {
@@ -50,8 +54,8 @@ async function searchLocal(q: string): Promise<Track[]> {
   return data.tracks
 }
 
-async function searchHybrid(q: string): Promise<HybridSearchResponse> {
-  const res = await authFetch(`/search/hybrid?q=${encodeURIComponent(q)}`)
+async function searchHybrid(q: string, signal?: AbortSignal): Promise<HybridSearchResponse> {
+  const res = await authFetch(`/search/hybrid?q=${encodeURIComponent(q)}`, { signal })
   if (!res.ok) throw new Error('Search failed')
   return res.json()
 }
@@ -82,6 +86,10 @@ export default function Search() {
   const [debouncedQuery, setDebouncedQuery] = useState('')
   const [localOnly, setLocalOnly] = useState(false)
   const [activeTab, setActiveTab] = useState<'songs' | 'albums'>('songs')
+  const [hybridData, setHybridData] = useState<HybridSearchResponse | null>(null)
+  const [hybridLoading, setHybridLoading] = useState(false)
+  const [hybridError, setHybridError] = useState<Error | null>(null)
+  const hybridAbortRef = useRef<AbortController | null>(null)
   const [similarTracks, setSimilarTracks] = useState<Track[]>([])
   const [similarStreamPending, setSimilarStreamPending] = useState(false)
   const [similarNotice, setSimilarNotice] = useState<string | null>(null)
@@ -130,6 +138,44 @@ export default function Search() {
     }
   }, [query])
 
+  // Abort any in-flight hybrid search immediately on every keystroke
+  useEffect(() => {
+    hybridAbortRef.current?.abort()
+    hybridAbortRef.current = null
+  }, [query])
+
+  // Fire hybrid fetch when debounced query settles; abort previous if still running
+  useEffect(() => {
+    if (localOnly || debouncedQuery.length <= 2 || !isPlausibleSearchQuery(debouncedQuery)) {
+      setHybridData(null)
+      setHybridLoading(false)
+      setHybridError(null)
+      return
+    }
+    const controller = new AbortController()
+    hybridAbortRef.current = controller
+    setHybridLoading(true)
+    setHybridError(null)
+    const q = debouncedQuery
+    searchHybrid(q, controller.signal)
+      .then((result) => {
+        if (!controller.signal.aborted) {
+          setHybridData(result)
+          saveSearchTerm(q)
+          setHybridLoading(false)
+        }
+      })
+      .catch((err) => {
+        if (!controller.signal.aborted) {
+          setHybridError(err)
+          setHybridLoading(false)
+        }
+      })
+    return () => {
+      controller.abort()
+    }
+  }, [debouncedQuery, localOnly])
+
   useEffect(() => {
     if (location.state?.localOnly === true) setLocalOnly(true)
   }, [location.state])
@@ -144,23 +190,16 @@ export default function Search() {
       const mbId = data.mb_id as string | undefined
       if (!mbId) return
       setCachedIds((prev) => new Set([...prev, mbId]))
-      queryClient.setQueriesData<HybridSearchResponse>(
-        { queryKey: ['search-hybrid'] },
-        (old) => {
-          if (!old?.sections) return old
-          const mark = (t: Track) =>
-            t.mb_id === mbId ? { ...t, is_cached: true } : t
-          return {
-            ...old,
-            sections: old.sections.map((sec) => ({
-              ...sec,
-              tracks: sec.tracks.map(mark),
-            })),
-          }
+      setHybridData((old) => {
+        if (!old?.sections) return old
+        const mark = (t: Track) => (t.mb_id === mbId ? { ...t, is_cached: true } : t)
+        return {
+          ...old,
+          sections: old.sections.map((sec) => ({ ...sec, tracks: sec.tracks.map(mark) })),
         }
-      )
+      })
     })
-  }, [queryClient])
+  }, [])
 
   const { data: localResults, isLoading: localLoading, error: localError } = useQuery({
     queryKey: ['search-local', debouncedQuery],
@@ -173,27 +212,50 @@ export default function Search() {
       debouncedQuery.length > 2 && localOnly && isPlausibleSearchQuery(debouncedQuery),
   })
 
-  const { data: hybridData, isLoading: hybridLoading, error: hybridError } = useQuery({
-    queryKey: ['search-hybrid', debouncedQuery],
-    queryFn: async () => {
-      const result = await searchHybrid(debouncedQuery)
-      saveSearchTerm(debouncedQuery)
-      return result
-    },
-    enabled:
-      debouncedQuery.length > 2 &&
-      !localOnly &&
-      isPlausibleSearchQuery(debouncedQuery),
-  })
-
   const isLoading = localOnly ? localLoading : hybridLoading
   const error = localOnly ? localError : hybridError
-  const baseResults: Track[] = localOnly
-    ? (localResults ?? [])
-    : (hybridData?.sections.flatMap(s => s.tracks) ?? [])
+  const results: Track[] = useMemo(() => {
+    return localOnly ? (localResults ?? []) : (hybridData?.sections.flatMap((s) => s.tracks) ?? [])
+  }, [localOnly, localResults, hybridData])
 
-  const baseResultsRef = useRef(baseResults)
-  baseResultsRef.current = baseResults
+  const persistResolvedSearchCover = useCallback(
+    (mbid: string, url: string) => {
+      if (!mbid || !url) return
+      if (localOnly) {
+        queryClient.setQueryData(['search-local', debouncedQuery], (old: Track[] | undefined) => {
+          if (!old) return old
+          return old.map((t) => (t.mb_id === mbid && t.album_cover !== url ? { ...t, album_cover: url } : t))
+        })
+      } else {
+        setHybridData((old) => {
+          if (!old?.sections) return old
+          return {
+            ...old,
+            sections: old.sections.map((sec) => ({
+              ...sec,
+              tracks: sec.tracks.map((t) =>
+                t.mb_id === mbid && t.album_cover !== url ? { ...t, album_cover: url } : t,
+              ),
+            })),
+          }
+        })
+      }
+      usePlayerStore.setState((s) => {
+        const nextUserQueue = (s.userQueue || []).map((t) =>
+          t.mb_id === mbid && t.album_cover !== url ? { ...t, album_cover: url } : t,
+        )
+        const nextSystemList = (s.systemList || []).map((t) =>
+          t.mb_id === mbid && t.album_cover !== url ? { ...t, album_cover: url } : t,
+        )
+        const nextCurrent =
+          s.currentTrack && s.currentTrack.mb_id === mbid && s.currentTrack.album_cover !== url
+            ? { ...s.currentTrack, album_cover: url }
+            : s.currentTrack
+        return { userQueue: nextUserQueue, systemList: nextSystemList, currentTrack: nextCurrent }
+      })
+    },
+    [debouncedQuery, localOnly, queryClient],
+  )
 
   const bestMatchMbid = useMemo(() => {
     if (localOnly) return null
@@ -201,108 +263,35 @@ export default function Search() {
     return t?.mb_id || null
   }, [hybridData, localOnly])
 
-  // Background similar-tracks stream (non-blocking; fast batch only on server)
+  // Similar tracks are now returned directly by `/search/hybrid` (as a section),
+  // so we don't need the background NDJSON stream here.
   useEffect(() => {
     setSimilarTracks([])
     setSimilarNotice(null)
+    setSimilarStreamPending(false)
+  }, [debouncedQuery, localOnly])
+
+  const flatListRows: SearchListRow[] = useMemo(() => {
     if (localOnly) {
-      setSimilarStreamPending(false)
-      return
+      return results.map((track, i) => ({ kind: 'track' as const, track, playIdx: i }))
     }
-    if (!bestMatchMbid) {
-      setSimilarStreamPending(false)
-      return
-    }
-    if (!debouncedQuery || debouncedQuery.length <= 2) {
-      setSimilarStreamPending(false)
-      return
-    }
-    if (!token) {
-      setSimilarStreamPending(false)
-      return
-    }
-
-    const ac = new AbortController()
-    const myGen = ++similarStreamGenRef.current
-    setSimilarStreamPending(true)
-
-    ;(async () => {
-      try {
-        console.debug('[similar] stream start', { mbid: bestMatchMbid, q: debouncedQuery })
-        // Use a raw fetch (no 15s timeout) because this is a streaming endpoint.
-        const res = await fetch(`${API}/search/similar/${encodeURIComponent(bestMatchMbid)}/stream`, {
-          method: 'GET',
-          headers: { Authorization: `Bearer ${token}` },
-          signal: ac.signal,
-        })
-        console.debug('[similar] stream response', { ok: res.ok, status: res.status, hasBody: Boolean(res.body) })
-        if (!res.ok || !res.body) {
-          if (similarStreamGenRef.current === myGen) {
-            setSimilarNotice(
-              'Related tracks could not be loaded. Only the main search results are shown.',
-            )
-          }
-          return
-        }
-        const reader = res.body.getReader()
-        const dec = new TextDecoder()
-        let buf = ''
-        for (;;) {
-          const { done, value } = await reader.read()
-          if (done) break
-          buf += dec.decode(value, { stream: true })
-          const parts = buf.split('\n')
-          buf = parts.pop() ?? ''
-          for (const part of parts) {
-            const ev = parseNdjsonLine(part)
-            if (!ev) continue
-            if (ev.type === 'track' && ev.track?.mb_id) {
-              console.debug('[similar] got track', { mbid: ev.track.mb_id, title: ev.track.title, artist: ev.track.artist })
-              setSimilarTracks((prev) => {
-                if (prev.some((t) => t.mb_id === ev.track.mb_id)) return prev
-                if (baseResultsRef.current.some((t) => t.mb_id === ev.track.mb_id)) return prev
-                return [...prev, ev.track]
-              })
-            } else if (ev.type === 'done') {
-              if (
-                similarStreamGenRef.current === myGen &&
-                typeof ev.notice === 'string' &&
-                ev.notice.trim()
-              ) {
-                setSimilarNotice(ev.notice.trim())
-              }
-            }
-          }
-        }
-      } catch {
-        // ignore background stream failures
-      } finally {
-        if (similarStreamGenRef.current === myGen) setSimilarStreamPending(false)
+    const topLen = hybridData?.sections?.[0]?.tracks?.length ?? 0
+    const relatedLabel =
+      hybridData?.sections?.find((s) => s.type === 'related')?.label ?? 'Related tracks'
+    const out: SearchListRow[] = []
+    for (let i = 0; i < results.length; i++) {
+      if (topLen > 0 && i === topLen && results.length > topLen) {
+        out.push({ kind: 'sep', label: relatedLabel })
       }
-    })()
-
-    return () => ac.abort()
-  }, [bestMatchMbid, debouncedQuery, localOnly, token])
-
-  const results: Track[] = useMemo(() => {
-    if (localOnly) return baseResults
-    if (similarTracks.length === 0) return baseResults
-    return [...baseResults, ...similarTracks]
-  }, [baseResults, similarTracks, localOnly])
-
-  const flatResults: { track: Track; playIdx: number }[] = useMemo(() => {
-    // For local search: results are already a flat array.
-    if (localOnly) return results.map((track, i) => ({ track, playIdx: i }))
-
-    // For hybrid mode we *also* render from `results` so background similar tracks appear.
-    // (hybridData.sections only contains the best match.)
-    return results.map((track, i) => ({ track, playIdx: i }))
-  }, [results, localOnly])
+      out.push({ kind: 'track', track: results[i], playIdx: i })
+    }
+    return out
+  }, [results, localOnly, hybridData])
 
   const rowVirtualizer = useVirtualizer({
-    count: flatResults.length,
+    count: flatListRows.length,
     getScrollElement: () => scrollRef.current,
-    estimateSize: () => 40,
+    estimateSize: (index) => (flatListRows[index]?.kind === 'sep' ? 48 : 40),
     overscan: 10,
   })
 
@@ -515,7 +504,42 @@ export default function Search() {
             }}
           >
             {rowVirtualizer.getVirtualItems().map((virtualRow) => {
-              const { track, playIdx } = flatResults[virtualRow.index]
+              const row = flatListRows[virtualRow.index]
+              if (row.kind === 'sep') {
+                return (
+                  <div
+                    key={`search-sep-${virtualRow.index}`}
+                    className="flex items-center gap-3 px-4 select-none"
+                    style={{
+                      position: 'absolute',
+                      top: 0,
+                      left: 0,
+                      width: '100%',
+                      height: `${virtualRow.size}px`,
+                      transform: `translateY(${virtualRow.start}px)`,
+                    }}
+                    role="separator"
+                    aria-label={row.label}
+                  >
+                    <div className="flex-1 h-px shrink-0" style={{ background: '#261A14' }} />
+                    <span
+                      className="shrink-0 whitespace-nowrap"
+                      style={{
+                        fontFamily: "'Barlow Condensed', sans-serif",
+                        fontSize: 12,
+                        fontWeight: 600,
+                        letterSpacing: '0.14em',
+                        textTransform: 'uppercase',
+                        color: '#b4003e',
+                      }}
+                    >
+                      {row.label}
+                    </span>
+                    <div className="flex-1 h-px shrink-0" style={{ background: '#261A14' }} />
+                  </div>
+                )
+              }
+              const { track, playIdx } = row
               const rowKey = track.mb_id || `${virtualRow.index}-${track.title}`
               const downloadState = downloadStates[rowKey]
               const isCached = track.is_cached || cachedIds.has(track.mb_id)
@@ -536,6 +560,8 @@ export default function Search() {
                     index={playIdx}
                     isCached={isCached}
                     downloadState={downloadState}
+                    playlistStyleCover
+                    onCoverResolved={persistResolvedSearchCover}
                     onPlay={() => playTrack(track)}
                     onContextMenu={(e) => handleContextMenu(e, track)}
                     onHoverArtist={(artistId, albumIds) => enqueue(artistId, albumIds)}
@@ -544,7 +570,7 @@ export default function Search() {
               )
             })}
           </div>
-          {!localOnly && similarNotice && baseResults.length > 0 && (
+          {!localOnly && similarNotice && results.length > 0 && (
             <p
               className="mt-3 px-4 text-sm leading-relaxed"
               style={{ color: '#6B625C', fontFamily: "'Barlow Semi Condensed', sans-serif" }}

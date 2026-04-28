@@ -13,6 +13,12 @@ from typing import Any
 from difflib import SequenceMatcher
 
 from services.providers._http import MB_CLIENT, CAA_CLIENT
+from services.artist_alias_cache import (
+    norm_alias,
+    rewrite_query_with_cached_aliases,
+    upsert_from_fix_artist_alias,
+    upsert_from_mb_artist_json,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -1335,6 +1341,59 @@ def _with_resolve_phase(meta: dict[str, Any], phase: str) -> dict[str, Any]:
     return out
 
 
+async def resolve_artist_string_via_mb_search(raw_artist: str) -> str:
+    """Resolve a Last.fm-style artist string to MusicBrainz's canonical ``name`` when the top
+    ``/artist`` search hit matches the input (primary name or any alias, normalized).
+
+    Upserts alias rows from the hit JSON and, when matched via an alias, persists the raw string
+    via ``upsert_from_fix_artist_alias``. Does not rewrite the input through the local alias cache
+    first — callers should try DB cache before calling this.
+    """
+    artist = (raw_artist or "").strip()
+    if not artist:
+        return artist
+    try:
+        resp = await _mb_get(
+            f"{MUSICBRAINZ_API}/artist",
+            {"query": artist, "fmt": "json", "limit": 1},
+        )
+        if resp.status_code != 200:
+            return artist
+        artists = resp.json().get("artists", [])
+        if not artists:
+            return artist
+        hit = artists[0]
+        try:
+            upsert_from_mb_artist_json(hit, source="musicbrainz_resolve_artist_string")
+        except Exception:
+            logger.debug("resolve_artist_string upsert failed (ignored)", exc_info=True)
+        canon = (hit.get("name") or "").strip()
+        if not canon:
+            return artist
+        aid = (hit.get("id") or "").strip()
+        n0 = norm_alias(artist)
+        if norm_alias(canon) == n0:
+            return canon
+        for al in hit.get("aliases") or []:
+            if not isinstance(al, dict):
+                continue
+            an = (al.get("name") or "").strip()
+            if an and norm_alias(an) == n0:
+                try:
+                    if aid:
+                        upsert_from_fix_artist_alias(
+                            alias_raw=artist,
+                            artist_mbid=aid,
+                            canonical_name=canon,
+                        )
+                except Exception:
+                    logger.debug("resolve_artist_string persist alias failed (ignored)", exc_info=True)
+                return canon
+        return artist
+    except Exception:
+        return artist
+
+
 async def fix_artist_alias(query: str) -> str:
     """Resolve MB artist aliases in *query* to the artist's primary name (e.g. Ye → Kanye West).
 
@@ -1344,6 +1403,7 @@ async def fix_artist_alias(query: str) -> str:
     query = (query or "").strip()
     if not query:
         return query
+    query = rewrite_query_with_cached_aliases(query)
     try:
         resp = await _mb_get(
             f"{MUSICBRAINZ_API}/artist",
@@ -1355,11 +1415,23 @@ async def fix_artist_alias(query: str) -> str:
         if not artists:
             return query
         artist = artists[0]
+        try:
+            upsert_from_mb_artist_json(artist, source="musicbrainz_fix_artist_alias")
+        except Exception:
+            logger.debug("artist alias upsert (fix_artist_alias) failed (ignored)", exc_info=True)
         qnorm = f" {query.lower()} "
         for alias in artist.get("aliases", []):
             alias_name = alias.get("name")
             if alias_name and f" {alias_name.lower()} " in qnorm:
-                return query.lower().replace(alias_name.lower(), (artist.get("name") or "").lower())
+                out = query.lower().replace(alias_name.lower(), (artist.get("name") or "").lower())
+                try:
+                    aid = (artist.get("id") or "").strip()
+                    canon = (artist.get("name") or "").strip()
+                    if aid and canon and alias_name:
+                        upsert_from_fix_artist_alias(alias_raw=str(alias_name), artist_mbid=aid, canonical_name=canon)
+                except Exception:
+                    logger.debug("fix_artist_alias persist failed (ignored)", exc_info=True)
+                return out
         return query
     except Exception:
         return query
@@ -1375,19 +1447,31 @@ async def _recording_search_results(lucene_query: str, limit: int = 10) -> list[
     return resp.json().get("recordings", []) or []
 
 
-async def recording_query_raw(query: str, *, limit: int = 20) -> list[dict[str, Any]]:
+async def recording_query_raw(
+    query: str,
+    *,
+    limit: int = 20,
+    offset: int = 0,
+) -> list[dict[str, Any]]:
     """Recording search returning raw MusicBrainz recording objects.
 
     Includes artist-credits + releases so callers can match against all credited artists and all
-    release titles (important for playlist import batching).
+    release titles (important for playlist import batching). *query* is sent verbatim (no alias
+    rewrite); callers pass Lucene or plain text as appropriate.
     """
     q = (query or "").replace("\ufeff", "").strip()
     if not q:
         return []
-    resp = await _mb_get(
-        f"{MUSICBRAINZ_API}/recording",
-        {"query": q, "fmt": "json", "limit": limit, "inc": "artist-credits+releases"},
-    )
+    # Caller-built Lucene (e.g. playlist import batch) must not go through free-text alias rewrite.
+    params: dict[str, Any] = {
+        "query": q,
+        "fmt": "json",
+        "limit": limit,
+        "inc": "artist-credits+releases",
+    }
+    if offset > 0:
+        params["offset"] = int(offset)
+    resp = await _mb_get(f"{MUSICBRAINZ_API}/recording", params)
     if resp.status_code != 200:
         return []
     recs = resp.json().get("recordings", []) or []
@@ -1789,11 +1873,18 @@ async def get_track(mbid: str, *, include_cover: bool = True) -> dict[str, Any] 
 async def get_artist_head(artist_mbid: str) -> dict | None:
     """One MB ``/artist`` request: id, name, empty ``top_tracks``. Used for fast artist page load."""
     try:
-        resp = await _mb_get(f"{MUSICBRAINZ_API}/artist/{artist_mbid}", params={"fmt": "json"})
+        resp = await _mb_get(
+            f"{MUSICBRAINZ_API}/artist/{artist_mbid}",
+            params={"fmt": "json", "inc": "aliases"},
+        )
         if resp.status_code != 200:
             logger.warning(f"[mb] get_artist_head {artist_mbid} → {resp.status_code}: {resp.text[:200]}")
             return None
         data = resp.json()
+        try:
+            upsert_from_mb_artist_json(data, source="musicbrainz_get_artist_head")
+        except Exception:
+            logger.debug("artist alias upsert (head) failed (ignored)", exc_info=True)
         return {
             "mbid": data["id"],
             "name": data.get("name", "Unknown"),
@@ -2046,7 +2137,10 @@ async def _caa_artist_banner_url(artist_mbid: str, fallback_release_mbids: list[
 async def _get_artist_head_data(artist_mbid: str) -> dict | None:
     try:
         resp, recording_resp = await asyncio.gather(
-            _mb_get(f"{MUSICBRAINZ_API}/artist/{artist_mbid}", params={"fmt": "json"}),
+            _mb_get(
+                f"{MUSICBRAINZ_API}/artist/{artist_mbid}",
+                params={"fmt": "json", "inc": "aliases"},
+            ),
             _mb_get(
                 f"{MUSICBRAINZ_API}/recording",
                 params={"query": f"arid:{artist_mbid}", "fmt": "json", "limit": 10, "sort": "desc"},
@@ -2056,6 +2150,10 @@ async def _get_artist_head_data(artist_mbid: str) -> dict | None:
             logger.warning(f"[mb] get_artist_head {artist_mbid} → {resp.status_code}: {resp.text[:200]}")
             return None
         data = resp.json()
+        try:
+            upsert_from_mb_artist_json(data, source="musicbrainz_get_artist")
+        except Exception:
+            logger.debug("artist alias upsert (get_artist) failed (ignored)", exc_info=True)
 
         top_cover_memo: dict[str, str | None] = {}
 

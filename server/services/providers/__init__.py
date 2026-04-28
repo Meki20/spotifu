@@ -12,6 +12,7 @@ from sqlmodel import Session, select
 from database import engine
 from models import MBEntityCache
 from services.providers import audiodb, ddg, fanarttv, musicbrainz
+from services.artist_alias_cache import rewrite_query_with_cached_aliases
 
 logger = logging.getLogger(__name__)
 
@@ -168,7 +169,8 @@ class MetadataService:
 
     async def search(self, query: str) -> list[dict[str, Any]]:
         provider = self._get_provider()
-        results = await provider.search(query)
+        q = rewrite_query_with_cached_aliases(query)
+        results = await provider.search(q)
         return results if results else []
 
     def _detect_provider(self, id: str) -> tuple[str, Any] | None:

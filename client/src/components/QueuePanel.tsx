@@ -52,8 +52,21 @@ function NowPlayingCard({ track }: { track: Track }) {
             <span key={i} style={{ color: 'rgba(232,221,208,0.70)' }}>{`, ${name}`}</span>
           ))}
         </div>
-        <div className="text-[11px] mt-0.5 truncate" style={{ fontFamily: "'Barlow Semi Condensed', sans-serif", color: 'rgba(232,221,208,0.50)' }}>
-          {track.album}
+        <div
+          className="text-[11px] mt-0.5 truncate"
+          style={{ fontFamily: "'Barlow Semi Condensed', sans-serif", color: 'rgba(232,221,208,0.50)' }}
+        >
+          <span
+            className={track.mb_release_id || track.mb_release_group_id ? 'hover:underline cursor-pointer' : 'cursor-default'}
+            style={{ color: 'rgba(232,221,208,0.50)' }}
+            onClick={(e) => {
+              e.stopPropagation()
+              const albumId = track.mb_release_group_id || track.mb_release_id
+              albumId && navigate(`/album/${albumId}`)
+            }}
+          >
+            {track.album}
+          </span>
         </div>
       </div>
     </div>
@@ -71,6 +84,7 @@ function TrackRow({
   onClick?: () => void
   onRemove?: () => void
 }) {
+  const navigate = useNavigate()
   return (
     <div
       className="relative group flex items-center gap-3 px-3 py-2 rounded-md cursor-pointer"
@@ -93,7 +107,16 @@ function TrackRow({
           {track.title}
         </div>
         <div className="text-[11px] truncate" style={{ fontFamily: "'Barlow Semi Condensed', sans-serif", color: 'rgba(232,221,208,0.65)' }}>
-          {track.artist}
+          <span
+            className={track.mb_artist_id ? 'hover:underline cursor-pointer' : 'cursor-default'}
+            style={{ color: 'rgba(232,221,208,0.65)' }}
+            onClick={(e) => {
+              e.stopPropagation()
+              track.mb_artist_id && navigate(`/artist/${track.mb_artist_id}`)
+            }}
+          >
+            {track.artist}
+          </span>
         </div>
       </div>
       <div className="shrink-0 flex items-center gap-2">

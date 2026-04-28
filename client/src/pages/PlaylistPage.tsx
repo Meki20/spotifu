@@ -46,6 +46,7 @@ function itemToPlayableTrack(
       album_cover: art,
       mb_artist_id: item.mb_artist_id,
       mb_release_id: item.mb_release_id,
+      mb_release_group_id: item.mb_release_group_id,
       duration: 0,
       is_cached: isCached,
       local_stream_url: streamOnlyWhenReady ? `/stream/${item.track_id}` : null,

@@ -46,6 +46,7 @@ export default function AlbumTrackPanel({ album, onClose }: AlbumTrackPanelProps
       album: album?.title ?? '',
       album_cover: album?.cover ?? null,
       mb_release_id: album?.id?.includes('-') ? album.id : null,
+      mb_release_group_id: album?.id?.includes('-') ? album.id : null,
     }))
   }
 

@@ -16,6 +16,7 @@ export interface Track {
   is_cached?: boolean
   local_stream_url?: string | null
   mb_release_id?: string | null
+  mb_release_group_id?: string | null
   mb_artist_id?: string | null
 }
 

@@ -25,6 +25,7 @@ export function toTrack(raw: any, extras?: Partial<Track>): Track {
     is_cached: raw.is_cached === true,
     local_stream_url: raw.local_stream_url ?? (raw.is_cached && track_id ? `/stream/${track_id}` : null),
     mb_release_id: raw.mb_release_id ?? null,
+    mb_release_group_id: raw.mb_release_group_id ?? null,
     mb_artist_id: raw.mb_artist_id ?? null,
     ...extras,
   }

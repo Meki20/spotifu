@@ -24,7 +24,8 @@ function albumTrackToControllerTrack(track: any, album: any, cover: string | nul
   return toTrack(track, {
     album: album?.title ?? '',
     album_cover: cover ?? album?.cover ?? null,
-    mb_release_id: track.mb_id ?? null,
+    mb_release_id: album?.id?.includes('-') ? album.id : null,
+    mb_release_group_id: album?.id?.includes('-') ? album.id : null,
     mb_artist_id: album?.artist_mb_id ?? null,
   })
 }

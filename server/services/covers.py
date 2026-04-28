@@ -302,7 +302,9 @@ async def upsert_local_cover(
 ) -> None:
     """Extract cover from downloaded audio file and store for all available entity IDs.
 
-    Only runs if none of the provided entity IDs already have a positive cover.
+    If some entities already have a positive cover, reuse that asset for the remaining
+    ones rather than skipping entirely — so a second track from the same album inherits
+    the cover that was stored from the first track.
     """
     entities = [
         ("recording", recording_id),
@@ -321,12 +323,39 @@ async def upsert_local_cover(
             clauses.append(f"(entity_kind = '{kind}' AND entity_id = :{key})")
             params[key] = eid  # type: ignore[assignment]
         where = " OR ".join(clauses)
-        row = session.exec(
-            text(f"SELECT 1 FROM cover_links WHERE found = TRUE AND ({where}) LIMIT 1"),
+        covered_rows = session.exec(
+            text(f"SELECT entity_kind, asset_id FROM cover_links WHERE found = TRUE AND ({where})"),
             params=params,
-        ).first()
-        if row:
-            return  # already have a cover
+        ).all()
+
+    covered_kinds = {row[0] for row in covered_rows}
+    existing_asset_id: int | None = next(
+        (int(row[1]) for row in covered_rows if row[1] is not None), None
+    )
+    missing_pairs = [(k, v) for k, v in entity_pairs if k not in covered_kinds]
+
+    if not missing_pairs:
+        return  # all entities already covered
+
+    if existing_asset_id is not None:
+        # Reuse the existing cover asset for any entities not yet linked (e.g. a second
+        # track from the same album whose recording_id has no entry yet).
+        with Session(engine) as session:
+            for kind, eid in missing_pairs:
+                _upsert_link(
+                    session,
+                    entity_kind=kind,  # type: ignore[arg-type]
+                    entity_id=eid,
+                    asset_id=existing_asset_id,
+                    found=True,
+                    source="local",
+                )
+            session.commit()
+        logger.debug(
+            "Linked existing local cover asset=%s to %d missing entities for track_id=%s",
+            existing_asset_id, len(missing_pairs), track_id,
+        )
+        return
 
     url = _extract_local_cover(local_file_path, track_id)
     if not url:

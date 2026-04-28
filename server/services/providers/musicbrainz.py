@@ -416,13 +416,15 @@ def official_releases_latest_first(release_list: list[dict]) -> list[dict]:
     non_vinyl = [r for r in official if not _is_vinyl_only(r)]
     pool = non_vinyl if non_vinyl else official
 
-    _TYPE_ORDER = {"Album": 0, "EP": 1, "Single": 2}
+    # Higher value = preferred (sort is reverse=True). Album > EP > Single > other.
+    _TYPE_ORDER = {"Album": 3, "EP": 2, "Single": 1}
     return sorted(
         pool,
         key=lambda r: (
             _release_score(r),
             _release_event_date(r),
-            _TYPE_ORDER.get(_release_rg_primary_type(r) or "", 3),
+            _TYPE_ORDER.get(_release_rg_primary_type(r) or "", 0),
+            r.get("id") or "",
         ),
         reverse=True,
     )

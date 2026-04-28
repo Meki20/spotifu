@@ -189,12 +189,6 @@ async def play(
         if meta:
             caa_release_mbids = list(meta.pop("_caa_release_mbids", []) or [])
         track, needs_download = _get_or_create_track_by_mb(session, mbid, meta)
-        if caa_release_mbids and not track.album_cover:
-            background_tasks.add_task(
-                mb_provider.hydrate_track_album_cover_from_releases,
-                track.id,
-                caa_release_mbids,
-            )
 
         if needs_download:
             background_tasks.add_task(
@@ -205,6 +199,13 @@ async def play(
                 track.album,
                 track.mb_id,
                 track.duration,
+            )
+
+        if caa_release_mbids and not track.album_cover:
+            background_tasks.add_task(
+                mb_provider.hydrate_track_album_cover_from_releases,
+                track.id,
+                caa_release_mbids,
             )
 
         is_ready = track.status == TrackStatus.READY and track.local_file_path

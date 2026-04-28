@@ -61,8 +61,9 @@ export default function ContextMenuRenderer() {
   }
 
   function goToAlbum() {
-    if (track?.mb_release_id) {
-      navigate(`/album/${track.mb_release_id}`)
+    const albumId = track?.mb_release_group_id || track?.mb_release_id
+    if (albumId) {
+      navigate(`/album/${albumId}`)
       closeContextMenu()
     }
   }

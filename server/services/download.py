@@ -249,11 +249,16 @@ async def _run_download(track_id: int, title: str, artist: str, album: str = "",
             logger.debug("Local cover upsert failed for track_id=%s", track_id, exc_info=True)
 
     if status == TrackStatus.READY:
+        with Session(engine) as session:
+            track = session.get(Track, track_id)
+            quality = track.quality if track else None
         payload: dict = {
             "type": "track_ready",
             "track_id": track_id,
             "local_stream_url": f"/stream/{track_id}",
         }
+        if quality:
+            payload["quality"] = quality
         if mb_id_for_ws:
             payload["mb_id"] = mb_id_for_ws
         await ws_manager.broadcast(payload)

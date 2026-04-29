@@ -171,8 +171,19 @@ class PlaybackController {
       const url = `/stream/${track.track_id}`
       usePlayerStore.setState({
         currentTrack: { ...track, local_stream_url: url, is_cached: true },
-        phase: 'ready',
+        phase: 'resolving',
       })
+      authFetch(`/play/musicbrainz/${track.mb_id}`)
+        .then(r => r.json())
+        .then(data => {
+          usePlayerStore.setState({
+            currentTrack: { ...track, local_stream_url: url, is_cached: true, quality: data.quality ?? track.quality, track_id: data.track_id },
+            phase: 'ready',
+          })
+        })
+        .catch(() => {
+          usePlayerStore.setState({ phase: 'ready' })
+        })
       authFetch(`/play/local/${track.track_id}`).catch(() => {})
       queryClient.invalidateQueries({ queryKey: ['recently-played'] })
       this._loadAndPlay(url)
@@ -187,7 +198,7 @@ class PlaybackController {
 
         if (currentPhase === 'streaming' || currentPhase === 'ready') {
           if (ct && data.track_id) {
-            usePlayerStore.setState({ currentTrack: { ...ct, track_id: data.track_id, is_cached: Boolean(data.local_stream_url) } })
+            usePlayerStore.setState({ currentTrack: { ...ct, track_id: data.track_id, is_cached: Boolean(data.local_stream_url), quality: data.quality ?? ct.quality } })
           }
           queryClient.invalidateQueries({ queryKey: ['recently-played'] })
           return
@@ -199,7 +210,7 @@ class PlaybackController {
           const rawUrl = String(data.local_stream_url)
           const url = rawUrl.startsWith('http') ? rawUrl : `${API}${rawUrl}`
           usePlayerStore.setState({
-            currentTrack: { ...ct!, local_stream_url: url, track_id: this._currentTrackId ?? undefined, is_cached: true },
+            currentTrack: { ...ct!, local_stream_url: url, track_id: this._currentTrackId ?? undefined, is_cached: true, quality: data.quality ?? ct?.quality },
             phase: 'ready',
           })
           queryClient.invalidateQueries({ queryKey: ['recently-played'] })

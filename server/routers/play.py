@@ -31,6 +31,7 @@ class PlayResponse(BaseModel):
     mb_release_group_id: str | None = None
     release_date: str | None = None
     genre: str | None = None
+    quality: str | None = None
 
 
 def _get_or_create_track_by_mb(session: Session, mbid: str, meta: dict | None) -> tuple[Track, bool]:
@@ -154,6 +155,7 @@ async def play(
             mb_release_group_id=track.mb_release_group_id,
             release_date=track.release_date,
             genre=track.genre,
+            quality=track.quality if is_ready else None,
         )
 
     elif provider == "musicbrainz":
@@ -181,6 +183,7 @@ async def play(
                 mb_release_group_id=existing.mb_release_group_id,
                 release_date=existing.release_date,
                 genre=existing.genre,
+                quality=existing.quality,
             )
 
         async with mb_provider.mb_interactive_calls():
@@ -224,6 +227,7 @@ async def play(
             mb_release_group_id=track.mb_release_group_id,
             release_date=track.release_date,
             genre=track.genre,
+            quality=track.quality if is_ready else None,
         )
 
     else:

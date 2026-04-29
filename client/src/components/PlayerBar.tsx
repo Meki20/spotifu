@@ -180,15 +180,42 @@ export default function PlayerBar() {
 
           {/* Track info */}
           <div className="min-w-0 flex-1">
-            <p
-              className="text-sm truncate cursor-pointer hover:underline"
-              style={{
-                fontFamily: "'Barlow Semi Condensed', sans-serif",
-                color: '#E8DDD0',
-              }}
-            >
-              {currentTrack.title}
-            </p>
+            <div className="flex items-center gap-2">
+              <p
+                className="text-sm truncate cursor-pointer hover:underline"
+                style={{
+                  fontFamily: "'Barlow Semi Condensed', sans-serif",
+                  color: '#E8DDD0',
+                }}
+              >
+                {currentTrack.title}
+              </p>
+              {currentTrack.quality ? (
+                <span
+                  className="shrink-0 inline-flex items-center px-1.5 py-0.5 text-xs font-medium rounded"
+                  style={{
+                    color: '#E8DDD0',
+                    backgroundColor: '#b4003e',
+                    border: '1px solid #b4003e',
+                    fontFamily: "'Barlow Semi Condensed', sans-serif",
+                  }}
+                >
+                  {currentTrack.quality}
+                </span>
+              ) : currentTrack.is_cached ? (
+                <span
+                  className="shrink-0 inline-flex items-center px-1.5 py-0.5 text-xs font-medium rounded animate-pulse"
+                  style={{
+                    color: '#E8DDD0',
+                    backgroundColor: '#4A413C',
+                    border: '1px solid #b4003e',
+                    fontFamily: "'Barlow Semi Condensed', sans-serif",
+                  }}
+                >
+                  ...
+                </span>
+              ) : null}
+            </div>
             <p
               className="text-sm truncate cursor-pointer hover:underline mt-0.5"
               style={{

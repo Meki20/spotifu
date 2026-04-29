@@ -289,12 +289,19 @@ async def download_track_direct(
                 session.commit()
 
     if status == TrackStatus.READY:
-        await ws_manager.broadcast({
+        quality = None
+        with Session(engine) as session:
+            track = session.get(Track, track_id)
+            quality = track.quality if track else None
+        payload = {
             "type": "direct_download_ready",
             "track_id": track_id,
             "local_stream_url": f"/stream/{track_id}",
             "album_cover": album_cover,
-        })
+        }
+        if quality:
+            payload["quality"] = quality
+        await ws_manager.broadcast(payload)
 
     async with _active_lock:
         del _active_downloads[track_id]

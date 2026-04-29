@@ -27,6 +27,7 @@ export function toTrack(raw: any, extras?: Partial<Track>): Track {
     mb_release_id: raw.mb_release_id ?? null,
     mb_release_group_id: raw.mb_release_group_id ?? null,
     mb_artist_id: raw.mb_artist_id ?? null,
+    quality: raw.quality ?? null,
     ...extras,
   }
 }

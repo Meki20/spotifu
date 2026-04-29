@@ -18,6 +18,7 @@ export interface Track {
   mb_release_id?: string | null
   mb_release_group_id?: string | null
   mb_artist_id?: string | null
+  quality?: string | null
 }
 
 export type SystemSource =

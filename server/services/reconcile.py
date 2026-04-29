@@ -172,18 +172,25 @@ def _apply_mb_ids(updates: list[tuple[int, str]]) -> None:
         session.commit()
 
 
+MIN_MB_SCORE = 70
+
+
 async def reconcile_provider_ids() -> None:
     """Backfill missing mb_ids for all READY tracks.
 
     Runs once at startup. For each READY track without an mb_id, ask
     MusicBrainz to resolve it. MusicBrainz limits to ~1 req/sec per IP —
     we throttle to 1.5s between calls.
+
+    Only backfills for 100% sure matches: requires "full" mode (artist + title + album)
+    and high MB score (>= MIN_MB_SCORE).
     """
     from services.providers import musicbrainz
 
-    logger.info("Starting provider ID reconciliation...")
+    logger.info("Starting provider ID reconciliation (strict: full mode + score >= %d)...", MIN_MB_SCORE)
 
     filled_count = 0
+    skipped_not_strict = 0
     _BATCH = 100
     after_id = 0
     while True:
@@ -197,12 +204,29 @@ async def reconcile_provider_ids() -> None:
                 "Processing track %s: artist=%r, title=%r, album=%r",
                 track.id, track.artist, track.title, track.album,
             )
+            mb_id = None
             try:
                 async with musicbrainz.mb_prefetch_calls():
-                    mb_id = await musicbrainz.resolve_id(track.title, track.artist, track.album)
+                    meta = await musicbrainz.resolve_recording_metadata(
+                        track.title, track.artist, track.album
+                    )
+                if meta:
+                    phase = meta.get("_resolve_phase", "")
+                    score = meta.get("mb_score", 0)
+                    if phase == "full" and score >= MIN_MB_SCORE:
+                        mb_id = meta.get("mbid")
+                        logger.debug(
+                            "Track %s matched: phase=%s score=%d",
+                            track.id, phase, score,
+                        )
+                    else:
+                        logger.debug(
+                            "Track %s skipped: phase=%r score=%d (need 'full' + score >= %d)",
+                            track.id, phase, score, MIN_MB_SCORE,
+                        )
+                        skipped_not_strict += 1
             except Exception as e:
                 logger.warning("mb resolve ERROR: %s", e)
-                mb_id = None
             if mb_id:
                 updates.append((track.id, mb_id))
                 filled_count += 1
@@ -210,4 +234,4 @@ async def reconcile_provider_ids() -> None:
         if updates:
             await asyncio.to_thread(_apply_mb_ids, updates)
 
-    logger.info("Provider ID reconciliation done. Filled %d mb_ids.", filled_count)
+    logger.info("Provider ID reconciliation done. Filled %d mb_ids, skipped %d (not strict enough).", filled_count, skipped_not_strict)

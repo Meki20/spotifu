@@ -1,4 +1,4 @@
-import { X, ListMusic } from 'lucide-react'
+import { X, ListMusic, Computer } from 'lucide-react'
 import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { Link, useNavigate } from 'react-router-dom'
@@ -16,7 +16,7 @@ function NowPlayingCard({ track }: { track: Track }) {
   return (
     <div className="w-full">
       <div
-        className="w-full aspect-square rounded-md overflow-hidden"
+        className="w-full aspect-square rounded-md overflow-hidden relative"
         style={{
           background: '#231815',
           boxShadow: '0 14px 40px rgba(0,0,0,0.55), 0 2px 0 rgba(255,255,255,0.03) inset',
@@ -25,6 +25,14 @@ function NowPlayingCard({ track }: { track: Track }) {
         {track.album_cover ? (
           <img src={track.album_cover} alt="" className="w-full h-full object-cover block" />
         ) : null}
+        {!track.mb_id && !track.mb_artist_id && !track.mb_release_id && !track.mb_release_group_id && (
+          <div
+            className="absolute top-2 right-2 p-1.5 rounded"
+            style={{ background: 'rgba(0,0,0,0.6)' }}
+          >
+            <Computer size={16} className="text-[#9A8E84]" />
+          </div>
+        )}
       </div>
 
       <div className="pt-3">
@@ -95,12 +103,20 @@ function TrackRow({
       }}
     >
       <div
-        className="shrink-0 rounded-md overflow-hidden"
+        className="shrink-0 rounded-md overflow-hidden relative"
         style={{ width: 30, height: 30, background: '#231815' }}
       >
         {track.album_cover ? (
           <img src={track.album_cover} alt="" className="w-full h-full object-cover block" loading="lazy" />
         ) : null}
+        {!track.mb_id && !track.mb_artist_id && !track.mb_release_id && !track.mb_release_group_id && (
+          <div
+            className="absolute top-0 right-0 p-0.5"
+            style={{ background: 'rgba(0,0,0,0.6)' }}
+          >
+            <Computer size={10} className="text-[#9A8E84]" />
+          </div>
+        )}
       </div>
       <div className="min-w-0 flex-1">
         <div className="text-xs font-semibold truncate" style={{ fontFamily: "'Barlow Semi Condensed', sans-serif", color: '#E8DDD0' }}>

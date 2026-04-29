@@ -1,5 +1,10 @@
 import { memo } from 'react'
+import { Computer } from 'lucide-react'
 import { displayArtist } from '../utils/trackHelpers'
+
+function isLocalTrack(track: any): boolean {
+  return !track.mb_id && !track.mb_artist_id && !track.mb_release_id && !track.mb_release_group_id
+}
 
 const BACKDROP_OPACITY = 0.14
 
@@ -42,13 +47,23 @@ const TrackCardImpl = ({ track, size = 96, onPlay, onHoverArtist, onContextMenu 
       )}
       <div className="relative z-10 w-full flex flex-col items-center gap-2">
         {cover ? (
-          <img
-            src={cover}
-            alt={track.title}
-            className="rounded"
-            style={{ width: size, height: size, objectFit: 'cover' }}
-            loading="lazy"
-          />
+          <div className="relative rounded overflow-hidden" style={{ width: size, height: size }}>
+            <img
+              src={cover}
+              alt={track.title}
+              className="w-full h-full"
+              style={{ objectFit: 'cover' }}
+              loading="lazy"
+            />
+            {isLocalTrack(track) && (
+              <div
+                className="absolute top-1 right-1 p-1 rounded"
+                style={{ background: 'rgba(0,0,0,0.6)' }}
+              >
+                <Computer size={14} className="text-[#9A8E84]" />
+              </div>
+            )}
+          </div>
         ) : (
           <div
             className="rounded flex items-center justify-center shrink-0"

@@ -1,8 +1,12 @@
 import { memo } from 'react'
-import { Play } from 'lucide-react'
+import { Play, Computer } from 'lucide-react'
 import { displayArtist } from '../utils/trackHelpers'
 import { PollyLoading } from './PollyLoading'
 import PlaylistTrackCover from './PlaylistTrackCover'
+
+function isLocalTrack(track: any): boolean {
+  return !track.mb_id && !track.mb_artist_id && !track.mb_release_id && !track.mb_release_group_id
+}
 
 interface TrackRowProps {
   track: any
@@ -89,12 +93,22 @@ const TrackRowImpl = ({
           />
         )}
         {showCover && !playlistStyleCover && track.album_cover && (
-          <img
-            src={track.album_cover}
-            alt={track.album || ''}
-            className="w-8 h-8 rounded shrink-0"
-            loading="lazy"
-          />
+          <div className="relative w-8 h-8 rounded shrink-0 overflow-hidden">
+            <img
+              src={track.album_cover}
+              alt={track.album || ''}
+              className="w-full h-full object-cover"
+              loading="lazy"
+            />
+            {isLocalTrack(track) && (
+              <div
+                className="absolute top-0 right-0 p-0.5"
+                style={{ background: 'rgba(0,0,0,0.6)' }}
+              >
+                <Computer size={10} className="text-[#9A8E84]" />
+              </div>
+            )}
+          </div>
         )}
         {showCover && !playlistStyleCover && !track.album_cover && track.mb_id && coverBatchLoading && (
           <div className="w-8 h-8 rounded shrink-0 animate-pulse bg-[#231815]" aria-hidden />

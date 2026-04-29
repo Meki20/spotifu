@@ -4,7 +4,7 @@ import PlayerBar from './PlayerBar'
 import NotificationCenter from './NotificationCenter'
 import QueuePanel from './QueuePanel'
 import { useAudioPlayer } from '../hooks/useAudioPlayer'
-import { ChevronLeft, ChevronRight, Home, Library, Search, Settings } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Home, Library, Search, Settings, Download } from 'lucide-react'
 import { useAuthStore } from '../stores/authStore'
 import { usePrefetchSettingsStore } from '../stores/prefetchSettingsStore'
 import { authFetch } from '../api'
@@ -15,6 +15,7 @@ const NAV_ITEMS = [
   { id: '/', icon: Home, label: 'Home' },
   { id: '/search', icon: Search, label: 'Search' },
   { id: '/library', icon: Library, label: 'Library' },
+  { id: '/soulseek', icon: Download, label: 'Soulseek' },
   { id: '/settings', icon: Settings, label: 'Settings' },
 ]
 

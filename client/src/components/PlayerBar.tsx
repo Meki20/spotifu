@@ -6,7 +6,7 @@ import { useState, useRef, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
   Play, Pause, SkipBack, SkipForward, Volume2, VolumeX,
-  MoreHorizontal, Shuffle, Repeat, Repeat1, Heart,
+  MoreHorizontal, Shuffle, Repeat, Repeat1, Heart, Computer,
 } from 'lucide-react'
 import type { RepeatMode } from '../stores/playerStore'
 import AddToPlaylistModal, { type AddToPlaylistTrack } from './AddToPlaylistModal'
@@ -151,12 +151,22 @@ export default function PlayerBar() {
             }}
           >
             {currentTrack.album_cover ? (
-              <img
-                src={currentTrack.album_cover}
-                alt={currentTrack.album || ''}
-                className="w-full h-full object-cover"
-                loading="lazy"
-              />
+              <div className="relative w-full h-full overflow-hidden">
+                <img
+                  src={currentTrack.album_cover}
+                  alt={currentTrack.album || ''}
+                  className="w-full h-full object-cover"
+                  loading="lazy"
+                />
+                {!currentTrack.mb_id && !currentTrack.mb_artist_id && !currentTrack.mb_release_id && !currentTrack.mb_release_group_id && (
+                  <div
+                    className="absolute top-0 right-0 p-0.5"
+                    style={{ background: 'rgba(0,0,0,0.6)' }}
+                  >
+                    <Computer size={10} className="text-[#9A8E84]" />
+                  </div>
+                )}
+              </div>
             ) : (
               <div
                 className="w-7 h-7 rounded-full"

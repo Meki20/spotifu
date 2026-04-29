@@ -14,6 +14,7 @@ import { PollyLoading } from './components/PollyLoading'
 const Home = lazy(() => import('./pages/Home'))
 const Search = lazy(() => import('./pages/Search'))
 const Library = lazy(() => import('./pages/Library'))
+const Soulseek = lazy(() => import('./pages/Soulseek'))
 const Settings = lazy(() => import('./pages/Settings'))
 const Login = lazy(() => import('./pages/Login'))
 const Register = lazy(() => import('./pages/Register'))
@@ -48,6 +49,7 @@ function AppContent() {
         <Route index element={<Suspense fallback={<LoadingSpinner />}><RouteErrorBoundary name="Home"><Home /></RouteErrorBoundary></Suspense>} />
         <Route path="/search" element={<Suspense fallback={<LoadingSpinner />}><RouteErrorBoundary name="Search"><Search /></RouteErrorBoundary></Suspense>} />
         <Route path="/library" element={<Suspense fallback={<LoadingSpinner />}><RouteErrorBoundary name="Library"><Library /></RouteErrorBoundary></Suspense>} />
+        <Route path="/soulseek" element={<Suspense fallback={<LoadingSpinner />}><RouteErrorBoundary name="Soulseek"><Soulseek /></RouteErrorBoundary></Suspense>} />
         <Route path="/settings" element={<Suspense fallback={<LoadingSpinner />}><RouteErrorBoundary name="Settings"><Settings /></RouteErrorBoundary></Suspense>} />
         <Route path="/album/:albumId" element={<Suspense fallback={<LoadingSpinner />}><RouteErrorBoundary name="Album"><AlbumPage /></RouteErrorBoundary></Suspense>} />
         <Route path="/artist/:artistId" element={<Suspense fallback={<LoadingSpinner />}><RouteErrorBoundary name="Artist"><ArtistPage /></RouteErrorBoundary></Suspense>} />

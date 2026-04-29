@@ -254,6 +254,9 @@ async def download_track_direct(
             if track:
                 track.status = status
                 track.local_file_path = local_path
+                if local_path:
+                    from services.audio_quality import extract_quality
+                    track.quality = extract_quality(local_path)
                 session.add(track)
                 session.commit()
 

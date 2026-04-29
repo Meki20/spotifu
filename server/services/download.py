@@ -211,6 +211,9 @@ async def _run_download(track_id: int, title: str, artist: str, album: str = "",
         if track:
             track.status = status
             track.local_file_path = local_path
+            if status == TrackStatus.READY and local_path:
+                from services.audio_quality import extract_quality
+                track.quality = extract_quality(local_path)
             if not track.artist_credit:
                 track.artist_credit = track.artist
             mb_id_for_ws = track.mb_id

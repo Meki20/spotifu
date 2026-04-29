@@ -28,6 +28,7 @@ class Track(SQLModel, table=True):
     album: str = Field(index=True, max_length=255)
     status: TrackStatus = Field(index=True, default=TrackStatus.FETCHING)
     local_file_path: Optional[str] = Field(default=None, max_length=4096)
+    quality: Optional[str] = Field(default=None, max_length=64)
     album_cover: Optional[str] = Field(default=None, max_length=4096)
     duration: int = Field(default=0)
     mb_id: Optional[str] = Field(default=None, max_length=64, index=True)

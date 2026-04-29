@@ -149,18 +149,15 @@ export default function QueuePanel(_: QueuePanelProps) {
 
   useEffect(() => {
     const compute = () => {
-      const appW = window.innerWidth || 0
-      const screenW = window.screen?.availWidth || window.screen?.width || 0
-      const widerThanHalfScreen = screenW > 0 ? appW > screenW * 0.5 : appW >= 1100
-      const sidebarCollapsed = document.documentElement.dataset.sidebarCollapsed === '1'
-      setIsVisible(widerThanHalfScreen || sidebarCollapsed)
+      const visible = document.documentElement.dataset.queueVisible === '1'
+      setIsVisible(visible)
     }
 
     compute()
     window.addEventListener('resize', compute)
 
     const obs = new MutationObserver(compute)
-    obs.observe(document.documentElement, { attributes: true, attributeFilter: ['data-sidebar-collapsed'] })
+    obs.observe(document.documentElement, { attributes: true, attributeFilter: ['data-queue-visible'] })
 
     return () => {
       window.removeEventListener('resize', compute)

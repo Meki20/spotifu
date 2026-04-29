@@ -44,11 +44,9 @@ export default function MainLayout() {
 
   useEffect(() => {
     const compute = () => {
-      // Show both panels when app is wider than half the physical screen.
-      // Otherwise, show queue only when left sidebar is collapsed.
       const appW = window.innerWidth || 0
       const screenW = window.screen?.availWidth || window.screen?.width || 0
-      const widerThanHalfScreen = screenW > 0 ? appW > screenW * 0.5 : appW >= 1100
+      const widerThanHalfScreen = screenW > 0 ? appW > screenW * 0.7 : appW >= 1100
       setQueueVisible(widerThanHalfScreen || collapsed)
     }
     compute()

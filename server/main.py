@@ -68,11 +68,6 @@ ws_manager = ConnectionManager()
 async def lifespan(app: FastAPI):
     await asyncio.to_thread(create_db)
 
-    from services.reconcile import reconcile_stuck_tracks, reconcile_provider_ids
-
-    await asyncio.to_thread(reconcile_stuck_tracks)
-    asyncio.create_task(reconcile_provider_ids())
-
     def _loop_exception_handler(loop, context):
         exc = context.get("exception")
         if exc is not None:

@@ -1,9 +1,11 @@
+import asyncio
+
 from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks, Query
 from pydantic import BaseModel
 from sqlmodel import Session, select, delete, func
 from database import get_session
 from deps import get_current_user
-from models import User, Track, MBLookupCache, MBEntityCache, PlaylistItem, CoverLink, CoverAsset
+from models import User, Track, TrackStatus, MBLookupCache, MBEntityCache, PlaylistItem, CoverLink, CoverAsset
 from schemas.track import DownloadedTrackListItem, DownloadedTracksListResponse
 from services.user_preferences import get_stored_prefetch_prefs, merge_prefetch_into_user, PREFETCH_DEFAULTS
 
@@ -290,3 +292,540 @@ def clear_covers_cache(
     session.exec(delete(CoverAsset))
     session.commit()
     return {"status": "ok"}
+
+
+# Reconciliation endpoint models
+class ReconciliationTrackItem(BaseModel):
+    id: int
+    title: str
+    artist: str
+    artist_credit: str | None = None
+    album: str
+    mb_id: str | None = None
+    mb_artist_id: str | None = None
+    mb_release_id: str | None = None
+    mb_release_group_id: str | None = None
+    missing_fields: list[str]
+
+
+class ReconciliationTracksResponse(BaseModel):
+    tracks: list[ReconciliationTrackItem]
+    total: int
+    page: int
+    page_size: int
+    total_pages: int
+
+
+class ResolveRequest(BaseModel):
+    track_ids: list[int]
+
+
+class MatchResult(BaseModel):
+    track_id: int
+    original_title: str
+    original_artist: str
+    original_album: str
+    matched_title: str | None = None
+    matched_artist: str | None = None
+    matched_artist_credit: str | None = None
+    matched_album: str | None = None
+    mb_id: str | None = None
+    mb_artist_id: str | None = None
+    mb_release_id: str | None = None
+    mb_release_group_id: str | None = None
+    mb_score: int | None = None
+    phase: str | None = None
+    matched: bool
+
+
+class ResolveResponse(BaseModel):
+    results: list[MatchResult]
+
+
+class ApplyRequest(BaseModel):
+    track_id: int
+    title: str
+    artist: str
+    artist_credit: str | None = None
+    album: str
+    mb_id: str
+    mb_artist_id: str | None = None
+    mb_release_id: str | None = None
+    mb_release_group_id: str | None = None
+    release_date: str | None = None
+    genre: str | None = None
+
+
+class ApplyResponse(BaseModel):
+    status: str
+
+
+def _get_missing_fields(track: Track) -> list[str]:
+    missing = []
+    if not track.mb_id:
+        missing.append("mb_id")
+    if not track.mb_artist_id:
+        missing.append("mb_artist_id")
+    if not track.mb_release_id:
+        missing.append("mb_release_id")
+    if not track.mb_release_group_id:
+        missing.append("mb_release_group_id")
+    return missing
+
+
+@router.get("/reconciliation/tracks", response_model=ReconciliationTracksResponse)
+def get_reconciliation_tracks(
+    user: User = Depends(get_current_user),
+    session: Session = Depends(get_session),
+    page: int = Query(default=1, ge=1),
+    page_size: int = Query(default=20, ge=1, le=100),
+):
+    # Get total count
+    total = session.exec(
+        select(func.count(Track.id)).where(
+            Track.status == TrackStatus.READY,
+            (Track.mb_id == None) | (Track.mb_artist_id == None) | (Track.mb_release_id == None),  # noqa: E711
+        )
+    ).one()
+
+    offset = (page - 1) * page_size
+    rows = session.exec(
+        select(Track)
+        .where(
+            Track.status == TrackStatus.READY,
+            (Track.mb_id == None) | (Track.mb_artist_id == None) | (Track.mb_release_id == None),  # noqa: E711
+        )
+        .order_by(Track.id)
+        .limit(page_size)
+        .offset(offset)
+    ).all()
+
+    return ReconciliationTracksResponse(
+        tracks=[
+            ReconciliationTrackItem(
+                id=t.id,
+                title=t.title,
+                artist=t.artist,
+                artist_credit=t.artist_credit,
+                album=t.album,
+                mb_id=t.mb_id,
+                mb_artist_id=t.mb_artist_id,
+                mb_release_id=t.mb_release_id,
+                mb_release_group_id=t.mb_release_group_id,
+                missing_fields=_get_missing_fields(t),
+            )
+            for t in rows
+        ],
+        total=total,
+        page=page,
+        page_size=page_size,
+        total_pages=(total + page_size - 1) // page_size if total > 0 else 1,
+    )
+
+
+@router.post("/reconciliation/resolve", response_model=ResolveResponse)
+async def resolve_reconciliation_tracks(
+    body: ResolveRequest,
+    user: User = Depends(get_current_user),
+    session: Session = Depends(get_session),
+):
+    from services.providers import musicbrainz
+    from services.playlist_import import (
+        _resolve_batch_verbatim,
+        ImportInputRow,
+        ResolveOutcome,
+        _query_normalized,
+        _retry_mb_forever_503_429,
+    )
+
+    results: list[MatchResult] = []
+    track_map: dict[str, Track] = {}  # query_normalized -> Track
+    results_map: dict[str, MatchResult] = {}  # query_normalized -> MatchResult
+    memo: dict[str, ResolveOutcome] = {}
+    stats: dict[str, int] = {"memo_hit": 0, "db_cache_hit": 0, "live_lookup": 0, "matched": 0, "unmatched": 0}
+
+    # Fetch all tracks first
+    all_tracks = [session.get(Track, tid) for tid in body.track_ids]
+    all_tracks = [t for t in all_tracks if t]
+
+    # Split into full (have artist+title+album) and incomplete
+    full_rows: list[ImportInputRow] = []
+    incomplete_tracks: list[Track] = []
+
+    row_idx = 0
+    for track in all_tracks:
+        artist = track.artist or ""
+        title = track.title or ""
+        album = track.album or ""
+
+        # Check if we have all three fields
+        if artist and title and album:
+            qn = _query_normalized(artist, title, album)
+            row = ImportInputRow(
+                row_index=row_idx,
+                title=title,
+                artist=artist,
+                album=album,
+                duration_ms=0,
+                query_normalized=qn,
+            )
+            full_rows.append(row)
+            track_map[qn] = track
+            row_idx += 1
+        else:
+            incomplete_tracks.append(track)
+
+    # Process full rows using 4-pass batch resolver
+    # Process in batches of 5 with throttling
+    batch_size = 5
+    for i in range(0, len(full_rows), batch_size):
+        batch = full_rows[i : i + batch_size]
+        await _resolve_batch_verbatim(session, batch, memo=memo, stats=stats)
+        await asyncio.sleep(1.2)  # Throttle to respect MB rate limits
+
+    # Convert memo results to MatchResult for full tracks
+    for qn, outcome in memo.items():
+        track = track_map.get(qn)
+        if not track:
+            continue
+
+        if outcome.state.name == "MATCHED" and outcome.meta:
+            meta = outcome.meta
+            results_map[qn] = MatchResult(
+                track_id=track.id,
+                original_title=track.title,
+                original_artist=track.artist,
+                original_album=track.album,
+                matched_title=meta.get("title"),
+                matched_artist=meta.get("artist"),
+                matched_artist_credit=meta.get("artist_credit"),
+                matched_album=meta.get("album"),
+                mb_id=meta.get("mbid"),
+                mb_artist_id=meta.get("mb_artist_id"),
+                mb_release_id=meta.get("mb_release_id"),
+                mb_release_group_id=meta.get("mb_release_group_id"),
+                mb_score=int(outcome.confidence * 100) if outcome.confidence else None,
+                phase=outcome.phase,
+                matched=True,
+            )
+        else:
+            results_map[qn] = MatchResult(
+                track_id=track.id,
+                original_title=track.title,
+                original_artist=track.artist,
+                original_album=track.album,
+                matched=False,
+            )
+
+    # Handle incomplete tracks with simple lucene query
+    async def resolve_incomplete(track: Track) -> MatchResult:
+        title = track.title or ""
+        artist = track.artist or ""
+        album = track.album or ""
+
+        parts = []
+        if artist:
+            parts.append(f'artist:"{artist}"')
+        if album:
+            parts.append(f'release:"{album}"')
+        if title:
+            parts.append(title)
+        lucene = " AND ".join(parts) if parts else title
+
+        if not lucene:
+            return MatchResult(
+                track_id=track.id,
+                original_title=track.title,
+                original_artist=track.artist,
+                original_album=track.album,
+                matched=False,
+            )
+
+        try:
+            cand = await _retry_mb_forever_503_429(
+                lambda: musicbrainz.recording_query_raw(lucene, limit=20)
+            )
+            if cand and len(cand) > 0:
+                best = cand[0]
+                meta = musicbrainz.recording_to_playlist_meta(best, album_hint=album)
+                if meta and meta.get("mbid"):
+                    score = best.get("score", 0)
+                    return MatchResult(
+                        track_id=track.id,
+                        original_title=track.title,
+                        original_artist=track.artist,
+                        original_album=track.album,
+                        matched_title=meta.get("title"),
+                        matched_artist=meta.get("artist"),
+                        matched_artist_credit=meta.get("artist_credit"),
+                        matched_album=meta.get("album"),
+                        mb_id=meta.get("mbid"),
+                        mb_artist_id=meta.get("mb_artist_id"),
+                        mb_release_id=meta.get("mb_release_id"),
+                        mb_release_group_id=meta.get("mb_release_group_id"),
+                        mb_score=int(score * 100) if score else None,
+                        phase=meta.get("_resolve_phase"),
+                        matched=True,
+                    )
+        except Exception:
+            pass
+
+        return MatchResult(
+            track_id=track.id,
+            original_title=track.title,
+            original_artist=track.artist,
+            original_album=track.album,
+            matched=False,
+        )
+
+    # Process incomplete tracks with throttling
+    incomplete_qn_map: dict[int, str] = {}  # track_id -> query_normalized
+    for track in incomplete_tracks:
+        qn = _query_normalized(track.artist or "", track.title or "", track.album or "")
+        result = await resolve_incomplete(track)
+        results_map[qn] = result
+        incomplete_qn_map[track.id] = qn
+        await asyncio.sleep(1.2)
+
+    # Build final results list in original order
+    track_id_to_qn: dict[int, str] = {}
+    for qn, track in track_map.items():
+        track_id_to_qn[track.id] = qn
+    for track in incomplete_tracks:
+        track_id_to_qn[track.id] = incomplete_qn_map[track.id]
+
+    # If we have results from resolve (full rows processed first), add them
+    for track in all_tracks:
+        qn = track_id_to_qn.get(track.id)
+        if qn and qn in results_map:
+            results.append(results_map[qn])
+        else:
+            # Fallback - shouldn't happen but include all tracks
+            results.append(MatchResult(
+                track_id=track.id,
+                original_title=track.title,
+                original_artist=track.artist,
+                original_album=track.album,
+                matched=False,
+            ))
+
+    return ResolveResponse(results=results)
+
+
+@router.post("/reconciliation/resolve/stream")
+async def resolve_reconciliation_tracks_stream(
+    body: ResolveRequest,
+    user: User = Depends(get_current_user),
+    session: Session = Depends(get_session),
+):
+    from services.providers import musicbrainz
+    from services.playlist_import import (
+        _resolve_batch_verbatim,
+        ImportInputRow,
+        ResolveOutcome,
+        _query_normalized,
+        _retry_mb_forever_503_429,
+    )
+
+    import json
+    from fastapi.responses import StreamingResponse
+
+    async def event_stream():
+        track_map: dict[str, Track] = {}
+        memo: dict[str, ResolveOutcome] = {}
+        stats: dict[str, int] = {"memo_hit": 0, "db_cache_hit": 0, "live_lookup": 0, "matched": 0, "unmatched": 0}
+
+        # Fetch all tracks first
+        all_tracks = [session.get(Track, tid) for tid in body.track_ids]
+        all_tracks = [t for t in all_tracks if t]
+
+        # Split into full (have artist+title+album) and incomplete
+        full_rows: list[ImportInputRow] = []
+        incomplete_tracks: list[Track] = []
+
+        row_idx = 0
+        for track in all_tracks:
+            artist = track.artist or ""
+            title = track.title or ""
+            album = track.album or ""
+
+            if artist and title and album:
+                qn = _query_normalized(artist, title, album)
+                row = ImportInputRow(
+                    row_index=row_idx,
+                    title=title,
+                    artist=artist,
+                    album=album,
+                    duration_ms=0,
+                    query_normalized=qn,
+                )
+                full_rows.append(row)
+                track_map[qn] = track
+                row_idx += 1
+            else:
+                incomplete_tracks.append(track)
+
+        # Send initial count
+        yield f"data: {json.dumps({'type': 'start', 'total': len(all_tracks)})}\n\n"
+
+        # Process full rows using 4-pass batch resolver
+        batch_size = 5
+        processed = 0
+
+        for i in range(0, len(full_rows), batch_size):
+            batch = full_rows[i : i + batch_size]
+            await _resolve_batch_verbatim(session, batch, memo=memo, stats=stats)
+            await asyncio.sleep(1.2)
+
+            # Yield results from this batch
+            for qn, outcome in memo.items():
+                track = track_map.get(qn)
+                if not track:
+                    continue
+
+                if outcome.state.name == "MATCHED" and outcome.meta:
+                    meta = outcome.meta
+                    result = MatchResult(
+                        track_id=track.id,
+                        original_title=track.title,
+                        original_artist=track.artist,
+                        original_album=track.album,
+                        matched_title=meta.get("title"),
+                        matched_artist=meta.get("artist"),
+                        matched_artist_credit=meta.get("artist_credit"),
+                        matched_album=meta.get("album"),
+                        mb_id=meta.get("mbid"),
+                        mb_artist_id=meta.get("mb_artist_id"),
+                        mb_release_id=meta.get("mb_release_id"),
+                        mb_release_group_id=meta.get("mb_release_group_id"),
+                        mb_score=int(outcome.confidence * 100) if outcome.confidence else None,
+                        phase=outcome.phase,
+                        matched=True,
+                    )
+                else:
+                    result = MatchResult(
+                        track_id=track.id,
+                        original_title=track.title,
+                        original_artist=track.artist,
+                        original_album=track.album,
+                        matched=False,
+                    )
+                processed += 1
+                yield f"data: {json.dumps({'type': 'result', 'result': result.model_dump(), 'processed': processed})}\n\n"
+
+        # Handle incomplete tracks with simple lucene query
+        for track in incomplete_tracks:
+            result = await resolve_incomplete_stream(track)
+            processed += 1
+            yield f"data: {json.dumps({'type': 'result', 'result': result.model_dump(), 'processed': processed})}\n\n"
+            await asyncio.sleep(1.2)
+
+        yield f"data: {json.dumps({'type': 'done', 'processed': processed})}\n\n"
+
+    async def resolve_incomplete_stream(track: Track) -> MatchResult:
+        from services.providers import musicbrainz
+        from services.playlist_import import _retry_mb_forever_503_429
+
+        title = track.title or ""
+        artist = track.artist or ""
+        album = track.album or ""
+
+        parts = []
+        if artist:
+            parts.append(f'artist:"{artist}"')
+        if album:
+            parts.append(f'release:"{album}"')
+        if title:
+            parts.append(title)
+        lucene = " AND ".join(parts) if parts else title
+
+        if not lucene:
+            return MatchResult(
+                track_id=track.id,
+                original_title=track.title,
+                original_artist=track.artist,
+                original_album=track.album,
+                matched=False,
+            )
+
+        try:
+            cand = await _retry_mb_forever_503_429(
+                lambda: musicbrainz.recording_query_raw(lucene, limit=20)
+            )
+            if cand and len(cand) > 0:
+                best = cand[0]
+                meta = musicbrainz.recording_to_playlist_meta(best, album_hint=album)
+                if meta and meta.get("mbid"):
+                    score = best.get("score", 0)
+                    return MatchResult(
+                        track_id=track.id,
+                        original_title=track.title,
+                        original_artist=track.artist,
+                        original_album=track.album,
+                        matched_title=meta.get("title"),
+                        matched_artist=meta.get("artist"),
+                        matched_artist_credit=meta.get("artist_credit"),
+                        matched_album=meta.get("album"),
+                        mb_id=meta.get("mbid"),
+                        mb_artist_id=meta.get("mb_artist_id"),
+                        mb_release_id=meta.get("mb_release_id"),
+                        mb_release_group_id=meta.get("mb_release_group_id"),
+                        mb_score=int(score * 100) if score else None,
+                        phase=meta.get("_resolve_phase"),
+                        matched=True,
+                    )
+        except Exception:
+            pass
+
+        return MatchResult(
+            track_id=track.id,
+            original_title=track.title,
+            original_artist=track.artist,
+            original_album=track.album,
+            matched=False,
+        )
+
+    return StreamingResponse(event_stream(), media_type="text/event-stream")
+
+
+@router.post("/reconciliation/apply", response_model=ApplyResponse)
+async def apply_reconciliation_match(
+    body: ApplyRequest,
+    user: User = Depends(get_current_user),
+    session: Session = Depends(get_session),
+):
+    from services.covers import upsert_local_cover
+
+    track = session.get(Track, body.track_id)
+    if not track:
+        raise HTTPException(status_code=404, detail="Track not found")
+
+    # Update track with matched metadata
+    track.title = body.title
+    track.artist = body.artist
+    track.artist_credit = body.artist_credit
+    track.album = body.album
+    track.mb_id = body.mb_id
+    track.mb_artist_id = body.mb_artist_id
+    track.mb_release_id = body.mb_release_id
+    track.mb_release_group_id = body.mb_release_group_id
+    track.release_date = body.release_date
+    track.genre = body.genre
+
+    session.add(track)
+    session.commit()
+
+    # Upsert cover art if we have release_id or release_group_id
+    if (body.mb_release_id or body.mb_release_group_id) and track.local_file_path:
+        try:
+            await upsert_local_cover(
+                local_file_path=track.local_file_path,
+                track_id=track.id,
+                recording_id=body.mb_id,
+                release_id=body.mb_release_id,
+                release_group_id=body.mb_release_group_id,
+            )
+        except Exception:
+            pass
+
+    return ApplyResponse(status="ok")

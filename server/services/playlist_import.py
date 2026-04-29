@@ -880,6 +880,99 @@ async def _resolve_batch_verbatim(
             error=None,
         )
 
+    # Pass 5: relaxed single-track search for remaining unmatched (Artist - Title) AND status:official
+    # Collect unmatched from Pass 4
+    misses4 = [r for r in misses3 if r.query_normalized not in memo or memo[r.query_normalized].state == PlaylistImportRowState.UNMATCHED]
+
+    if not misses4:
+        return
+
+    for idx, r in enumerate(misses4):
+        stats["live_lookup"] += 1
+        # Build relaxed query: (artist - title) AND status:official - no quotes
+        artist_escaped = _lucene_escape_phrase(r.artist)
+        title_escaped = _lucene_escape_phrase(r.title)
+        lucene5 = f"({artist_escaped} - {title_escaped}) AND status:official"
+        try:
+            cand5 = await _retry_mb_forever_503_429(
+                lambda: musicbrainz.recording_query_raw(lucene5, limit=10)
+            )
+        except Exception:
+            continue
+
+        if not cand5:
+            continue
+
+        # Score: high weight for MB native score (top results) + medium weight for album + artist match
+        best: dict[str, Any] | None = None
+        best_score = 0.0
+        for rank, c in enumerate(cand5):
+            if not isinstance(c, dict):
+                continue
+            # MB native score: 0-100, normalize to 0-1
+            mb_score = float(c.get("score", 0)) / 100.0
+            # Position bonus: earlier results get higher score
+            position_bonus = 1.0 - (rank * 0.08)  # rank 0 gets 1.0, rank 9 gets 0.28
+            # Album match bonus
+            album_bonus = 0.0
+            if r.album:
+                for rel in c.get("releases") or []:
+                    if not isinstance(rel, dict):
+                        continue
+                    rel_title = (rel.get("title") or "").strip()
+                    if rel_title and _ratio(r.album, rel_title) >= 0.72:
+                        album_bonus = 0.30
+                        break
+            # Artist match bonus - check against both original and canonical artist
+            artist_bonus = 0.0
+            artist_credit = c.get("artist-credit") or []
+            if artist_credit:
+                mb_artist_name = ""
+                if isinstance(artist_credit, list) and len(artist_credit) > 0:
+                    first_artist = artist_credit[0]
+                    if isinstance(first_artist, dict):
+                        mb_artist_name = (first_artist.get("name") or first_artist.get("artist", {}).get("name") or "").strip().lower()
+                elif isinstance(artist_credit, str):
+                    mb_artist_name = artist_credit.strip().lower()
+                # Compare against original and canonical (stored in artist field after Pass 2)
+                original_artist = (r.artist or "").strip().lower()
+                if mb_artist_name and (mb_artist_name == original_artist or _ratio(original_artist, mb_artist_name) >= 0.80):
+                    artist_bonus = 0.35
+            # Combined score: 40% MB/position, 30% artist, 30% album
+            combined_score = (mb_score * 0.35 + position_bonus * 0.05 + artist_bonus * 0.30 + album_bonus * 0.30)
+            if combined_score > best_score:
+                best_score = combined_score
+                best = c
+
+        if best and best.get("id"):
+            meta = musicbrainz.recording_to_playlist_meta(best, album_hint=r.album)
+            if meta and meta.get("mbid"):
+                stats["matched"] += 1
+                meta["_resolve_phase"] = "MB: relaxed (artist - title)"
+                memo[r.query_normalized] = ResolveOutcome(
+                    state=PlaylistImportRowState.MATCHED,
+                    meta=meta,
+                    mbid=str(meta["mbid"]),
+                    phase=meta["_resolve_phase"],
+                    confidence=max(0.01, min(0.99, best_score)),
+                    error=None,
+                )
+                continue
+
+    # Mark any still-unmatched as unmatched
+    for r in misses4:
+        if r.query_normalized not in memo or memo[r.query_normalized].state != PlaylistImportRowState.MATCHED:
+            stats["unmatched"] += 1
+            if r.query_normalized not in memo:
+                memo[r.query_normalized] = ResolveOutcome(
+                    state=PlaylistImportRowState.UNMATCHED,
+                    meta=None,
+                    mbid=None,
+                    phase="MB: relaxed (artist - title)",
+                    confidence=None,
+                    error=None,
+                )
+
 
 async def _resolve_one(
     session: Session,

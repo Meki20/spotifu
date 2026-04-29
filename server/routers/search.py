@@ -388,3 +388,37 @@ async def _local_search(q: str, session: Session, local_limit: int) -> SearchRes
         )
         for _, t in scored[:local_limit]
     ])
+
+
+@router.get("/mb/recording/{mbid}")
+async def get_mb_recording_by_id(
+    mbid: str,
+    user: User = Depends(get_current_user),
+):
+    from fastapi import HTTPException
+    from services.providers.musicbrainz import _get_recording_with_releases, recording_to_playlist_meta
+
+    data = await _get_recording_with_releases(mbid)
+    if not data:
+        raise HTTPException(status_code=404, detail="Recording not found")
+
+    meta = recording_to_playlist_meta(data, album_hint=None)
+    if not meta:
+        raise HTTPException(status_code=500, detail="Failed to parse recording")
+
+    release_date = None
+    if data.get("releases") and len(data["releases"]) > 0:
+        first_release = data["releases"][0]
+        release_date = first_release.get("date")
+
+    return {
+        "mbid": meta.get("mbid"),
+        "title": meta.get("title"),
+        "artist": meta.get("artist"),
+        "artist_credit": meta.get("artist_credit"),
+        "album": meta.get("album"),
+        "mb_artist_id": meta.get("mb_artist_id"),
+        "mb_release_id": meta.get("mb_release_id"),
+        "mb_release_group_id": meta.get("mb_release_group_id"),
+        "release_date": release_date,
+    }

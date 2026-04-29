@@ -127,6 +127,15 @@ export default function Soulseek() {
     refetchInterval: 5000,
   })
 
+  useEffect(() => {
+    const unsub = subscribeSpotifuWebSocket((data) => {
+      if (data.type === 'soulseek_connected' || data.type === 'soulseek_error') {
+        queryClient.invalidateQueries({ queryKey: ['soulseekStatus'] })
+      }
+    })
+    return unsub
+  }, [queryClient])
+
   const { data: searchResults, isLoading: searchLoading, error: searchError, refetch: doSearch } = useQuery({
     queryKey: ['soulseekSearch', query],
     queryFn: () => searchSoulseek(query),

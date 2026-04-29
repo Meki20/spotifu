@@ -6,6 +6,7 @@ import { usePrefetchSettingsStore } from '../stores/prefetchSettingsStore'
 import { subscribeSpotifuWebSocket, WS_RECONNECT } from '../spotifuWebSocket'
 import { authFetch } from '../api'
 import { PollyLoading } from '../components/PollyLoading'
+import ReconciliationModal from '../components/ReconciliationModal'
 
 interface Settings {
   soulseek_username: string | null
@@ -63,6 +64,7 @@ export default function Settings() {
   const [tracks, setTracks] = useState<TrackConfig[]>([])
   const [tracksLoading, setTracksLoading] = useState(false)
   const [prefetchStatus, setPrefetchStatus] = useState('')
+  const [reconciliationOpen, setReconciliationOpen] = useState(false)
   const prefetch = usePrefetchSettingsStore((s) => s.prefetch)
   const applyServerPrefetch = usePrefetchSettingsStore((s) => s.applyServerPrefetch)
   const trackListRef = useRef<HTMLDivElement>(null)
@@ -687,6 +689,24 @@ export default function Settings() {
       {/* Downloaded Tracks */}
       <section className="mb-6">
         <div style={sectionLabelStyle}>Downloaded Tracks</div>
+        <button
+          type="button"
+          onClick={() => setReconciliationOpen(true)}
+          className="mb-3 px-3 py-1.5 text-xs font-semibold border transition-colors"
+          style={{
+            fontFamily: "'Barlow Condensed', sans-serif",
+            fontWeight: 600,
+            textTransform: 'uppercase',
+            letterSpacing: '0.05em',
+            background: 'transparent',
+            color: '#b4003e',
+            borderColor: '#b4003e',
+            borderRadius: 4,
+            cursor: 'pointer',
+          }}
+        >
+          Reconcile Tracks
+        </button>
         {tracksLoading ? (
           <div className="flex items-center gap-2 py-2">
             <PollyLoading size={28} />
@@ -832,6 +852,8 @@ export default function Settings() {
           Logout
         </button>
       </section>
+
+      <ReconciliationModal open={reconciliationOpen} onClose={() => setReconciliationOpen(false)} />
       </div>
     </div>
   )

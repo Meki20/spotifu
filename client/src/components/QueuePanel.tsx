@@ -294,17 +294,15 @@ export default function QueuePanel(_: QueuePanelProps) {
         <div className="flex-1 overflow-y-auto" style={{ overscrollBehavior: 'contain' }}>
           {isEmpty ? (
             <div className="px-4 py-6">
-              <div className="w-full aspect-square rounded-md overflow-hidden" style={{ background: 'rgba(26,18,16,0.35)', border: '1px solid rgba(61,40,32,0.45)' }}>
-                <div className="w-full h-full grid place-items-center">
-                  <img
-                    src="/assets/brand/polly_512x512.png"
-                    alt=""
-                    aria-hidden
-                    className="select-none w-[82%] h-[82%]"
-                    draggable={false}
-                    style={{ objectFit: 'contain' }}
-                  />
-                </div>
+              <div className="w-20 mx-auto">
+                <img
+                  src="/assets/brand/polly_512x512.png"
+                  alt=""
+                  aria-hidden
+                  className="select-none w-full"
+                  draggable={false}
+                  style={{ objectFit: 'contain' }}
+                />
               </div>
               <div
                 className="mt-4 text-center text-sm"

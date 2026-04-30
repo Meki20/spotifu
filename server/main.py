@@ -35,7 +35,7 @@ from routers import (auth_router, search_router, play_router, stream_router,
 
 logger = logging.getLogger(__name__)
 
-ALLOWED_ORIGINS = ["http://localhost:1984"]
+ALLOWED_ORIGINS = ["*"]
 
 
 class ConnectionManager:
@@ -106,7 +106,15 @@ app.add_middleware(
 
 def _cors_headers_for_request(request) -> dict[str, str]:
     origin = request.headers.get("origin")
-    if origin and origin in ALLOWED_ORIGINS:
+    if ALLOWED_ORIGINS == ["*"]:
+        if origin:
+            return {
+                "Access-Control-Allow-Origin": origin,
+                "Access-Control-Allow-Credentials": "true",
+                "Access-Control-Allow-Methods": "*",
+                "Access-Control-Allow-Headers": "*",
+            }
+    elif origin and origin in ALLOWED_ORIGINS:
         return {
             "Access-Control-Allow-Origin": origin,
             "Access-Control-Allow-Credentials": "true",

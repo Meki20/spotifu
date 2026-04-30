@@ -14,7 +14,7 @@ import {
 } from '../api/playlists'
 import { toTrack, resolveTrackArtUrl } from '../utils/trackHelpers'
 import PlaylistTrackCover from '../components/PlaylistTrackCover'
-import { usePlayerStore } from '../stores/playerStore'
+import { usePlayerStore, type PlayerState, type Track } from '../stores/playerStore'
 import { useDownloadStates } from '../hooks/useDownloadStates'
 import { useArtistPrefetch } from '../hooks/useArtistPrefetch'
 import ContextMenu from '../components/ContextMenu'
@@ -24,7 +24,7 @@ import { PollyLoading } from '../components/PollyLoading'
 
 function itemToPlayableTrack(
   item: PlaylistItemDTO,
-  playlistCover: string | null,
+  _playlistCover: string | null,
   cachedMbIds: Set<string>,
 ) {
   const mbid = item.mb_recording_id
@@ -101,11 +101,11 @@ export default function PlaylistPage() {
       }
     })
 
-    usePlayerStore.setState((s) => {
-      const nextUserQueue = (s.userQueue || []).map((t) =>
+    usePlayerStore.setState((s: PlayerState) => {
+      const nextUserQueue = (s.userQueue || []).map((t: Track) =>
         t.mb_id === mbid && t.album_cover !== url ? { ...t, album_cover: url } : t,
       )
-      const nextSystemList = (s.systemList || []).map((t) =>
+      const nextSystemList = (s.systemList || []).map((t: Track) =>
         t.mb_id === mbid && t.album_cover !== url ? { ...t, album_cover: url } : t,
       )
       const nextCurrent =

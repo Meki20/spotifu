@@ -1,5 +1,5 @@
 import { useShallow } from 'zustand/react/shallow'
-import { usePlayerStore } from '../stores/playerStore'
+import { usePlayerStore, type PlayerState } from '../stores/playerStore'
 import { seekAudio } from '../hooks/useAudioPlayer'
 import * as controller from '../playback/controller'
 import { useState, useRef, useEffect } from 'react'
@@ -41,7 +41,7 @@ export default function PlayerBar() {
     phase, isDownloadBuffering, shuffle, repeat,
     setIsPlaying,
   } = usePlayerStore(
-    useShallow((s) => ({
+    useShallow((s: PlayerState) => ({
       currentTrack: s.currentTrack,
       isPlaying: s.isPlaying,
       volume: s.volume,

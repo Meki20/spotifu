@@ -3,7 +3,7 @@ import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { Link, useNavigate } from 'react-router-dom'
 import { useShallow } from 'zustand/react/shallow'
-import { usePlayerStore, type Track } from '../stores/playerStore'
+import { usePlayerStore, type Track, type PlayerState } from '../stores/playerStore'
 import * as controller from '../playback/controller'
 import { authFetch } from '../api'
 
@@ -188,7 +188,7 @@ export default function QueuePanel(_: QueuePanelProps) {
     systemList,
     systemIndex,
   } = usePlayerStore(
-    useShallow((s) => ({
+    useShallow((s: PlayerState) => ({
       currentTrack: s.currentTrack,
       userQueue: s.userQueue,
       systemLookahead: s.systemLookahead,

@@ -29,7 +29,7 @@ export type SystemSource =
   | { kind: 'search'; query: string }
   | { kind: 'unknown'; title?: string }
 
-interface PlayerState {
+export interface PlayerState {
   currentTrack: Track | null
   userQueue: Track[]
   systemSource: SystemSource | null

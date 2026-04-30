@@ -111,6 +111,7 @@ coverage/
 # Rust (if any)
 target/
 Cargo.lock
+/gen/
 
 # Unreal (if any)
 Binaries/

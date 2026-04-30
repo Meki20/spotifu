@@ -64,10 +64,6 @@ export default function Home() {
     staleTime: 30 * 1000,
   })
 
-  function playTrack(track: any) {
-    controller.play(toTrack(track))
-  }
-
   function playFromRecentlyAdded(track: any) {
     const list = (recentlyAdded || []).map((t) => toTrack(t))
     const idx = Math.max(0, (recentlyAdded || []).findIndex((t) => (t?.mb_id || t?.mbid) === (track?.mb_id || track?.mbid)))

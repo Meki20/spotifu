@@ -32,6 +32,9 @@ class UserPermission(SQLModel, table=True):
 
 class SearchHistory(SQLModel, table=True):
     __tablename__ = "search_history"
+    __table_args__ = (
+        Index('ix_search_history_user_query_unique', 'user_id', 'query', unique=True),
+    )
     id: Optional[int] = Field(default=None, primary_key=True)
     user_id: int = Field(foreign_key="users.id", index=True, ondelete="CASCADE")
     query: str = Field(max_length=512)

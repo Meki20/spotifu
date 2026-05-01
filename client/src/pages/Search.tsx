@@ -463,14 +463,15 @@ export default function Search() {
         </div>
       )}
 
-      {/* Results / all tracks */}
-      <div
-        className="flex items-center gap-2.5 mb-3"
-        style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 18, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.12em', color: '#b4003e' }}
-      >
-        {showResults ? `results for "${query}"` : 'All Tracks'}
-        <div className="flex-1 h-px" style={{ background: '#261A14' }} />
-      </div>
+      {showResults && (
+        <div
+          className="flex items-center gap-2.5 mb-3"
+          style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 18, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.12em', color: '#b4003e' }}
+        >
+          {`results for "${query}"`}
+          <div className="flex-1 h-px" style={{ background: '#261A14' }} />
+        </div>
+      )}
 
       {isLoading && (
         <div className="flex items-center gap-3 py-2">

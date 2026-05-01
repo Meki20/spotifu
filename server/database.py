@@ -27,10 +27,20 @@ def _migrate():
         "ALTER TABLE mb_lookup_cache ADD COLUMN IF NOT EXISTS artist_credit VARCHAR",
         "ALTER TABLE mb_lookup_cache ADD COLUMN IF NOT EXISTS mb_artist_id VARCHAR",
         "ALTER TABLE mb_lookup_cache ADD COLUMN IF NOT EXISTS mb_release_id VARCHAR",
-"ALTER TABLE mb_lookup_cache ADD COLUMN IF NOT EXISTS mb_release_group_id VARCHAR",
+        "ALTER TABLE mb_lookup_cache ADD COLUMN IF NOT EXISTS mb_release_group_id VARCHAR",
         """
         CREATE UNIQUE INDEX IF NOT EXISTS ix_mb_lookup_cache_mb_id
         ON mb_lookup_cache (mb_id) WHERE mb_id IS NOT NULL
+        """,
+        """
+        DELETE FROM search_history WHERE id NOT IN (
+            SELECT MAX(id) FROM search_history
+            GROUP BY user_id, query
+        )
+        """,
+        """
+        CREATE UNIQUE INDEX IF NOT EXISTS ix_search_history_user_query_unique
+        ON search_history (user_id, query)
         """,
     ]
     with engine.connect() as conn:

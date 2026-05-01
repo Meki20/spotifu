@@ -117,8 +117,16 @@ async def hybrid_search(
         for sec in raw["sections"]
     ]
 
-    search_history = SearchHistory(user_id=user.id, query=q)
-    session.add(search_history)
+    from datetime import datetime
+    existing = session.query(SearchHistory).filter(
+        SearchHistory.user_id == user.id,
+        SearchHistory.query == q
+    ).first()
+    if existing:
+        existing.searched_at = datetime.utcnow()
+    else:
+        search_history = SearchHistory(user_id=user.id, query=q)
+        session.add(search_history)
     session.commit()
 
     return HybridSearchResponse(intent=raw["intent"], sections=sections)

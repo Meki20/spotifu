@@ -1,5 +1,6 @@
 import asyncio
 import hashlib
+from datetime import datetime
 from fastapi import APIRouter, HTTPException, Depends, Request
 from fastapi.responses import StreamingResponse, Response
 from sqlmodel import Session
@@ -174,8 +175,16 @@ async def stream(track_id: int, request: Request, session: Session = Depends(get
     if not file_path or not os.path.isfile(file_path):
         raise HTTPException(status_code=404, detail="Track not available")
 
-    recent = UserRecentlyPlayed(user_id=user.user.id, track_id=track_id)
-    session.add(recent)
+    recent = session.query(UserRecentlyPlayed).filter(
+        UserRecentlyPlayed.user_id == user.user.id,
+        UserRecentlyPlayed.track_id == track_id
+    ).first()
+    if recent:
+        recent.played_at = datetime.utcnow()
+        recent.play_amount = (recent.play_amount or 0) + 1
+    else:
+        recent = UserRecentlyPlayed(user_id=user.user.id, track_id=track_id, play_amount=1)
+        session.add(recent)
     session.commit()
 
     etag = _weak_etag(file_path)

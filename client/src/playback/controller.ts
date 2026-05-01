@@ -190,7 +190,9 @@ class PlaybackController {
           usePlayerStore.setState({ phase: 'ready' })
         })
       authFetch(`/play/local/${track.track_id}`).catch(() => {})
-      queryClient.invalidateQueries({ queryKey: ['recently-played'] })
+      if (usePlayerStore.getState().systemSource?.kind !== 'recently-played') {
+        queryClient.invalidateQueries({ queryKey: ['recently-played'] })
+      }
       this._loadAndPlay(url)
       return
     }
@@ -205,7 +207,9 @@ class PlaybackController {
           if (ct && data.track_id) {
             usePlayerStore.setState({ currentTrack: { ...ct, track_id: data.track_id, is_cached: Boolean(data.local_stream_url), quality: data.quality ?? ct.quality } })
           }
-          queryClient.invalidateQueries({ queryKey: ['recently-played'] })
+          if (usePlayerStore.getState().systemSource?.kind !== 'recently-played') {
+        queryClient.invalidateQueries({ queryKey: ['recently-played'] })
+      }
           return
         }
 
@@ -218,7 +222,9 @@ class PlaybackController {
             currentTrack: { ...ct!, local_stream_url: url, track_id: this._currentTrackId ?? undefined, is_cached: true, quality: data.quality ?? ct?.quality },
             phase: 'ready',
           })
-          queryClient.invalidateQueries({ queryKey: ['recently-played'] })
+          if (usePlayerStore.getState().systemSource?.kind !== 'recently-played') {
+        queryClient.invalidateQueries({ queryKey: ['recently-played'] })
+      }
           this._loadAndPlay(url)
         } else {
           usePlayerStore.setState({

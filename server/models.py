@@ -40,10 +40,14 @@ class SearchHistory(SQLModel, table=True):
 
 class UserRecentlyPlayed(SQLModel, table=True):
     __tablename__ = "user_recently_played"
+    __table_args__ = (
+        Index('ix_user_recently_played_user_track_unique', 'user_id', 'track_id', unique=True),
+    )
     id: Optional[int] = Field(default=None, primary_key=True)
     user_id: int = Field(foreign_key="users.id", index=True, ondelete="CASCADE")
-    track_id: int = Field(foreign_key="tracks.id", index=True)
+    track_id: int = Field(foreign_key="tracks.id")
     played_at: datetime = Field(default_factory=datetime.utcnow, index=True)
+    play_amount: int = Field(default=1)
 
 
 class Track(SQLModel, table=True):

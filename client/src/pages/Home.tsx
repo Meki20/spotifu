@@ -1,4 +1,5 @@
 import { useQuery } from '@tanstack/react-query'
+import { queryClient } from '../queryClient'
 import { useAuthStore } from '../stores/authStore'
 import { authFetch } from '../api'
 import { Link } from 'react-router-dom'
@@ -94,6 +95,10 @@ export default function Home() {
     openContextMenu(e.clientX, e.clientY, track)
   }
 
+  function refreshRecentlyPlayed() {
+    queryClient.invalidateQueries({ queryKey: ['recently-played'] })
+  }
+
   return (
     <div className="p-6 flex-1 overflow-y-auto">
       <div className="mb-6">
@@ -171,6 +176,16 @@ export default function Home() {
         >
           Recently Played
           <div className="flex-1 h-px" style={{ background: '#261A14' }} />
+          <button
+            onClick={refreshRecentlyPlayed}
+            className="p-1.5 rounded hover:bg-[#3D2820] transition-colors"
+            title="Refresh recently played"
+            style={{ color: '#4A413C' }}
+          >
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M21 2v6h-6M3 12a9 9 0 0 1 15-6.7L21 8M3 22v-6h6M21 12a9 9 0 0 1-15 6.7L3 16" />
+            </svg>
+          </button>
         </div>
         <div
           className="flex flex-col gap-0.5 overflow-y-auto"

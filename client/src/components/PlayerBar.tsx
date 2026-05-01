@@ -419,9 +419,9 @@ export default function PlayerBar() {
                 album: t.album != null ? String(t.album) : undefined,
                 album_cover: t.album_cover ?? null,
                 mb_id: t.mb_id,
-                mb_artist_id: t.mb_artist_id ?? null,
-                mb_release_id: t.mb_release_id ?? null,
-                mb_release_group_id: t.mb_release_group_id ?? null,
+                mb_artist_id: t.mb_artist_id || null,
+                mb_release_id: t.mb_release_id || null,
+                mb_release_group_id: t.mb_release_group_id || null,
               })
               setContextMenu(null)
               setAddPlOpen(true)
@@ -446,7 +446,7 @@ export default function PlayerBar() {
             style={{ fontFamily: "'Barlow Semi Condensed', sans-serif", color: '#E8DDD0' }}
             onClick={() => {
               const track = contextMenu.track as any
-              const albumId = track.mb_release_group_id ?? track.mb_release_id ?? null
+              const albumId = track.mb_release_id || track.mb_release_group_id || null
               if (albumId) navigate(`/album/${albumId}`)
               setContextMenu(null)
             }}

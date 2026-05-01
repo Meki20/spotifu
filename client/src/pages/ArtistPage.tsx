@@ -165,18 +165,18 @@ function HorizontalAlbumStrip({
       >
         {albums.map((album: any) => (
           <ArtistAlbumTile
-            key={album.mb_id || album.mb_release_group_id}
+            key={album.mb_release_group_id || album.mb_id}
             album={album}
             covers={covers}
             narrow
             onClick={() => {
-              const id = album.mb_id || album.mb_release_group_id
+              const id = album.mb_release_group_id || album.mb_id
               if (id) navigate(`/album/${id}`)
             }}
             onVisible={
               artistId && onAlbumVisible
                 ? () => {
-                    const id = album.mb_id || album.mb_release_group_id
+                    const id = album.mb_release_group_id || album.mb_id
                     if (id) onAlbumVisible(id)
                   }
                 : undefined
@@ -471,15 +471,15 @@ export default function ArtistPage() {
                 ? Array.from({ length: 6 }).map((_, i) => <AlbumSkeleton key={i} />)
                 : sortedAlbums.map((album: any) => (
                     <ArtistAlbumTile
-                      key={album.mb_id || album.mb_release_group_id}
+                      key={album.mb_release_group_id || album.mb_id}
                       album={album}
                       covers={covers}
                       onClick={() => {
-                        const id = album.mb_id || album.mb_release_group_id
+                        const id = album.mb_release_group_id || album.mb_id
                         if (id) navigate(`/album/${id}`)
                       }}
                       onVisible={() => {
-                        const id = album.mb_id || album.mb_release_group_id
+                        const id = album.mb_release_group_id || album.mb_id
                         if (id && artistId) enqueue(artistId, [id])
                       }}
                     />
@@ -517,10 +517,10 @@ export default function ArtistPage() {
             </div>
             {sortedSingles.map((album: any, i: number) => (
               <div
-                key={album.mb_id || album.mb_release_group_id}
+                key={album.mb_release_group_id || album.mb_id}
                 className="grid grid-cols-[auto_1fr_1fr] gap-4 px-4 py-3 hover:bg-[#282828] rounded cursor-pointer group"
                 onClick={() => {
-                  const id = album.mb_id || album.mb_release_group_id
+                  const id = album.mb_release_group_id || album.mb_id
                   if (id) navigate(`/album/${id}`)
                 }}
               >

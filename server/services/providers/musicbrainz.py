@@ -2412,6 +2412,57 @@ async def _get_recording_with_releases(recording_mbid: str) -> dict | None:
         return None
 
 
+async def _hydrate_track_artist_credits_from_recordings(track_rows: list[dict]) -> None:
+    """Batch-fetch recording artist-credits and merge into track_rows.
+
+    Some MusicBrainz releases return recording objects with incomplete
+    ``artist-credit`` arrays even when ``inc=artist-credits`` is requested.
+    A direct ``/recording`` lookup usually has the full credit, so we
+    back-fill any rows that look empty or generic.
+    """
+    if not track_rows:
+        return
+
+    # Only back-fill rows that appear to have missing/placeholder credits.
+    needs_fill = [
+        row for row in track_rows
+        if not row.get("artist_credit") or row["artist_credit"] in ("Unknown", "")
+    ]
+    if not needs_fill:
+        return
+
+    mbids = [row["mbid"] for row in needs_fill if row.get("mbid")]
+    if not mbids:
+        return
+
+    chunk_size = 50
+    for i in range(0, len(mbids), chunk_size):
+        chunk = mbids[i:i + chunk_size]
+        ids_str = ";".join(chunk)
+        try:
+            resp = await _mb_get(
+                f"{MUSICBRAINZ_API}/recording/{ids_str}",
+                params={"fmt": "json", "inc": "artist-credits"},
+            )
+            if resp.status_code != 200:
+                continue
+            data = resp.json()
+            recordings = data.get("recordings", [])
+            rec_map: dict[str, dict] = {rec.get("id"): rec for rec in recordings if rec.get("id")}
+            for row in needs_fill:
+                rec = rec_map.get(row["mbid"])
+                if not rec:
+                    continue
+                ac = _artist_credit_string(rec)
+                if ac and ac not in ("Unknown", ""):
+                    row["artist_credit"] = ac
+                mb_artist_id = _first_artist_mbid_from_recording(rec)
+                if mb_artist_id:
+                    row["mb_artist_id"] = mb_artist_id
+        except Exception:
+            continue
+
+
 async def _get_release_with_tracks(release_mbid: str, *, light: bool = False) -> dict | None:
     """Fetch release with full tracklist.
 
@@ -2422,7 +2473,7 @@ async def _get_release_with_tracks(release_mbid: str, *, light: bool = False) ->
     try:
         resp = await _mb_get(
             f"{MUSICBRAINZ_API}/release/{release_mbid}",
-            params={"fmt": "json", "inc": "recordings+artists+release-groups"},
+            params={"fmt": "json", "inc": "recordings+artists+release-groups+artist-credits"},
         )
         if resp.status_code == 404:
             return None
@@ -2465,6 +2516,12 @@ async def _get_release_with_tracks(release_mbid: str, *, light: bool = False) ->
                     "mb_release_group_id": rg_id,
                 }
             )
+
+        # Fallback: some releases have incomplete recording artist-credit data.
+        # Batch-fetch direct recording lookups to fill in any missing credits.
+        if track_rows:
+            await _hydrate_track_artist_credits_from_recordings(track_rows)
+
         return {
             "mbid": data["id"],
             "title": data.get("title", ""),

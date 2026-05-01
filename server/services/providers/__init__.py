@@ -27,6 +27,8 @@ _artist_cache: OrderedDict[str, tuple[float, dict]] = OrderedDict()
 _artist_head_cache: OrderedDict[str, tuple[float, dict]] = OrderedDict()
 _artist_albums_cache: OrderedDict[str, tuple[float, list]] = OrderedDict()
 
+_ALBUM_CACHE_VERSION = 2  # bump when album track schema changes
+
 
 def clear_memory_caches() -> dict[str, int]:
     """Clear all in-memory caches. Returns count of items cleared per cache."""
@@ -182,7 +184,7 @@ class MetadataService:
         """``light=True`` fetches tracklist without CAA cover HTTP; result is not persisted in album cache."""
         if not light:
             cached = _cache_get(_album_cache, "album", album_id)
-            if cached is not None:
+            if isinstance(cached, dict) and cached.get("_v") == _ALBUM_CACHE_VERSION:
                 return cached
         logger.debug(f"[get_album] album_id={album_id!r} light={light}")
         detected = self._detect_provider(album_id)
@@ -198,6 +200,7 @@ class MetadataService:
             if fn:
                 result = await fn(album_id, light=light)  # type: ignore[call-arg]
         if result and not light:
+            result["_v"] = _ALBUM_CACHE_VERSION
             _cache_set(_album_cache, "album", album_id, result)
         return result
 

@@ -29,9 +29,9 @@ function normalizeTrack(t: AddToPlaylistTrack) {
     artist: (t.artist_credit || t.artist),
     album,
     mb_recording_id: t.mb_id,
-    mb_artist_id: t.mb_artist_id ?? null,
-    mb_release_id: t.mb_release_id ?? null,
-    mb_release_group_id: t.mb_release_group_id ?? null,
+    mb_artist_id: t.mb_artist_id || null,
+    mb_release_id: t.mb_release_id || null,
+    mb_release_group_id: t.mb_release_group_id || null,
     album_cover: t.album_cover ?? null,
   }
 }

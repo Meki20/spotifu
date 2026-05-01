@@ -526,8 +526,8 @@ export default function PlaylistPage() {
             setContextMenu(null)
           }}
           onGoToAlbum={() => {
-            const rg = contextMenu.item.mb_release_group_id ?? contextMenu.item.mb_release_id
-            if (rg) navigate(`/album/${rg}`)
+            const albumId = contextMenu.item.mb_release_id || contextMenu.item.mb_release_group_id
+            if (albumId) navigate(`/album/${albumId}`)
             setContextMenu(null)
           }}
           onAddToPlaylist={() => {

@@ -25,9 +25,9 @@ function toAddPayload(t: unknown): AddToPlaylistTrack | null {
     album: obj.album != null ? String(obj.album) : undefined,
     album_cover: typeof obj.album_cover === 'string' ? obj.album_cover : (obj.album_cover == null ? null : String(obj.album_cover)),
     mb_id: mb,
-    mb_artist_id: typeof obj.mb_artist_id === 'string' ? obj.mb_artist_id : null,
-    mb_release_id: typeof obj.mb_release_id === 'string' ? obj.mb_release_id : null,
-    mb_release_group_id: typeof obj.mb_release_group_id === 'string' ? obj.mb_release_group_id : null,
+    mb_artist_id: typeof obj.mb_artist_id === 'string' && obj.mb_artist_id ? obj.mb_artist_id : null,
+    mb_release_id: typeof obj.mb_release_id === 'string' && obj.mb_release_id ? obj.mb_release_id : null,
+    mb_release_group_id: typeof obj.mb_release_group_id === 'string' && obj.mb_release_group_id ? obj.mb_release_group_id : null,
   }
 }
 
@@ -61,7 +61,7 @@ export default function ContextMenuRenderer() {
   }
 
   function goToAlbum() {
-    const albumId = track?.mb_release_group_id || track?.mb_release_id
+    const albumId = track?.mb_release_id || track?.mb_release_group_id
     if (albumId) {
       navigate(`/album/${albumId}`)
       closeContextMenu()

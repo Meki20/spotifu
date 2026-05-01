@@ -92,7 +92,7 @@ function NowPlayingCard({ track }: { track: Track }) {
             style={{ color: 'rgba(232,221,208,0.50)' }}
             onClick={(e) => {
               e.stopPropagation()
-              const albumId = track.mb_release_group_id || track.mb_release_id
+              const albumId = track.mb_release_id || track.mb_release_group_id
               albumId && navigate(`/album/${albumId}`)
             }}
           >

@@ -25,9 +25,9 @@ function albumTrackToControllerTrack(track: any, album: any, cover: string | nul
   return toTrack(track, {
     album: album?.title ?? '',
     album_cover: cover ?? album?.cover ?? null,
-    mb_release_id: album?.mbid ?? null,
-    mb_release_group_id: album?.mb_release_group_id ?? null,
-    mb_artist_id: track?.mb_artist_id ?? album?.artist_mb_id ?? null,
+    mb_release_id: album?.mbid || null,
+    mb_release_group_id: album?.mb_release_group_id || null,
+    mb_artist_id: track?.mb_artist_id || album?.artist_mb_id || null,
     artist_credit: track?.artist_credit ?? null,
   })
 }
@@ -264,7 +264,7 @@ export default function AlbumPage() {
             setContextMenu(null)
           }}
           onGoToAlbum={() => {
-            const albumIdNav = album?.mb_release_group_id ?? album?.mbid ?? albumId
+            const albumIdNav = album?.mb_release_group_id || album?.mbid || albumId
             if (albumIdNav) navigate(`/album/${albumIdNav}`)
             setContextMenu(null)
           }}

@@ -395,7 +395,7 @@ export default function Search() {
   const showResults = query.length > 0
 
   const uniqueAlbums = results
-    ? Array.from(new Map(results.map(t => [(t as any).mb_release_group_id ?? t.mb_release_id ?? t.album, t])).values())
+    ? Array.from(new Map(results.map(t => [(t as any).mb_release_group_id || t.mb_release_id || t.album, t])).values())
     : []
 
   const transitionActive = useArtistTransitionStore((s) => s.isActive)
@@ -657,10 +657,10 @@ export default function Search() {
       {!isLoading && activeTab === 'albums' && results && (
         <div className="grid grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
           {uniqueAlbums.map((track) => {
-            const albumId = (track as any).mb_release_group_id ?? track.mb_release_id
+            const albumId = (track as any).mb_release_group_id || track.mb_release_id
             return (
               <AlbumCard
-                key={(track as any).mb_release_group_id ?? track.mb_release_id ?? track.album}
+                key={(track as any).mb_release_group_id || track.mb_release_id || track.album}
                 album={{ id: albumId ?? track.album, title: track.album, artist: track.artist, cover: track.album_cover }}
                 onClick={(id) => id && navigate(`/album/${id}`)}
                 onMouseEnter={() => {
@@ -747,7 +747,7 @@ export default function Search() {
           }}
           onGoToAlbum={() => {
             const t = contextMenu.track as any
-            const albumId = t.mb_release_group_id ?? t.mb_release_id
+            const albumId = t.mb_release_id || t.mb_release_group_id
             if (albumId) navigate(`/album/${albumId}`)
             setContextMenu(null)
           }}

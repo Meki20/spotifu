@@ -1,3 +1,6 @@
+import { useRef } from 'react'
+import { useArtistTransitionStore } from '../stores/artistTransitionStore'
+
 interface ArtistCardProps {
   artist: {
     artist_mbid: string
@@ -12,8 +15,26 @@ interface ArtistCardProps {
 }
 
 export default function ArtistCard({ artist, imageUrl, onClick }: ArtistCardProps) {
+  const cardRef = useRef<HTMLDivElement>(null)
+  const transition = useArtistTransitionStore()
+
+  const handleClick = () => {
+    const circle = cardRef.current?.querySelector('[data-transition-circle]') as HTMLElement | null
+    if (circle) {
+      const rect = circle.getBoundingClientRect()
+      transition.start(
+        { x: rect.left, y: rect.top, width: rect.width, height: rect.height },
+        imageUrl || null,
+        artist.name,
+        artist.artist_mbid
+      )
+    }
+    onClick(artist.artist_mbid)
+  }
+
   return (
     <div
+      ref={cardRef}
       className="p-5 rounded cursor-pointer border transition-all duration-150 relative overflow-hidden flex flex-col items-center"
       style={{
         background: '#1A1210',
@@ -21,7 +42,7 @@ export default function ArtistCard({ artist, imageUrl, onClick }: ArtistCardProp
         borderRadius: 4,
         width: 220,
       }}
-      onClick={() => onClick(artist.artist_mbid)}
+      onClick={handleClick}
       onMouseEnter={(e) => {
         e.currentTarget.style.background = '#231815'
         e.currentTarget.style.borderColor = '#b4003e'
@@ -32,11 +53,12 @@ export default function ArtistCard({ artist, imageUrl, onClick }: ArtistCardProp
       }}
     >
       <div
+        data-transition-circle
         className="relative z-10 flex items-center justify-center overflow-hidden rounded-full mb-4"
         style={{
           background: '#231815',
-          width: 160,
-          height: 160,
+          width: 128,
+          height: 128,
         }}
       >
         {imageUrl ? (
@@ -49,7 +71,7 @@ export default function ArtistCard({ artist, imageUrl, onClick }: ArtistCardProp
         ) : (
           <span
             style={{
-              fontSize: 56,
+              fontSize: 44,
               color: '#4A413C',
               fontFamily: "'Barlow Condensed', sans-serif",
               fontWeight: 700,

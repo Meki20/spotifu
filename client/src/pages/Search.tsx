@@ -9,6 +9,7 @@ import { requestMbDownload } from '../stores/downloadBusyStore'
 import * as controller from '../playback/controller'
 import { useDownloadStates } from '../hooks/useDownloadStates'
 import { useArtistPrefetch } from '../hooks/useArtistPrefetch'
+import { useArtistTransitionStore } from '../stores/artistTransitionStore'
 import TrackRowFull from '../components/TrackRowFull'
 import AlbumCard from '../components/AlbumCard'
 import ArtistCard from '../components/ArtistCard'
@@ -397,8 +398,19 @@ export default function Search() {
     ? Array.from(new Map(results.map(t => [(t as any).mb_release_group_id ?? t.mb_release_id ?? t.album, t])).values())
     : []
 
+  const transitionActive = useArtistTransitionStore((s) => s.isActive)
+
   return (
-    <div ref={scrollRef} className="p-6 flex-1 overflow-y-auto" onClick={() => setContextMenu(null)}>
+    <div
+      ref={scrollRef}
+      className="p-6 flex-1 overflow-y-auto"
+      onClick={() => setContextMenu(null)}
+      style={{
+        opacity: transitionActive ? 0 : 1,
+        transition: 'opacity 120ms ease',
+        pointerEvents: transitionActive ? 'none' : 'auto',
+      }}
+    >
       {/* Search input + local toggle */}
       <div className="flex items-center gap-3 mb-6">
         <div className="relative flex-1">
@@ -681,7 +693,9 @@ export default function Search() {
             <ArtistCard
               artist={artistResult}
               imageUrl={artistImagesData?.thumb ?? artistResult.image_url}
-              onClick={(id) => navigate(`/artist/${id}`)}
+              onClick={(id) => {
+                setTimeout(() => navigate(`/artist/${id}`), 60)
+              }}
             />
           )}
           {!artistLoading && !artistError && !artistResult && debouncedQuery.length > 2 && (

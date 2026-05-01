@@ -5,6 +5,7 @@ import { useAuthStore } from '../stores/authStore'
 import { Play, ChevronLeft, ChevronRight, Pencil } from 'lucide-react'
 import { API, authFetch } from '../api'
 import { useArtistPrefetch } from '../hooks/useArtistPrefetch'
+import { useArtistTransitionStore } from '../stores/artistTransitionStore'
 import ImagePickerModal from '../components/ImagePickerModal'
 import { PollyLoading } from '../components/PollyLoading'
 import { fetchReleaseGroupCover } from '../api/covers'
@@ -201,6 +202,9 @@ export default function ArtistPage() {
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc')
 
   const [showImagePicker, setShowImagePicker] = useState(false)
+  const [revealing, setRevealing] = useState(false)
+  const imageContainerRef = useRef<HTMLDivElement>(null)
+  const transition = useArtistTransitionStore()
 
   const { data: artistImages, refetch: refetchImages } = useQuery({
     queryKey: ['artist-images', artistId],
@@ -223,6 +227,41 @@ export default function ArtistPage() {
     },
     enabled: !!artistId,
   })
+
+  // Report destination rect for transition animation
+  // The artist thumb has a 2px border (border-2) with border-box sizing,
+  // so the visible circle is 4px smaller than the element rect.
+  useEffect(() => {
+    if (
+      !transition.isActive ||
+      transition.artistMbid !== artistId ||
+      !imageContainerRef.current
+    )
+      return
+    const rect = imageContainerRef.current.getBoundingClientRect()
+    const border = 2
+    transition.setToRect({
+      x: rect.left + border,
+      y: rect.top + border,
+      width: rect.width - border * 2,
+      height: rect.height - border * 2,
+    })
+  }, [transition.isActive, transition.artistMbid, artistId, artistImages, artist])
+
+  // Once travel finishes, fade in the real image and then remove the overlay
+  useEffect(() => {
+    if (!transition.isActive || transition.artistMbid !== artistId) {
+      setRevealing(false)
+      return
+    }
+    if (isLoading || !artistImages) return
+    const revealTimer = setTimeout(() => setRevealing(true), 300)
+    const endTimer = setTimeout(() => transition.end(), 550)
+    return () => {
+      clearTimeout(revealTimer)
+      clearTimeout(endTimer)
+    }
+  }, [transition.isActive, transition.artistMbid, artistId, isLoading, artistImages, transition])
 
   const { data: albumsData, isLoading: albumsLoading } = useQuery({
     queryKey: ['artist-albums', artistId],
@@ -346,20 +385,28 @@ export default function ArtistPage() {
         </button>
 
         {/* Artist image — placeholder until /images + fanart/DDG return */}
-        {pictureUrl ? (
-          <img
-            src={pictureUrl}
-            alt={artist.name}
-            className="w-40 h-40 rounded-full shadow-xl object-cover shrink-0 relative z-10 border-2 border-[#383838]"
-            loading="lazy"
-            style={{ borderColor: '#2A2A2A' }}
-          />
-        ) : (
-          <div
-            className="w-40 h-40 rounded-full shrink-0 relative z-10 border-2 border-[#2A2A2A] bg-[#282828] animate-pulse"
-            aria-hidden
-          />
-        )}
+        <div
+          ref={imageContainerRef}
+          style={{
+            opacity: transition.isActive && transition.artistMbid === artistId && !revealing ? 0 : 1,
+            transition: 'opacity 200ms ease',
+          }}
+        >
+          {pictureUrl ? (
+            <img
+              src={pictureUrl}
+              alt={artist.name}
+              className="w-40 h-40 rounded-full shadow-xl object-cover shrink-0 relative z-10 border-2 border-[#383838]"
+              loading="lazy"
+              style={{ borderColor: '#2A2A2A' }}
+            />
+          ) : (
+            <div
+              className="w-40 h-40 rounded-full shrink-0 relative z-10 border-2 border-[#2A2A2A] bg-[#282828] animate-pulse"
+              aria-hidden
+            />
+          )}
+        </div>
         <div className="relative z-10">
           <p className="text-xs text-white/80 uppercase font-semibold">Artist</p>
           <h1 className="text-4xl font-bold text-white mb-2">{artist.name}</h1>

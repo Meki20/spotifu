@@ -10,6 +10,7 @@ import './index.css'
 import { lazy, Suspense } from 'react'
 import RouteErrorBoundary from './components/RouteErrorBoundary'
 import { PollyLoading } from './components/PollyLoading'
+import ArtistTransitionOverlay from './components/ArtistTransitionOverlay'
 
 const Home = lazy(() => import('./pages/Home'))
 const Search = lazy(() => import('./pages/Search'))
@@ -66,6 +67,7 @@ function App() {
         <BrowserRouter>
           <ContextMenuLayer />
           <AppContent />
+          <ArtistTransitionOverlay />
         </BrowserRouter>
       </ContextMenuProvider>
     </QueryClientProvider>

@@ -3,9 +3,9 @@ import asyncio
 from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks, Query
 from pydantic import BaseModel
 from sqlmodel import Session, select, delete, func
-from database import get_session
+from database import get_session, engine
 from deps import get_current_user, require_admin, require_permission, CurrentUser
-from models import User, Track, TrackStatus, MBLookupCache, MBEntityCache, PlaylistItem, CoverLink, CoverAsset
+from models import User, Track, TrackStatus, MBLookupCache, MBEntityCache, PlaylistItem, CoverLink, CoverAsset, UserRecentlyPlayed
 from schemas.track import DownloadedTrackListItem, DownloadedTracksListResponse
 from services.user_preferences import get_stored_prefetch_prefs, merge_prefetch_into_user, PREFETCH_DEFAULTS
 
@@ -193,6 +193,10 @@ def delete_downloaded_track(
     for pi in session.exec(select(PlaylistItem).where(PlaylistItem.track_id == track_id)).all():
         pi.track_id = None
         session.add(pi)
+
+    for urp in session.exec(select(UserRecentlyPlayed).where(UserRecentlyPlayed.track_id == track_id)).all():
+        session.delete(urp)
+
     session.flush()
 
     session.delete(track)
@@ -829,3 +833,223 @@ async def apply_reconciliation_match(
             pass
 
     return ApplyResponse(status="ok")
+
+
+# Local files import - detect new files in cache folder
+
+
+class LocalFileInfo(BaseModel):
+    path: str
+    filename: str
+    size: int
+
+
+class LocalFilesScanResponse(BaseModel):
+    files: list[LocalFileInfo]
+    total: int
+
+
+class LocalFileImportItem(BaseModel):
+    path: str
+    title: str
+    artist: str
+    album: str
+
+
+class LocalFilesImportRequest(BaseModel):
+    files: list[LocalFileImportItem]
+
+
+class LocalFileExtractItem(BaseModel):
+    track_id: int
+    path: str
+    extracted_title: str
+    extracted_artist: str
+    extracted_album: str
+    quality: str | None
+
+
+class LocalFilesImportResponse(BaseModel):
+    tracks: list[LocalFileExtractItem]
+    total: int
+
+
+class LocalFileApplyItem(BaseModel):
+    track_id: int
+    action: str  # "accept" or "reject"
+    title: str | None = None
+    artist: str | None = None
+    album: str | None = None
+
+
+class LocalFilesApplyRequest(BaseModel):
+    items: list[LocalFileApplyItem]
+
+
+class LocalFilesApplyResponse(BaseModel):
+    accepted: int
+    rejected: int
+    results: list[dict]
+
+
+import os
+
+
+@router.get("/local-files/scan", response_model=LocalFilesScanResponse)
+def scan_local_files(user: User = Depends(get_current_user)):
+    from services.soulseek import CACHE_DIR
+
+    audio_extensions = {'.flac', '.mp3', '.ogg', '.wav'}
+    files: list[LocalFileInfo] = []
+
+    if not os.path.isdir(CACHE_DIR):
+        return LocalFilesScanResponse(files=[], total=0)
+
+    # Get all existing local_file_path values and filenames from tracks
+    with Session(engine) as session:
+        rows = session.exec(
+            select(Track.local_file_path).where(Track.local_file_path.isnot(None))
+        ).all()
+        existing_paths = set(rows)
+        # Also extract just the filenames from paths
+        existing_filenames = set(os.path.basename(p) for p in rows if p)
+
+    # Scan cache directory
+    for root, _dirs, filenames in os.walk(CACHE_DIR):
+        for filename in filenames:
+            ext = os.path.splitext(filename)[1].lower()
+            if ext not in audio_extensions:
+                continue
+
+            file_path = os.path.join(root, filename)
+
+            # Skip if already in database (by full path OR by filename)
+            if file_path in existing_paths or filename in existing_filenames:
+                continue
+
+            try:
+                size = os.path.getsize(file_path)
+            except OSError:
+                continue
+
+            files.append(LocalFileInfo(
+                path=file_path,
+                filename=filename,
+                size=size,
+            ))
+
+    return LocalFilesScanResponse(files=files, total=len(files))
+
+
+@router.post("/local-files/import", response_model=LocalFilesImportResponse)
+def import_local_files(
+    body: LocalFilesImportRequest,
+    user: User = Depends(get_current_user),
+):
+    from datetime import datetime
+    from services.download_direct import _extract_metadata
+    from services.covers import _extract_local_cover
+    from services.audio_quality import extract_quality
+
+    tracks: list[LocalFileExtractItem] = []
+
+    with Session(engine) as session:
+        for item in body.files:
+            # Create track with FETCHING status initially
+            track = Track(
+                title=item.title,
+                artist=item.artist,
+                album=item.album,
+                artist_credit=item.artist,
+                status=TrackStatus.READY,  # Ready since we have the file
+                local_file_path=item.path,
+                added_at=datetime.utcnow(),
+                last_played_at=datetime.utcnow(),
+                duration=0,
+            )
+            session.add(track)
+            session.commit()
+            session.refresh(track)
+
+            # Extract metadata
+            extracted_title, extracted_artist, extracted_album = _extract_metadata(item.path)
+
+            # Update track with extracted metadata
+            if extracted_title:
+                track.title = extracted_title
+            if extracted_artist:
+                track.artist = extracted_artist
+                if not track.artist_credit:
+                    track.artist_credit = extracted_artist
+            if extracted_album:
+                track.album = extracted_album
+
+            # Extract quality
+            quality = extract_quality(item.path)
+            track.quality = quality
+
+            # Extract cover
+            cover_url = _extract_local_cover(item.path, track.id)
+            if cover_url:
+                track.album_cover = cover_url
+
+            session.add(track)
+            session.commit()
+
+            tracks.append(LocalFileExtractItem(
+                track_id=track.id,
+                path=item.path,
+                extracted_title=track.title,
+                extracted_artist=track.artist,
+                extracted_album=track.album,
+                quality=quality,
+            ))
+
+    return LocalFilesImportResponse(tracks=tracks, total=len(tracks))
+
+
+@router.post("/local-files/apply", response_model=LocalFilesApplyResponse)
+def apply_local_file_decisions(
+    body: LocalFilesApplyRequest,
+    user: User = Depends(get_current_user),
+):
+    accepted = 0
+    rejected = 0
+    results: list[dict] = []
+
+    with Session(engine) as session:
+        for item in body.items:
+            track = session.get(Track, item.track_id)
+            if not track:
+                continue
+
+            if item.action == "accept":
+                if item.title:
+                    track.title = item.title
+                if item.artist:
+                    track.artist = item.artist
+                    if not track.artist_credit:
+                        track.artist_credit = item.artist
+                if item.album:
+                    track.album = item.album
+                session.add(track)
+                session.commit()
+                accepted += 1
+                results.append({
+                    "track_id": item.track_id,
+                    "status": "accepted",
+                    "title": track.title,
+                    "artist": track.artist,
+                    "album": track.album,
+                })
+            elif item.action == "reject":
+                # Delete the track
+                session.delete(track)
+                session.commit()
+                rejected += 1
+                results.append({
+                    "track_id": item.track_id,
+                    "status": "rejected",
+                })
+
+    return LocalFilesApplyResponse(accepted=accepted, rejected=rejected, results=results)

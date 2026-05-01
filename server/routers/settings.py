@@ -350,7 +350,9 @@ class MatchResult(BaseModel):
     track_id: int
     original_title: str
     original_artist: str
+    original_artist_credit: str | None = None
     original_album: str
+    original_mb_release_group_id: str | None = None
     matched_title: str | None = None
     matched_artist: str | None = None
     matched_artist_credit: str | None = None
@@ -521,7 +523,9 @@ async def resolve_reconciliation_tracks(
                 track_id=track.id,
                 original_title=track.title,
                 original_artist=track.artist,
+                original_artist_credit=track.artist_credit,
                 original_album=track.album,
+                original_mb_release_group_id=track.mb_release_group_id,
                 matched_title=meta.get("title"),
                 matched_artist=meta.get("artist"),
                 matched_artist_credit=meta.get("artist_credit"),
@@ -539,7 +543,9 @@ async def resolve_reconciliation_tracks(
                 track_id=track.id,
                 original_title=track.title,
                 original_artist=track.artist,
+                original_artist_credit=track.artist_credit,
                 original_album=track.album,
+                original_mb_release_group_id=track.mb_release_group_id,
                 matched=False,
             )
 
@@ -563,7 +569,9 @@ async def resolve_reconciliation_tracks(
                 track_id=track.id,
                 original_title=track.title,
                 original_artist=track.artist,
+                original_artist_credit=track.artist_credit,
                 original_album=track.album,
+                original_mb_release_group_id=track.mb_release_group_id,
                 matched=False,
             )
 
@@ -580,7 +588,9 @@ async def resolve_reconciliation_tracks(
                         track_id=track.id,
                         original_title=track.title,
                         original_artist=track.artist,
+                        original_artist_credit=track.artist_credit,
                         original_album=track.album,
+                        original_mb_release_group_id=track.mb_release_group_id,
                         matched_title=meta.get("title"),
                         matched_artist=meta.get("artist"),
                         matched_artist_credit=meta.get("artist_credit"),
@@ -600,7 +610,9 @@ async def resolve_reconciliation_tracks(
             track_id=track.id,
             original_title=track.title,
             original_artist=track.artist,
+            original_artist_credit=track.artist_credit,
             original_album=track.album,
+            original_mb_release_group_id=track.mb_release_group_id,
             matched=False,
         )
 
@@ -770,7 +782,9 @@ async def resolve_reconciliation_tracks_stream(
                 track_id=track.id,
                 original_title=track.title,
                 original_artist=track.artist,
+                original_artist_credit=track.artist_credit,
                 original_album=track.album,
+                original_mb_release_group_id=track.mb_release_group_id,
                 matched=False,
             )
 
@@ -787,7 +801,9 @@ async def resolve_reconciliation_tracks_stream(
                         track_id=track.id,
                         original_title=track.title,
                         original_artist=track.artist,
+                        original_artist_credit=track.artist_credit,
                         original_album=track.album,
+                        original_mb_release_group_id=track.mb_release_group_id,
                         matched_title=meta.get("title"),
                         matched_artist=meta.get("artist"),
                         matched_artist_credit=meta.get("artist_credit"),
@@ -807,7 +823,9 @@ async def resolve_reconciliation_tracks_stream(
             track_id=track.id,
             original_title=track.title,
             original_artist=track.artist,
+            original_artist_credit=track.artist_credit,
             original_album=track.album,
+            original_mb_release_group_id=track.mb_release_group_id,
             matched=False,
         )
 

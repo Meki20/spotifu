@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { X, ChevronLeft, ChevronRight, Check, XCircle, Loader2, Pencil, Search, ChevronDown, ChevronUp } from 'lucide-react'
 import { authFetch } from '../api'
+import { fetchReleaseGroupCover } from '../api/covers'
 
 interface ReconciliationTrack {
   id: number
@@ -41,7 +42,9 @@ interface MatchResult {
   track_id: number
   original_title: string
   original_artist: string
+  original_artist_credit: string | null
   original_album: string
+  original_mb_release_group_id: string | null
   matched_title: string | null
   matched_artist: string | null
   matched_artist_credit: string | null
@@ -59,10 +62,14 @@ interface ApplyResult {
   track_id: number
   old_title: string
   old_artist: string
+  old_artist_credit: string | null
   old_album: string
   new_title: string
   new_artist: string
+  new_artist_credit: string | null
   new_album: string
+  old_cover_art: string | null
+  new_cover_art: string | null
 }
 
 type Props = {
@@ -82,6 +89,7 @@ export default function ReconciliationModal({ open, onClose }: Props) {
   const [resolveResults, setResolveResults] = useState<MatchResult[]>([])
   const [decisions, setDecisions] = useState<Record<number, 'accept' | 'reject' | null>>({})
   const [applyResults, setApplyResults] = useState<ApplyResult[]>([])
+  const [coverArt, setCoverArt] = useState<Record<number, { old: string | null; new: string | null }>>({})
   const [applying, setApplying] = useState(false)
   const [editingId, setEditingId] = useState<number | null>(null)
   const [manualMbId, setManualMbId] = useState('')
@@ -230,6 +238,20 @@ export default function ReconciliationModal({ open, onClose }: Props) {
       const data = (await response.json()) as { results: MatchResult[] }
       setResolveResults(data.results)
       setProcessedCount(data.results.length)
+
+      const newCoverArtMap: Record<number, { old: string | null; new: string | null }> = {}
+      for (const result of data.results) {
+        newCoverArtMap[result.track_id] = { old: null, new: null }
+        if (result.original_mb_release_group_id) {
+          const oldUrl = await fetchReleaseGroupCover(result.original_mb_release_group_id)
+          newCoverArtMap[result.track_id].old = oldUrl
+        }
+        if (result.matched && result.mb_release_group_id) {
+          const url = await fetchReleaseGroupCover(result.mb_release_group_id)
+          newCoverArtMap[result.track_id].new = url
+        }
+      }
+      setCoverArt(newCoverArtMap)
     } catch (err) {
       console.error('Resolve error:', err)
       alert(`Resolve error: ${err}`)
@@ -262,16 +284,30 @@ export default function ReconciliationModal({ open, onClose }: Props) {
           genre: null,
         }),
       })
+
+      const newCoverArt = result.mb_release_group_id
+        ? await fetchReleaseGroupCover(result.mb_release_group_id)
+        : null
+
+      setCoverArt((prev) => ({
+        ...prev,
+        [result.track_id]: { old: null, new: newCoverArt },
+      }))
+
       setApplyResults((prev) => [
         ...prev,
         {
           track_id: result.track_id,
           old_title: result.original_title,
           old_artist: result.original_artist,
+          old_artist_credit: result.original_artist_credit,
           old_album: result.original_album,
           new_title: result.matched_title || result.original_title,
           new_artist: result.matched_artist || result.original_artist,
+          new_artist_credit: result.matched_artist_credit,
           new_album: result.matched_album || result.original_album,
+          old_cover_art: null,
+          new_cover_art: newCoverArt,
         },
       ])
     } catch (err) {
@@ -652,51 +688,108 @@ setResolveResults(prev => prev.map(r => r.track_id === result.track_id ? updated
                       }}
                     >
                       <div className="flex items-start justify-between gap-4">
-                        <div className="flex-1 min-w-0">
-                          <p className="text-xs uppercase mb-2" style={{ fontFamily: "'Barlow Condensed', sans-serif", color: '#6B5E56' }}>
-                            Original
-                          </p>
-                          <p className="text-sm" style={{ fontFamily: "'Barlow Semi Condensed', sans-serif", color: '#E8DDD0' }}>
-                            {result.original_title}
-                          </p>
-                          <p className="text-xs" style={{ fontFamily: "'Barlow Semi Condensed', sans-serif", color: '#9A8E84' }}>
-                            {result.original_artist} — {result.original_album}
-                          </p>
+                        <div className="flex items-start gap-3 flex-1 min-w-0">
+                          <div
+                            className="w-16 h-16 rounded shrink-0 overflow-hidden"
+                            style={{ background: '#1A1210', border: '1px solid #3D2820' }}
+                          >
+                            {result.original_mb_release_group_id &&
+                              coverArt[result.track_id]?.old ? (
+                              <img
+                                src={coverArt[result.track_id].old!}
+                                alt="Cover"
+                                className="w-full h-full object-cover"
+                              />
+                            ) : (
+                              <div className="w-full h-full flex items-center justify-center" style={{ color: '#3D2820' }}>
+                                <span className="text-xs" style={{ fontFamily: "'Barlow Condensed', sans-serif" }}>No Cover</span>
+                              </div>
+                            )}
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <p className="text-xs uppercase mb-2" style={{ fontFamily: "'Barlow Condensed', sans-serif", color: '#6B5E56' }}>
+                              Original
+                            </p>
+                            <p className="text-sm" style={{ fontFamily: "'Barlow Semi Condensed', sans-serif", color: '#E8DDD0' }}>
+                              {result.original_title}
+                            </p>
+                            <p className="text-xs" style={{ fontFamily: "'Barlow Semi Condensed', sans-serif", color: '#9A8E84' }}>
+                              {result.original_artist}
+                            </p>
+                            {result.original_artist_credit && (
+                              <p className="text-xs" style={{ fontFamily: "'Barlow Semi Condensed', sans-serif", color: '#6B5E56' }}>
+                                {result.original_artist_credit}
+                              </p>
+                            )}
+                            <p className="text-xs" style={{ fontFamily: "'Barlow Semi Condensed', sans-serif", color: '#6B5E56' }}>
+                              {result.original_album}
+                            </p>
+                          </div>
                         </div>
                         <div style={{ color: '#6B5E56', fontSize: 20 }}>→</div>
-                        <div className="flex-1 min-w-0">
-                          <p className="text-xs uppercase mb-2" style={{ fontFamily: "'Barlow Condensed', sans-serif", color: '#b4003e' }}>
-                            Match
-                          </p>
-                          {result.matched ? (
-                            <>
-                              <p className="text-sm" style={{ fontFamily: "'Barlow Semi Condensed', sans-serif", color: '#E8DDD0' }}>
-                                {result.matched_title}
-                              </p>
-                              <p className="text-xs" style={{ fontFamily: "'Barlow Semi Condensed', sans-serif", color: '#9A8E84' }}>
-                                {result.matched_artist} — {result.matched_album}
-                              </p>
-                              <p className="text-xs mt-1" style={{ fontFamily: "'Barlow Semi Condensed', sans-serif", color: '#6B5E56' }}>
-                                MBID: {result.mb_id?.slice(0, 8)}... • {result.phase === 'Set by user' ? 'Set by user' : `Score: ${result.mb_score}%`}
-                              </p>
-                            </>
-                          ) : (
-                            <>
-                              <p className="text-sm" style={{ fontFamily: "'Barlow Semi Condensed', sans-serif", color: '#9A8E84' }}>
-                                No match found
-                              </p>
-                              {!decision && (
-                                <button
-                                  onClick={() => { setEditingId(result.track_id); setManualMbId('') }}
-                                  className="flex items-center gap-1 mt-2 text-xs"
-                                  style={{ fontFamily: "'Barlow Condensed', sans-serif", color: '#b4003e' }}
-                                >
-                                  <Pencil size={12} />
-                                  Enter MBID manually
-                                </button>
-                              )}
-                            </>
-                          )}
+                        <div className="flex items-start gap-3 flex-1 min-w-0">
+                          <div
+                            className="w-16 h-16 rounded shrink-0 overflow-hidden"
+                            style={{ background: '#1A1210', border: '1px solid #3D2820' }}
+                          >
+                            {result.matched && result.mb_release_group_id && coverArt[result.track_id]?.new ? (
+                              <img
+                                src={coverArt[result.track_id].new!}
+                                alt="Cover"
+                                className="w-full h-full object-cover"
+                              />
+                            ) : !result.matched || !result.mb_release_group_id ? (
+                              <div className="w-full h-full flex items-center justify-center" style={{ color: '#3D2820' }}>
+                                <span className="text-xs" style={{ fontFamily: "'Barlow Condensed', sans-serif" }}>No Cover</span>
+                              </div>
+                            ) : (
+                              <div className="w-full h-full flex items-center justify-center" style={{ color: '#3D2820' }}>
+                                <Loader2 className="animate-spin" size={20} />
+                              </div>
+                            )}
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <p className="text-xs uppercase mb-2" style={{ fontFamily: "'Barlow Condensed', sans-serif", color: '#b4003e' }}>
+                              Match
+                            </p>
+                            {result.matched ? (
+                              <>
+                                <p className="text-sm" style={{ fontFamily: "'Barlow Semi Condensed', sans-serif", color: '#E8DDD0' }}>
+                                  {result.matched_title}
+                                </p>
+                                <p className="text-xs" style={{ fontFamily: "'Barlow Semi Condensed', sans-serif", color: '#9A8E84' }}>
+                                  {result.matched_artist}
+                                </p>
+                                {result.matched_artist_credit && (
+                                  <p className="text-xs" style={{ fontFamily: "'Barlow Semi Condensed', sans-serif", color: '#6B5E56' }}>
+                                    {result.matched_artist_credit}
+                                  </p>
+                                )}
+                                <p className="text-xs mt-1" style={{ fontFamily: "'Barlow Semi Condensed', sans-serif", color: '#6B5E56' }}>
+                                  {result.matched_album}
+                                </p>
+                                <p className="text-xs mt-1" style={{ fontFamily: "'Barlow Semi Condensed', sans-serif", color: '#6B5E56' }}>
+                                  MBID: {result.mb_id?.slice(0, 8)}... • {result.phase === 'Set by user' ? 'Set by user' : `Score: ${result.mb_score}%`}
+                                </p>
+                              </>
+                            ) : (
+                              <>
+                                <p className="text-sm" style={{ fontFamily: "'Barlow Semi Condensed', sans-serif", color: '#9A8E84' }}>
+                                  No match found
+                                </p>
+                                {!decision && (
+                                  <button
+                                    onClick={() => { setEditingId(result.track_id); setManualMbId('') }}
+                                    className="flex items-center gap-1 mt-2 text-xs"
+                                    style={{ fontFamily: "'Barlow Condensed', sans-serif", color: '#b4003e' }}
+                                  >
+                                    <Pencil size={12} />
+                                    Enter MBID manually
+                                  </button>
+                                )}
+                              </>
+                            )}
+                          </div>
                         </div>
                       </div>
 
@@ -842,12 +935,40 @@ setResolveResults(prev => prev.map(r => r.track_id === result.track_id ? updated
                       className="p-3 rounded"
                       style={{ background: '#231815', border: '1px solid #3D2820' }}
                     >
+                      <div className="flex items-center gap-3 mb-2">
+                        <div
+                          className="w-12 h-12 rounded overflow-hidden shrink-0"
+                          style={{ background: '#1A1210', border: '1px solid #3D2820' }}
+                        >
+                          {result.old_cover_art ? (
+                            <img src={result.old_cover_art} alt="Old cover" className="w-full h-full object-cover" />
+                          ) : (
+                            <div className="w-full h-full flex items-center justify-center" style={{ color: '#3D2820', fontSize: '0.5rem', fontFamily: "'Barlow Condensed', sans-serif" }}>No Cover</div>
+                          )}
+                        </div>
+                        <span style={{ color: '#6B5E56', fontSize: 20 }}>→</span>
+                        <div
+                          className="w-12 h-12 rounded overflow-hidden shrink-0"
+                          style={{ background: '#1A1210', border: '1px solid #3D2820' }}
+                        >
+                          {result.new_cover_art ? (
+                            <img src={result.new_cover_art} alt="New cover" className="w-full h-full object-cover" />
+                          ) : (
+                            <div className="w-full h-full flex items-center justify-center" style={{ color: '#3D2820', fontSize: '0.5rem', fontFamily: "'Barlow Condensed', sans-serif" }}>No Cover</div>
+                          )}
+                        </div>
+                      </div>
                       <div className="text-xs" style={{ fontFamily: "'Barlow Semi Condensed', sans-serif", color: '#E8DDD0' }}>
                         <span style={{ color: '#6B5E56' }}>{result.old_title}</span> → <span style={{ color: '#b4003e' }}>{result.new_title}</span>
                       </div>
                       <div className="text-xs" style={{ fontFamily: "'Barlow Semi Condensed', sans-serif", color: '#9A8E84' }}>
                         {result.old_artist} → {result.new_artist}
                       </div>
+                      {(result.old_artist_credit || result.new_artist_credit) && (
+                        <div className="text-xs" style={{ fontFamily: "'Barlow Semi Condensed', sans-serif", color: '#6B5E56' }}>
+                          {(result.old_artist_credit || '—')} → {result.new_artist_credit || '—'}
+                        </div>
+                      )}
                       <div className="text-xs" style={{ fontFamily: "'Barlow Semi Condensed', sans-serif", color: '#9A8E84' }}>
                         {result.old_album} → {result.new_album}
                       </div>

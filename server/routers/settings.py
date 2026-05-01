@@ -147,10 +147,32 @@ def get_downloaded_tracks(
     session: Session = Depends(get_session),
     limit: int = Query(default=100, ge=1, le=1000),
     offset: int = Query(default=0, ge=0),
+    search: str = Query(default="", max_length=100),
+    exclude_ids: str = Query(default="", max_length=2000),
 ):
-    rows = session.exec(
-        select(Track).order_by(Track.id.desc()).limit(limit).offset(offset)
-    ).all()
+    query = select(Track).order_by(Track.id.desc())
+
+    excluded_ids_set: set[int] = set()
+    if exclude_ids:
+        try:
+            excluded_ids_set = {int(tid) for tid in exclude_ids.split(",") if tid.strip().isdigit()}
+        except ValueError:
+            pass
+
+    if excluded_ids_set:
+        query = query.where(Track.id.not_in(excluded_ids_set))
+
+    if search:
+        search_term = f"%{search}%"
+        query = query.where(
+            (Track.title.ilike(search_term))
+            | (Track.artist.ilike(search_term))
+            | (Track.artist_credit.ilike(search_term))
+            | (Track.album.ilike(search_term))
+        )
+
+    query = query.limit(limit).offset(offset)
+    rows = session.exec(query).all()
     return DownloadedTracksListResponse(
         tracks=[
             DownloadedTrackListItem(

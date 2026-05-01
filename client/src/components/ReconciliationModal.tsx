@@ -1,5 +1,5 @@
-import { useState, useEffect } from 'react'
-import { X, ChevronLeft, ChevronRight, Check, XCircle, Loader2, Pencil, Search } from 'lucide-react'
+import { useState, useEffect, useRef } from 'react'
+import { X, ChevronLeft, ChevronRight, Check, XCircle, Loader2, Pencil, Search, ChevronDown, ChevronUp } from 'lucide-react'
 import { authFetch } from '../api'
 
 interface ReconciliationTrack {
@@ -21,6 +21,20 @@ interface ReconciliationResponse {
   page: number
   page_size: number
   total_pages: number
+}
+
+interface DownloadedTrack {
+  id: number
+  title: string
+  artist: string
+  artist_credit: string | null
+  album: string
+  status: string
+  mb_id: string | null
+}
+
+interface DownloadedTracksResponse {
+  tracks: DownloadedTrack[]
 }
 
 interface MatchResult {
@@ -73,6 +87,14 @@ export default function ReconciliationModal({ open, onClose }: Props) {
   const [manualMbId, setManualMbId] = useState('')
   const [mbidLoading, setMbidLoading] = useState(false)
 
+  const [additionalExpanded, setAdditionalExpanded] = useState(false)
+  const [additionalTracks, setAdditionalTracks] = useState<DownloadedTrack[]>([])
+  const [additionalLoading, setAdditionalLoading] = useState(false)
+  const [additionalSearch, setAdditionalSearch] = useState('')
+  const [additionalOffset, setAdditionalOffset] = useState(0)
+  const [additionalHasMore, setAdditionalHasMore] = useState(true)
+  const additionalSearchTimeoutRef = useRef<number | null>(null)
+
   useEffect(() => {
     if (open) {
       setPage(1)
@@ -80,9 +102,19 @@ export default function ReconciliationModal({ open, onClose }: Props) {
       setDecisions({})
       setApplyResults([])
       setSelected(new Set())
+      setAdditionalExpanded(false)
+      setAdditionalTracks([])
+      setAdditionalSearch('')
+      setAdditionalOffset(0)
       fetchTracksAndSelect(1)
     }
   }, [open])
+
+  useEffect(() => {
+    if (additionalExpanded && additionalTracks.length === 0 && !additionalLoading) {
+      fetchAdditionalTracks(true)
+    }
+  }, [additionalExpanded])
 
   async function fetchTracksAndSelect(pageNum: number) {
     setLoading(true)
@@ -120,6 +152,58 @@ export default function ReconciliationModal({ open, onClose }: Props) {
 
   function deselectAll() {
     setSelected(new Set())
+  }
+
+  async function fetchAdditionalTracks(reset = false) {
+    if (reset) {
+      setAdditionalOffset(0)
+      setAdditionalTracks([])
+    }
+    setAdditionalLoading(true)
+    try {
+      const excludeIds = Array.from(selected).join(',')
+      const res = await authFetch(
+        `/settings/tracks?limit=20&offset=${reset ? 0 : additionalOffset}&search=${encodeURIComponent(additionalSearch)}&exclude_ids=${excludeIds}`
+      )
+      const data = (await res.json()) as DownloadedTracksResponse
+      if (reset) {
+        setAdditionalTracks(data.tracks)
+      } else {
+        setAdditionalTracks((prev) => [...prev, ...data.tracks])
+      }
+      setAdditionalOffset((reset ? 0 : additionalOffset) + data.tracks.length)
+      setAdditionalHasMore(data.tracks.length === 20)
+    } catch (err) {
+      console.error(err)
+    } finally {
+      setAdditionalLoading(false)
+    }
+  }
+
+  function handleAdditionalSearchChange(value: string) {
+    setAdditionalSearch(value)
+    if (additionalSearchTimeoutRef.current) {
+      window.clearTimeout(additionalSearchTimeoutRef.current)
+    }
+    additionalSearchTimeoutRef.current = window.setTimeout(() => {
+      fetchAdditionalTracks(true)
+    }, 400)
+  }
+
+  function toggleAdditionalTrack(id: number) {
+    const next = new Set(selected)
+    if (next.has(id)) {
+      next.delete(id)
+    } else {
+      next.add(id)
+    }
+    setSelected(next)
+  }
+
+  async function loadMoreAdditional() {
+    if (!additionalLoading && additionalHasMore) {
+      await fetchAdditionalTracks(false)
+    }
   }
 
   async function runResolution() {
@@ -374,6 +458,111 @@ setResolveResults(prev => prev.map(r => r.track_id === result.track_id ? updated
                     >
                       <ChevronRight size={20} />
                     </button>
+                  </div>
+
+                  <div className="mt-6 pt-4" style={{ borderTop: '1px solid #3D2820' }}>
+                    <button
+                      onClick={() => setAdditionalExpanded(!additionalExpanded)}
+                      className="flex items-center justify-between w-full p-3 rounded"
+                      style={{
+                        background: '#1A1210',
+                        border: '1px solid #3D2820',
+                      }}
+                    >
+                      <div className="flex items-center gap-2">
+                        {additionalExpanded ? <ChevronUp size={16} style={{ color: '#b4003e' }} /> : <ChevronDown size={16} style={{ color: '#9A8E84' }} />}
+                        <span style={{ fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 600, color: '#E8DDD0', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                          Additional Tracks
+                        </span>
+                        {selected.size > 0 && (
+                          <span
+                            className="text-xs px-1.5 py-0.5 rounded"
+                            style={{ fontFamily: "'Barlow Semi Condensed', sans-serif", background: '#b4003e', color: '#E8DDD0' }}
+                          >
+                            {selected.size} selected
+                          </span>
+                        )}
+                      </div>
+                      {!additionalExpanded && (
+                        <span style={{ fontFamily: "'Barlow Semi Condensed', sans-serif", color: '#6B5E56', fontSize: '0.75rem' }}>
+                          {additionalTracks.length > 0 ? `${additionalTracks.length} loaded` : 'click to browse'}
+                        </span>
+                      )}
+                    </button>
+
+                    {additionalExpanded && (
+                      <div className="mt-3 space-y-3">
+                        <div className="flex items-center gap-2">
+                          <input
+                            type="text"
+                            value={additionalSearch}
+                            onChange={(e) => handleAdditionalSearchChange(e.target.value)}
+                            placeholder="Search tracks..."
+                            className="flex-1 px-3 py-2 text-sm rounded"
+                            style={{
+                              background: '#1A1210',
+                              border: '1px solid #3D2820',
+                              color: '#E8DDD0',
+                              fontFamily: "'Barlow Semi Condensed', sans-serif",
+                            }}
+                          />
+                        </div>
+
+                        {additionalLoading && additionalTracks.length === 0 ? (
+                          <div className="flex items-center gap-2 py-4 justify-center">
+                            <Loader2 className="animate-spin" size={20} style={{ color: '#b4003e' }} />
+                            <span style={{ fontFamily: "'Barlow Semi Condensed', sans-serif", color: '#9A8E84' }}>Loading...</span>
+                          </div>
+                        ) : additionalTracks.length === 0 ? (
+                          <div className="py-4 text-center" style={{ fontFamily: "'Barlow Semi Condensed', sans-serif", color: '#6B5E56' }}>
+                            No additional tracks found
+                          </div>
+                        ) : (
+                          <>
+                            <div className="space-y-2 max-h-48 overflow-y-auto">
+                              {additionalTracks.map((track) => (
+                                <label
+                                  key={track.id}
+                                  className="flex items-center gap-3 p-2 rounded cursor-pointer"
+                                  style={{ background: '#231815', border: '1px solid #3D2820' }}
+                                >
+                                  <input
+                                    type="checkbox"
+                                    checked={selected.has(track.id)}
+                                    onChange={() => toggleAdditionalTrack(track.id)}
+                                    className="w-4 h-4"
+                                    style={{ accentColor: '#b4003e' }}
+                                  />
+                                  <div className="flex-1 min-w-0">
+                                    <p className="text-sm truncate" style={{ fontFamily: "'Barlow Semi Condensed', sans-serif", color: '#E8DDD0' }}>
+                                      {track.title}
+                                    </p>
+                                    <p className="text-xs truncate" style={{ fontFamily: "'Barlow Semi Condensed', sans-serif", color: '#9A8E84' }}>
+                                      {track.artist} — {track.album}
+                                    </p>
+                                  </div>
+                                </label>
+                              ))}
+                            </div>
+
+                            {additionalHasMore && (
+                              <button
+                                onClick={loadMoreAdditional}
+                                disabled={additionalLoading}
+                                className="w-full py-2 text-xs border rounded"
+                                style={{
+                                  fontFamily: "'Barlow Condensed', sans-serif",
+                                  color: '#9A8E84',
+                                  borderColor: '#3D2820',
+                                }}
+                              >
+                                {additionalLoading ? 'Loading...' : 'Load more'}
+                              </button>
+                            )}
+                          </>
+                        )}
+                      </div>
+                    )}
                   </div>
 
                   <div className="flex items-center justify-between">

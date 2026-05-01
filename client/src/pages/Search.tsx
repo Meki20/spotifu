@@ -11,6 +11,7 @@ import { useDownloadStates } from '../hooks/useDownloadStates'
 import { useArtistPrefetch } from '../hooks/useArtistPrefetch'
 import TrackRowFull from '../components/TrackRowFull'
 import AlbumCard from '../components/AlbumCard'
+import ArtistCard from '../components/ArtistCard'
 import ContextMenu from '../components/ContextMenu'
 import AddToPlaylistModal, { type AddToPlaylistTrack } from '../components/AddToPlaylistModal'
 import { useContextMenuActions } from '../contexts/ContextMenuProvider'
@@ -70,6 +71,26 @@ async function clearSearchHistory(): Promise<void> {
   if (!res.ok) throw new Error('Failed to clear search history')
 }
 
+interface ArtistSearchResponse {
+  artist_mbid: string
+  name: string
+  sort_name: string | null
+  disambiguation: string | null
+  country: string | null
+  type: string | null
+  score: number
+  mb_score: number
+  match_type: string
+  aliases: string[]
+  image_url: string | null
+}
+
+async function searchArtist(q: string): Promise<ArtistSearchResponse> {
+  const res = await authFetch(`/artist?q=${encodeURIComponent(q)}`)
+  if (!res.ok) throw new Error('Artist search failed')
+  return res.json()
+}
+
 type SimilarStreamEvent =
   | { type: 'track'; track: Track }
   | { type: 'done'; notice?: string; cached?: boolean }
@@ -95,7 +116,7 @@ export default function Search() {
   const [query, setQuery] = useState('')
   const [debouncedQuery, setDebouncedQuery] = useState('')
   const [localOnly, setLocalOnly] = useState(false)
-  const [activeTab, setActiveTab] = useState<'songs' | 'albums'>('songs')
+  const [activeTab, setActiveTab] = useState<'songs' | 'albums' | 'artists'>('songs')
   const [hybridData, setHybridData] = useState<HybridSearchResponse | null>(null)
   const [hybridLoading, setHybridLoading] = useState(false)
   const [hybridError, setHybridError] = useState<Error | null>(null)
@@ -222,6 +243,29 @@ export default function Search() {
     },
     enabled:
       debouncedQuery.length > 2 && localOnly && isPlausibleSearchQuery(debouncedQuery),
+  })
+
+  const {
+    data: artistResult,
+    isLoading: artistLoading,
+    error: artistError,
+  } = useQuery({
+    queryKey: ['artist-search', debouncedQuery],
+    queryFn: async () => searchArtist(debouncedQuery),
+    enabled:
+      activeTab === 'artists' &&
+      debouncedQuery.length > 2 &&
+      isPlausibleSearchQuery(debouncedQuery),
+  })
+
+  const { data: artistImagesData } = useQuery({
+    queryKey: ['artist-images', artistResult?.artist_mbid],
+    queryFn: async () => {
+      const res = await authFetch(`/artist/${artistResult!.artist_mbid}/images`)
+      if (!res.ok) throw new Error('Failed to fetch artist images')
+      return res.json() as Promise<{ thumb: string | null }>
+    },
+    enabled: activeTab === 'artists' && !!artistResult?.artist_mbid,
   })
 
   useEffect(() => {
@@ -617,10 +661,41 @@ export default function Search() {
         </div>
       )}
 
-      {/* Tabs for songs/albums */}
-      {results && results.length > 0 && (
+      {/* Artists tab */}
+      {activeTab === 'artists' && (
+        <div className="flex flex-col items-center py-6">
+          {artistLoading && (
+            <div className="flex items-center gap-3">
+              <PollyLoading size={36} />
+              <span className="text-sm" style={{ color: '#4A413C', fontFamily: "'Barlow Semi Condensed', sans-serif" }}>
+                searching artist…
+              </span>
+            </div>
+          )}
+          {artistError && !artistLoading && (
+            <div className="text-base" style={{ color: '#b4003e' }}>
+              Error: {String(artistError)}
+            </div>
+          )}
+          {!artistLoading && !artistError && artistResult && (
+            <ArtistCard
+              artist={artistResult}
+              imageUrl={artistImagesData?.thumb ?? artistResult.image_url}
+              onClick={(id) => navigate(`/artist/${id}`)}
+            />
+          )}
+          {!artistLoading && !artistError && !artistResult && debouncedQuery.length > 2 && (
+            <div className="text-base" style={{ color: '#4A413C', fontFamily: "'Barlow Semi Condensed', sans-serif" }}>
+              no artist found
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Tabs for songs/albums/artists */}
+      {debouncedQuery.length > 2 && (
         <div className="flex gap-2 mt-4">
-          {(['songs', 'albums'] as const).map((tab) => (
+          {(['songs', 'albums', 'artists'] as const).map((tab) => (
             <button
               key={tab}
               onClick={() => setActiveTab(tab)}

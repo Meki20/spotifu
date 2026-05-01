@@ -1,9 +1,13 @@
+import asyncio
+import difflib
+
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
 from sqlmodel import Session
 from database import get_session
 from deps import get_current_user, require_permission, CurrentUser
 from models import User
+from services.artist_alias_cache import norm_alias, upsert_from_mb_artist_json
 from services.providers import MetadataService
 from services.providers import musicbrainz
 from services.providers.musicbrainz import _caa_release_group_front_url, CAA_SIZE_LIST
@@ -95,6 +99,133 @@ def _save_idx(artist_id: str, banner_idx: int, picture_idx: int):
 def _load_idx(artist_id: str) -> tuple[int, int]:
     idx = _get_cache("artist_image_idx", artist_id) or {}
     return idx.get("banner_idx", 0), idx.get("picture_idx", 0)
+
+
+class ArtistSearchResponse(BaseModel):
+    artist_mbid: str
+    name: str
+    sort_name: str | None
+    disambiguation: str | None
+    country: str | None
+    type: str | None
+    score: float
+    mb_score: int
+    match_type: str
+    aliases: list[str]
+    image_url: str | None
+
+
+@router.get("")
+async def search_artist(
+    q: str = Query(..., min_length=1),
+    session: Session = Depends(get_session),
+    user: User = Depends(get_current_user),
+):
+    query_norm = norm_alias(q)
+    if not query_norm:
+        raise HTTPException(status_code=400, detail="Query is empty")
+
+    async with musicbrainz.mb_interactive_calls():
+        resp = await musicbrainz._mb_get(
+            f"{musicbrainz.MUSICBRAINZ_API}/artist",
+            {"query": q, "fmt": "json", "limit": 10},
+        )
+
+    if resp.status_code != 200:
+        raise HTTPException(status_code=503, detail="MusicBrainz API unavailable")
+
+    artists = resp.json().get("artists", [])
+    if not artists:
+        raise HTTPException(status_code=404, detail="No artist found for query")
+
+    best_hit = None
+    best_score = -1.0
+    best_mb_score = 0
+    best_name_match = 0.0
+    best_alias_match = 0.0
+
+    for i, hit in enumerate(artists):
+        mb_score = hit.get("score", 0)
+        name = (hit.get("name") or "").strip()
+        name_match = difflib.SequenceMatcher(None, query_norm, norm_alias(name)).ratio()
+
+        alias_match = 0.0
+        for al in hit.get("aliases", []):
+            if not isinstance(al, dict):
+                continue
+            an = (al.get("name") or "").strip()
+            if an:
+                ratio = difflib.SequenceMatcher(None, query_norm, norm_alias(an)).ratio()
+                if ratio > alias_match:
+                    alias_match = ratio
+
+        position_bonus = max(0, 10 - i)
+        total = 100 * mb_score + 20 * name_match + 20 * alias_match + 10 * position_bonus
+
+        if total > best_score:
+            best_score = total
+            best_hit = hit
+            best_mb_score = mb_score
+            best_name_match = name_match
+            best_alias_match = alias_match
+
+    if best_hit is None:
+        raise HTTPException(status_code=404, detail="No artist found for query")
+
+    try:
+        upsert_from_mb_artist_json(best_hit, source="musicbrainz_search")
+    except Exception:
+        pass
+
+    if best_name_match == 1.0:
+        match_type = "exact"
+    elif best_name_match > 0.8 or best_alias_match == 1.0:
+        match_type = "fuzzy"
+    else:
+        match_type = "position"
+
+    aliases = []
+    for al in best_hit.get("aliases", []):
+        if isinstance(al, dict):
+            an = al.get("name")
+            if an:
+                aliases.append(an)
+
+    mbid = best_hit.get("id", "")
+    name = best_hit.get("name", "")
+
+    # Read any already-cached image (non-blocking)
+    ft = _get_cache("cover_fanart_artist", mbid)
+    adb = _get_cache("cover_audiodb_artist", mbid)
+    ddg = _get_cache("cover_ddg_thumb", name)
+    image_url = (
+        (ft or {}).get("thumb")
+        or (adb or {}).get("thumb")
+        or (ddg or {}).get("thumb")
+        or None
+    )
+
+    # If nothing cached, fire a background fetch so it's ready next time
+    if not image_url:
+        try:
+            svc = MetadataService(session)
+            asyncio.create_task(svc.load_artist_visuals(mbid, artist_name=name))
+        except Exception:
+            pass
+
+    return ArtistSearchResponse(
+        artist_mbid=mbid,
+        name=name,
+        sort_name=best_hit.get("sort-name"),
+        disambiguation=best_hit.get("disambiguation"),
+        country=best_hit.get("country"),
+        type=best_hit.get("type"),
+        score=best_score,
+        mb_score=best_mb_score,
+        match_type=match_type,
+        aliases=aliases,
+        image_url=image_url,
+    )
 
 
 @router.get("/{artist_id}/images")

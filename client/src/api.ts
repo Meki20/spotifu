@@ -94,3 +94,52 @@ export async function authFetch(path: string, options: RequestInit = {}): Promis
     throw err
   }
 }
+
+export interface UserPermission {
+  can_play: boolean
+  can_download: boolean
+  can_use_soulseek: boolean
+  can_access_apis: boolean
+  can_view_recently_downloaded: boolean
+}
+
+export interface UserWithPermissions {
+  id: number
+  username: string
+  is_admin: boolean
+  permissions: UserPermission | null
+}
+
+export interface UserListResponse {
+  users: UserWithPermissions[]
+  total: number
+}
+
+export async function getUsers(): Promise<UserListResponse> {
+  const res = await authFetch('/admin/users')
+  if (!res.ok) throw new Error('Failed to fetch users')
+  return res.json()
+}
+
+export async function updateUserPermissions(userId: number, permissions: Partial<UserPermission>): Promise<void> {
+  const res = await authFetch(`/admin/users/${userId}/permissions`, {
+    method: 'PATCH',
+    body: JSON.stringify(permissions),
+  })
+  if (!res.ok) throw new Error('Failed to update permissions')
+}
+
+export async function grantAllPermissions(userId: number): Promise<void> {
+  const res = await authFetch(`/admin/users/${userId}/grant-all`, { method: 'POST' })
+  if (!res.ok) throw new Error('Failed to grant permissions')
+}
+
+export async function revokeAllPermissions(userId: number): Promise<void> {
+  const res = await authFetch(`/admin/users/${userId}/revoke`, { method: 'POST' })
+  if (!res.ok) throw new Error('Failed to revoke permissions')
+}
+
+export async function deleteUser(userId: number): Promise<void> {
+  const res = await authFetch(`/admin/users/${userId}`, { method: 'DELETE' })
+  if (!res.ok) throw new Error('Failed to delete user')
+}

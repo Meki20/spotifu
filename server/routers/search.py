@@ -8,7 +8,8 @@ from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 from sqlmodel import Session, select
 from database import get_session
-from deps import get_current_user
+from deps import get_current_user, require_permission, CurrentUser
+from models import SearchHistory
 from models import Track, TrackStatus, User
 from schemas import TrackOut
 from services.covers import attach_playlist_style_covers_mbentity_cache
@@ -115,7 +116,40 @@ async def hybrid_search(
         TrackSection(type=sec["type"], label=sec["label"], tracks=[_track_to_out(t, t.get("is_cached", False)) for t in sec["tracks"]])
         for sec in raw["sections"]
     ]
+
+    search_history = SearchHistory(user_id=user.id, query=q)
+    session.add(search_history)
+    session.commit()
+
     return HybridSearchResponse(intent=raw["intent"], sections=sections)
+
+
+@router.get("/history", response_model=list[str])
+async def get_search_history(
+    limit: int = Query(20, ge=1, le=100, description="Max number of recent searches"),
+    session: Session = Depends(get_session),
+    user: User = Depends(get_current_user),
+):
+    """Get current user's recent search history."""
+    results = (
+        session.query(SearchHistory)
+        .filter(SearchHistory.user_id == user.id)
+        .order_by(SearchHistory.searched_at.desc())
+        .limit(limit)
+        .all()
+    )
+    return [r.query for r in results]
+
+
+@router.delete("/history", response_model=dict)
+async def clear_search_history(
+    session: Session = Depends(get_session),
+    user: User = Depends(get_current_user),
+):
+    """Clear current user's search history."""
+    session.query(SearchHistory).filter(SearchHistory.user_id == user.id).delete()
+    session.commit()
+    return {"ok": True}
 
 
 @router.get("", response_model=SearchResponse)
@@ -170,12 +204,13 @@ async def search(
 async def stream_similar_tracks(
     mbid: str,
     session: Session = Depends(get_session),
-    user: User = Depends(get_current_user),
+    user: CurrentUser = Depends(require_permission("can_access_apis")),
 ):
     """Stream similar tracks for a MusicBrainz recording MBID as NDJSON.
 
     Uses cache, then Last.fm candidates resolved only via a fast MusicBrainz
     batch (Lucene OR). Per-track / import-style resolution is not used.
+    Requires can_access_apis permission.
     """
     from services.providers import lastfm
     from services.providers import musicbrainz

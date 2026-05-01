@@ -210,6 +210,42 @@ def _migrate():
         # Source tracking on cover_links: 'musicbrainz' | 'local'
         "ALTER TABLE cover_links ADD COLUMN IF NOT EXISTS source VARCHAR(64) NOT NULL DEFAULT 'musicbrainz'",
         "ALTER TABLE tracks ADD COLUMN IF NOT EXISTS quality VARCHAR(64)",
+        # ------------------------------------------------------------------
+        # Admin and permissions system
+        # ------------------------------------------------------------------
+        "ALTER TABLE users ADD COLUMN IF NOT EXISTS is_admin BOOLEAN NOT NULL DEFAULT FALSE",
+        """
+        CREATE TABLE IF NOT EXISTS user_permissions (
+            user_id INTEGER PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+            can_play BOOLEAN NOT NULL DEFAULT FALSE,
+            can_download BOOLEAN NOT NULL DEFAULT FALSE,
+            can_use_soulseek BOOLEAN NOT NULL DEFAULT FALSE,
+            can_access_apis BOOLEAN NOT NULL DEFAULT FALSE,
+            can_view_recently_downloaded BOOLEAN NOT NULL DEFAULT FALSE
+        )
+        """,
+        "ALTER TABLE user_permissions ADD COLUMN IF NOT EXISTS can_view_recently_downloaded BOOLEAN NOT NULL DEFAULT FALSE",
+        """
+        CREATE TABLE IF NOT EXISTS search_history (
+            id SERIAL PRIMARY KEY,
+            user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+            query VARCHAR(512) NOT NULL,
+            searched_at TIMESTAMP NOT NULL DEFAULT (CURRENT_TIMESTAMP AT TIME ZONE 'UTC')
+        )
+        """,
+        "CREATE INDEX IF NOT EXISTS ix_search_history_user_id ON search_history (user_id)",
+        "CREATE INDEX IF NOT EXISTS ix_search_history_searched_at ON search_history (searched_at)",
+        """
+        CREATE TABLE IF NOT EXISTS user_recently_played (
+            id SERIAL PRIMARY KEY,
+            user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+            track_id INTEGER NOT NULL REFERENCES tracks(id),
+            played_at TIMESTAMP NOT NULL DEFAULT (CURRENT_TIMESTAMP AT TIME ZONE 'UTC')
+        )
+        """,
+        "CREATE INDEX IF NOT EXISTS ix_user_recently_played_user_id ON user_recently_played (user_id)",
+        "CREATE INDEX IF NOT EXISTS ix_user_recently_played_played_at ON user_recently_played (played_at)",
+        "CREATE INDEX IF NOT EXISTS ix_user_recently_played_user_played ON user_recently_played (user_id, played_at)",
     ]
     with engine.connect() as conn:
         for sql in migrations:

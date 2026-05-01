@@ -6,6 +6,8 @@ from sqlmodel import Session
 from database import get_session
 from models import Track
 from services.soulseek import get_inflight_path, get_inflight_filesize
+from deps import require_permission, CurrentUser
+from models import UserRecentlyPlayed
 import os
 
 router = APIRouter(prefix="/stream", tags=["stream"])
@@ -160,7 +162,7 @@ def _stream_file(file_path: str, track_id: int, request: Request, inflight_files
 
 
 @router.get("/{track_id}")
-async def stream(track_id: int, request: Request, session: Session = Depends(get_session)):
+async def stream(track_id: int, request: Request, session: Session = Depends(get_session), user: CurrentUser = Depends(require_permission("can_play"))):
     track = session.get(Track, track_id)
     if not track:
         raise HTTPException(status_code=404, detail="Track not found")
@@ -171,6 +173,10 @@ async def stream(track_id: int, request: Request, session: Session = Depends(get
 
     if not file_path or not os.path.isfile(file_path):
         raise HTTPException(status_code=404, detail="Track not available")
+
+    recent = UserRecentlyPlayed(user_id=user.user.id, track_id=track_id)
+    session.add(recent)
+    session.commit()
 
     etag = _weak_etag(file_path)
     if_none_match = request.headers.get("if-none-match")

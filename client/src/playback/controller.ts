@@ -1,4 +1,5 @@
 import { usePlayerStore, type Track, type RepeatMode, type SystemSource } from '../stores/playerStore'
+import { useAuthStore } from '../stores/authStore'
 import { subscribeSpotifuWebSocket } from '../spotifuWebSocket'
 import { API, authFetch } from '../api'
 import { queryClient } from '../queryClient'
@@ -135,7 +136,11 @@ class PlaybackController {
   private _loadAndPlay(url: string) {
     this._clearPlayTimeout()
     const fullUrl = url.startsWith('http') ? url : `${API}${url}`
-    this._audio.src = `${fullUrl}?cb=${Date.now()}`
+    const token = useAuthStore.getState().token
+    const u = new URL(fullUrl, window.location.origin)
+    if (token) u.searchParams.set('token', token)
+    u.searchParams.set('cb', String(Date.now()))
+    this._audio.src = u.href
     this._audio.play().catch((e: unknown) => {
       console.error('[Controller] play() failed:', e)
       usePlayerStore.setState({ isPlaying: false })

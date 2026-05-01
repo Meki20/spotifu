@@ -1,5 +1,7 @@
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+
+const SHOW_LIBRARY_ALBUMS = false // TODO: re-enable once album features are ready
 import { useNavigate } from 'react-router-dom'
 import { useAuthStore } from '../stores/authStore'
 import { authFetch } from '../api'
@@ -225,6 +227,7 @@ export default function Library() {
               </div>
 
       {/* Albums — 3D disc strip */}
+      {SHOW_LIBRARY_ALBUMS && (
       <div className="mb-8">
         <div
           className="flex items-center gap-2.5 mb-4"
@@ -265,6 +268,7 @@ export default function Library() {
           />
         )}
       </div>
+      )}
 
       {/* Playlists section */}
       <div className="mb-6">

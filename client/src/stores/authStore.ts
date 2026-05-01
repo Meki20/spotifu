@@ -28,8 +28,9 @@ const hybridStorage: StateStorage = {
 interface AuthState {
   token: string | null
   username: string | null
+  isAdmin: boolean
   remember: boolean
-  setAuth: (token: string, username: string, remember?: boolean) => void
+  setAuth: (token: string, username: string, isAdmin: boolean, remember?: boolean) => void
   clearAuth: () => void
   isExpired: () => boolean
 }
@@ -39,9 +40,10 @@ export const useAuthStore = create<AuthState>()(
     (set, get) => ({
       token: null,
       username: null,
+      isAdmin: false,
       remember: false,
-      setAuth: (token, username, remember = false) => set({ token, username, remember }),
-      clearAuth: () => set({ token: null, username: null, remember: false }),
+      setAuth: (token, username, isAdmin = false, remember = false) => set({ token, username, isAdmin, remember }),
+      clearAuth: () => set({ token: null, username: null, isAdmin: false, remember: false }),
       isExpired: () => {
         const { token } = get()
         if (!token) return true

@@ -38,10 +38,13 @@ export default function Home() {
     enabled: !!token,
   })
 
-  async function fetchRecentlyAdded(): Promise<any[]> {
-    const res = await authFetch('/playlists/recently-added')
-    if (!res.ok) throw new Error('Failed to fetch recently added')
-    return res.json()
+  async function fetchRecentlyDownloaded(): Promise<{ tracks: any[]; hasPermission: boolean }> {
+    const res = await authFetch('/playlists/recently-downloaded')
+    if (!res.ok) {
+      if (res.status === 403) return { tracks: [], hasPermission: false }
+      throw new Error('Failed to fetch recently downloaded')
+    }
+    return { tracks: await res.json(), hasPermission: true }
   }
 
   async function fetchRecentlyPlayed(): Promise<any[]> {
@@ -50,12 +53,15 @@ export default function Home() {
     return res.json()
   }
 
-  const { data: recentlyAdded } = useQuery({
-    queryKey: ['recently-added'],
-    queryFn: fetchRecentlyAdded,
+  const { data: recentlyDownloadedData } = useQuery({
+    queryKey: ['recently-downloaded'],
+    queryFn: fetchRecentlyDownloaded,
     enabled: !!token,
     staleTime: 2 * 60 * 1000,
   })
+
+  const recentlyDownloaded = recentlyDownloadedData?.tracks ?? []
+  const showRecentlyDownloaded = recentlyDownloadedData?.hasPermission ?? false
 
   const { data: recentlyPlayed } = useQuery({
     queryKey: ['recently-played'],
@@ -64,9 +70,9 @@ export default function Home() {
     staleTime: 30 * 1000,
   })
 
-  function playFromRecentlyAdded(track: any) {
-    const list = (recentlyAdded || []).map((t) => toTrack(t))
-    const idx = Math.max(0, (recentlyAdded || []).findIndex((t) => (t?.mb_id || t?.mbid) === (track?.mb_id || track?.mbid)))
+  function playFromRecentlyDownloaded(track: any) {
+    const list = (recentlyDownloaded || []).map((t) => toTrack(t))
+    const idx = Math.max(0, (recentlyDownloaded || []).findIndex((t) => (t?.mb_id || t?.mbid) === (track?.mb_id || track?.mbid)))
     controller.setSystemAndPlay(list, idx, { kind: 'recently-added' })
   }
 
@@ -76,7 +82,7 @@ export default function Home() {
     controller.setSystemAndPlay(list, idx, { kind: 'recently-played' })
   }
 
-  function handleRecentlyAddedContextMenu(e: React.MouseEvent, track: any) {
+  function handleRecentlyDownloadedContextMenu(e: React.MouseEvent, track: any) {
     e.preventDefault()
     e.stopPropagation()
     openContextMenu(e.clientX, e.clientY, track)
@@ -157,31 +163,8 @@ export default function Home() {
         </div>
       )}
 
-      {/* Recently Added */}
-      <div className="mb-6">
-        <div
-          className="flex items-center gap-2.5 mb-3"
-          style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 16, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.12em', color: '#b4003e' }}
-        >
-          Recently Added
-          <div className="flex-1 h-px" style={{ background: '#261A14' }} />
-        </div>
-        <div
-          className="flex gap-2.5 overflow-x-auto pb-1"
-          style={{ maxHeight: 256, overflowY: 'auto' }}
-        >
-          {recentlyAdded && recentlyAdded.length > 0 ? (
-            recentlyAdded.map((track) => (
-              <TrackCard key={track.track_id} track={track} onPlay={playFromRecentlyAdded} onHoverArtist={(aid, albs) => enqueue(aid, albs)} onContextMenu={(e) => handleRecentlyAddedContextMenu(e, track)} />
-            ))
-          ) : (
-            <p className="text-sm" style={{ color: '#4A413C', fontFamily: "'Barlow Semi Condensed', sans-serif" }}>no tracks added yet</p>
-          )}
-        </div>
-      </div>
-
       {/* Recently Played */}
-      <div>
+      <div className="mb-6">
         <div
           className="flex items-center gap-2.5 mb-3"
           style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 16, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.12em', color: '#b4003e' }}
@@ -220,6 +203,30 @@ export default function Home() {
           )}
         </div>
       </div>
+
+      {showRecentlyDownloaded && (
+      <div>
+        <div
+          className="flex items-center gap-2.5 mb-3"
+          style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 16, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.12em', color: '#b4003e' }}
+        >
+          Recently Downloaded
+          <div className="flex-1 h-px" style={{ background: '#261A14' }} />
+        </div>
+        <div
+          className="flex gap-2.5 overflow-x-auto pb-1"
+          style={{ maxHeight: 256, overflowY: 'auto' }}
+        >
+          {recentlyDownloaded && recentlyDownloaded.length > 0 ? (
+            recentlyDownloaded.map((track) => (
+              <TrackCard key={track.track_id} track={track} onPlay={playFromRecentlyDownloaded} onHoverArtist={(aid, albs) => enqueue(aid, albs)} onContextMenu={(e) => handleRecentlyDownloadedContextMenu(e, track)} />
+            ))
+          ) : (
+            <p className="text-sm" style={{ color: '#4A413C', fontFamily: "'Barlow Semi Condensed', sans-serif" }}>no recently downloaded tracks</p>
+          )}
+        </div>
+      </div>
+      )}
     </div>
   )
 }

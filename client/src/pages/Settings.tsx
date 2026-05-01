@@ -4,7 +4,7 @@ import { useNavigate } from 'react-router-dom'
 import { useAuthStore } from '../stores/authStore'
 import { usePrefetchSettingsStore } from '../stores/prefetchSettingsStore'
 import { subscribeSpotifuWebSocket, WS_RECONNECT } from '../spotifuWebSocket'
-import { authFetch } from '../api'
+import { authFetch, getUsers, updateUserPermissions, grantAllPermissions, revokeAllPermissions, deleteUser, type UserWithPermissions, type UserPermission } from '../api'
 import { PollyLoading } from '../components/PollyLoading'
 import ReconciliationModal from '../components/ReconciliationModal'
 
@@ -48,6 +48,7 @@ function Toggle({ on, onChange }: { on: boolean; onChange: (v: boolean) => void 
 export default function Settings() {
   const token = useAuthStore((s) => s.token)
   const clearAuth = useAuthStore((s) => s.clearAuth)
+  const isAdmin = useAuthStore((s) => s.isAdmin)
   const navigate = useNavigate()
   const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
@@ -65,6 +66,8 @@ export default function Settings() {
   const [tracksLoading, setTracksLoading] = useState(false)
   const [prefetchStatus, setPrefetchStatus] = useState('')
   const [reconciliationOpen, setReconciliationOpen] = useState(false)
+  const [adminUsers, setAdminUsers] = useState<UserWithPermissions[]>([])
+  const [adminUsersLoading, setAdminUsersLoading] = useState(false)
   const prefetch = usePrefetchSettingsStore((s) => s.prefetch)
   const applyServerPrefetch = usePrefetchSettingsStore((s) => s.applyServerPrefetch)
   const trackListRef = useRef<HTMLDivElement>(null)
@@ -114,6 +117,88 @@ export default function Settings() {
         .catch(console.error)
     })
   }, [token])
+
+  useEffect(() => {
+    if (!isAdmin) return
+    setAdminUsersLoading(true)
+    getUsers()
+      .then((data) => setAdminUsers(data.users))
+      .catch(console.error)
+      .finally(() => setAdminUsersLoading(false))
+  }, [isAdmin])
+
+  async function handlePermissionChange(userId: number, permission: keyof UserPermission, value: boolean) {
+    try {
+      await updateUserPermissions(userId, { [permission]: value })
+      setAdminUsers((prev) =>
+        prev.map((u) =>
+          u.id === userId
+            ? { ...u, permissions: u.permissions ? { ...u.permissions, [permission]: value } : null }
+            : u
+        )
+      )
+    } catch (err) {
+      console.error('Failed to update permission:', err)
+    }
+  }
+
+  async function handleGrantAll(userId: number) {
+    try {
+      await grantAllPermissions(userId)
+      setAdminUsers((prev) =>
+        prev.map((u) =>
+          u.id === userId
+            ? {
+                ...u,
+                permissions: {
+                  can_play: true,
+                  can_download: true,
+                  can_use_soulseek: true,
+                  can_access_apis: true,
+                  can_view_recently_downloaded: true,
+                },
+              }
+            : u
+        )
+      )
+    } catch (err) {
+      console.error('Failed to grant permissions:', err)
+    }
+  }
+
+  async function handleRevokeAll(userId: number) {
+    try {
+      await revokeAllPermissions(userId)
+      setAdminUsers((prev) =>
+        prev.map((u) =>
+          u.id === userId
+            ? {
+                ...u,
+                permissions: {
+                  can_play: false,
+                  can_download: false,
+                  can_use_soulseek: false,
+                  can_access_apis: false,
+                  can_view_recently_downloaded: false,
+                },
+              }
+            : u
+        )
+      )
+    } catch (err) {
+      console.error('Failed to revoke permissions:', err)
+    }
+  }
+
+  async function handleDeleteUser(userId: number) {
+    if (!confirm('Are you sure you want to delete this user? This action cannot be undone.')) return
+    try {
+      await deleteUser(userId)
+      setAdminUsers((prev) => prev.filter((u) => u.id !== userId))
+    } catch (err) {
+      console.error('Failed to delete user:', err)
+    }
+  }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -426,6 +511,101 @@ export default function Settings() {
       >
         Settings
       </h1>
+
+      {isAdmin && (
+        <section className="mb-6 p-4 rounded" style={{ background: '#1A1210', border: '1px solid #3D2820' }}>
+          <div style={sectionLabelStyle}>User Management</div>
+          {adminUsersLoading ? (
+            <p style={{ color: '#9A8E84' }}>Loading users...</p>
+          ) : (
+            <div className="space-y-3 mt-4">
+              {adminUsers.map((user) => (
+                <div key={user.id} className="p-4 rounded" style={{ background: '#261A14', border: '1px solid #3D2820' }}>
+                  <div className="flex items-center justify-between mb-3">
+                    <div className="flex items-center gap-3">
+                      <div
+                        className="w-10 h-10 rounded-full flex items-center justify-center"
+                        style={{ background: '#b4003e' }}
+                      >
+                        <span className="text-white font-bold text-lg">{user.username[0].toUpperCase()}</span>
+                      </div>
+                      <div>
+                        <span className="text-white font-medium text-lg">{user.username}</span>
+                        {user.is_admin && (
+                          <span
+                            className="ml-2 text-xs px-2 py-0.5 rounded"
+                            style={{ background: '#b4003e', color: '#E8DDD0' }}
+                          >
+                            Admin
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                    {!user.is_admin && (
+                      <button
+                        onClick={() => handleDeleteUser(user.id)}
+                        className="p-2 rounded transition-colors"
+                        style={{ background: 'rgba(196, 48, 43, 0.15)', color: '#b4003e' }}
+                        title="Delete user"
+                      >
+                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                          <path d="M3 6h18"></path>
+                          <path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"></path>
+                          <path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"></path>
+                        </svg>
+                      </button>
+                    )}
+                  </div>
+
+                  {user.is_admin ? (
+                    <div className="flex gap-4 text-sm" style={{ color: '#9A8E84' }}>
+                      <span>Has full access to all features</span>
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="flex items-center justify-between p-2 rounded" style={{ background: '#1A1210' }}>
+                        <span className="text-sm" style={{ color: '#E8DDD0' }}>Play tracks</span>
+                        <Toggle
+                          on={user.permissions?.can_play ?? false}
+                          onChange={(v) => handlePermissionChange(user.id, 'can_play', v)}
+                        />
+                      </div>
+                      <div className="flex items-center justify-between p-2 rounded" style={{ background: '#1A1210' }}>
+                        <span className="text-sm" style={{ color: '#E8DDD0' }}>Download tracks</span>
+                        <Toggle
+                          on={user.permissions?.can_download ?? false}
+                          onChange={(v) => handlePermissionChange(user.id, 'can_download', v)}
+                        />
+                      </div>
+                      <div className="flex items-center justify-between p-2 rounded" style={{ background: '#1A1210' }}>
+                        <span className="text-sm" style={{ color: '#E8DDD0' }}>Use Soulseek</span>
+                        <Toggle
+                          on={user.permissions?.can_use_soulseek ?? false}
+                          onChange={(v) => handlePermissionChange(user.id, 'can_use_soulseek', v)}
+                        />
+                      </div>
+                      <div className="flex items-center justify-between p-2 rounded" style={{ background: '#1A1210' }}>
+                        <span className="text-sm" style={{ color: '#E8DDD0' }}>Access APIs</span>
+                        <Toggle
+                          on={user.permissions?.can_access_apis ?? false}
+                          onChange={(v) => handlePermissionChange(user.id, 'can_access_apis', v)}
+                        />
+                      </div>
+                      <div className="flex items-center justify-between p-2 rounded" style={{ background: '#1A1210' }}>
+                        <span className="text-sm" style={{ color: '#E8DDD0' }}>View Recently Downloaded</span>
+                        <Toggle
+                          on={user.permissions?.can_view_recently_downloaded ?? false}
+                          onChange={(v) => handlePermissionChange(user.id, 'can_view_recently_downloaded', v)}
+                        />
+                      </div>
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+        </section>
+      )}
 
       {/* Soulseek section */}
       <section className="mb-6">

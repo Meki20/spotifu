@@ -4,7 +4,7 @@ from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks, Query
 from pydantic import BaseModel
 from sqlmodel import Session, select, delete, func
 from database import get_session
-from deps import get_current_user
+from deps import get_current_user, require_admin, require_permission, CurrentUser
 from models import User, Track, TrackStatus, MBLookupCache, MBEntityCache, PlaylistItem, CoverLink, CoverAsset
 from schemas.track import DownloadedTrackListItem, DownloadedTracksListResponse
 from services.user_preferences import get_stored_prefetch_prefs, merge_prefetch_into_user, PREFETCH_DEFAULTS
@@ -88,16 +88,16 @@ def get_settings(
 
 
 @router.post("/soulseek")
-def save_soulseek_credentials(body: SoulseekCredentials, user: User = Depends(get_current_user)):
-    """Save credentials to .secrets file (does not connect)."""
+def save_soulseek_credentials(body: SoulseekCredentials, admin: CurrentUser = Depends(require_admin)):
+    """Save credentials to .secrets file (does not connect). Admin only."""
     import services.soulseek as slsk
     slsk.set_credentials(body.username, body.password)
     return {"status": "ok"}
 
 
 @router.post("/fanart")
-def set_fanarttv_api_key(body: FanartTVKey, user: User = Depends(get_current_user)):
-    """Save fanart.tv API key to .secrets file."""
+def set_fanarttv_api_key(body: FanartTVKey, admin: CurrentUser = Depends(require_admin)):
+    """Save fanart.tv API key to .secrets file. Admin only."""
     import services.soulseek as slsk
     data = slsk.get_secrets_data()
     data["fanarttv_api_key"] = body.api_key
@@ -106,8 +106,8 @@ def set_fanarttv_api_key(body: FanartTVKey, user: User = Depends(get_current_use
 
 
 @router.post("/lastfm")
-def set_lastfm_api_key(body: LastFMKey, user: User = Depends(get_current_user)):
-    """Save Last.fm API key to .secrets file."""
+def set_lastfm_api_key(body: LastFMKey, admin: CurrentUser = Depends(require_admin)):
+    """Save Last.fm API key to .secrets file. Admin only."""
     import services.soulseek as slsk
     data = slsk.get_secrets_data()
     data["lastfm_api_key"] = body.api_key
@@ -116,8 +116,8 @@ def set_lastfm_api_key(body: LastFMKey, user: User = Depends(get_current_user)):
 
 
 @router.post("/soulseek/connect")
-async def connect_soulseek(background_tasks: BackgroundTasks, user: User = Depends(get_current_user)):
-    """Connect using stored credentials."""
+async def connect_soulseek(background_tasks: BackgroundTasks, user: CurrentUser = Depends(require_permission("can_use_soulseek"))):
+    """Connect using stored credentials. Requires can_use_soulseek permission."""
     import services.soulseek as slsk
     if not slsk.has_stored_credentials():
         raise HTTPException(status_code=400, detail="No stored credentials")
@@ -126,16 +126,16 @@ async def connect_soulseek(background_tasks: BackgroundTasks, user: User = Depen
 
 
 @router.post("/soulseek/disconnect")
-async def disconnect_soulseek(user: User = Depends(get_current_user)):
-    """Disconnect Soulseek (credentials remain stored)."""
+async def disconnect_soulseek(user: CurrentUser = Depends(require_permission("can_use_soulseek"))):
+    """Disconnect Soulseek (credentials remain stored). Requires can_use_soulseek permission."""
     import services.soulseek as slsk
     await slsk.disconnect()
     return {"status": "ok"}
 
 
 @router.post("/soulseek/clear")
-def clear_soulseek_credentials(user: User = Depends(get_current_user)):
-    """Clear stored credentials and disconnect."""
+def clear_soulseek_credentials(admin: CurrentUser = Depends(require_admin)):
+    """Clear stored credentials and disconnect. Admin only."""
     import services.soulseek as slsk
     slsk.clear_credentials()
     return {"status": "ok"}

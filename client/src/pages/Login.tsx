@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useAuthStore } from '../stores/authStore'
+import { getIsAdminFromToken } from '../authToken'
 import { API } from '../api'
 
 export default function Login() {
@@ -25,7 +26,8 @@ export default function Login() {
         throw new Error(data.detail || 'Login failed')
       }
       const data = await res.json()
-      setAuth(data.access_token, username, remember)
+      const isAdmin = getIsAdminFromToken(data.access_token)
+      setAuth(data.access_token, username, isAdmin, remember)
       navigate('/')
     } catch (err) {
       setError(String(err))

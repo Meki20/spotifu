@@ -37,16 +37,32 @@ def register(
     body: RegisterRequest,
     session: Session = Depends(get_session),
 ):
+    from sqlmodel import func, select
+
     existing = session.query(User).filter(User.username == body.username).first()
     if existing:
         raise HTTPException(status_code=400, detail="Username already taken")
 
-    user = User(username=body.username, hashed_password=hash_password(body.password))
+    admin_count = session.exec(select(func.count()).select_from(User).where(User.is_admin == True)).one()
+    is_first_user = admin_count == 0
+
+    user = User(
+        username=body.username,
+        hashed_password=hash_password(body.password),
+        is_admin=is_first_user,
+    )
     session.add(user)
     session.commit()
     session.refresh(user)
 
-    token = create_access_token({"sub": str(user.id), "username": user.username})
+    if is_first_user:
+        logger.info(f"First user '{user.username}' created as admin")
+
+    token = create_access_token({
+        "sub": str(user.id),
+        "username": user.username,
+        "is_admin": user.is_admin,
+    })
     return TokenResponse(access_token=token)
 
 
@@ -63,5 +79,9 @@ def login(
         raise HTTPException(status_code=401, detail="Invalid credentials")
 
     expires_minutes = REMEMBER_ME_MINUTES if body.remember else ACCESS_TOKEN_EXPIRE_MINUTES
-    token = create_access_token({"sub": str(user.id), "username": user.username}, expires_in=expires_minutes)
+    token = create_access_token({
+        "sub": str(user.id),
+        "username": user.username,
+        "is_admin": user.is_admin,
+    }, expires_in=expires_minutes)
     return TokenResponse(access_token=token)

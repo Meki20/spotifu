@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useAuthStore } from '../stores/authStore'
+import { getIsAdminFromToken } from '../authToken'
 import { API } from '../api'
 
 export default function Register() {
@@ -24,7 +25,8 @@ export default function Register() {
         throw new Error(data.detail || 'Registration failed')
       }
       const data = await res.json()
-      setAuth(data.access_token, username)
+      const isAdmin = getIsAdminFromToken(data.access_token)
+      setAuth(data.access_token, username, isAdmin)
       navigate('/')
     } catch (err) {
       setError(String(err))

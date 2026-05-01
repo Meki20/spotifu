@@ -8,7 +8,7 @@ from pydantic import BaseModel
 from sqlmodel import Session, select, func, delete, or_, and_
 from database import get_session
 from database import engine
-from deps import get_current_user
+from deps import get_current_user, require_permission, CurrentUser
 from models import (
     Playlist,
     PlaylistItem,
@@ -19,6 +19,7 @@ from models import (
     Track,
     TrackStatus,
     LibraryAlbumOrder,
+    UserRecentlyPlayed,
 )
 from services.playlist_import import run_csv_import_job, stream_csv_import
 from services.providers import MetadataService
@@ -397,9 +398,9 @@ def update_album_order(
     return {"ok": True}
 
 
-@router.get("/recently-added", response_model=list[TrackOut])
-async def list_recently_added(
-    user: User = Depends(get_current_user),
+@router.get("/recently-downloaded", response_model=list[TrackOut])
+async def list_recently_downloaded(
+    user: CurrentUser = Depends(require_permission("can_view_recently_downloaded")),
     session: Session = Depends(get_session),
 ):
     tracks = session.exec(
@@ -458,19 +459,33 @@ async def list_recently_added(
 
 @router.get("/recently-played", response_model=list[TrackOut])
 async def list_recently_played(
-    user: User = Depends(get_current_user),
+    user: CurrentUser = Depends(require_permission("can_play")),
     session: Session = Depends(get_session),
 ):
+    recent_plays = (
+        session.query(UserRecentlyPlayed)
+        .filter(UserRecentlyPlayed.user_id == user.user.id)
+        .order_by(UserRecentlyPlayed.played_at.desc())
+        .limit(20)
+        .all()
+    )
+
+    track_ids = [rp.track_id for rp in recent_plays]
+    if not track_ids:
+        return []
+
     tracks = session.exec(
         select(Track)
+        .where(Track.id.in_(track_ids))
         .where(Track.status == TrackStatus.READY)
-        .where(Track.last_played_at.isnot(None))
-        .order_by(Track.last_played_at.desc())
-        .limit(20)
     ).all()
+
+    track_map = {t.id: t for t in tracks}
+    ordered_tracks = [track_map[tid] for tid in track_ids if tid in track_map]
+
     from services.covers import lookup_cached_cover_best_effort, get_cover_url
     dirty = False
-    for t in tracks:
+    for t in ordered_tracks:
         if t.album_cover:
             continue
         rec = (t.mb_id or "").strip() or None
@@ -511,7 +526,7 @@ async def list_recently_played(
             release_date=t.release_date,
             genre=t.genre,
         )
-        for t in tracks
+        for t in ordered_tracks
     ]
 
 

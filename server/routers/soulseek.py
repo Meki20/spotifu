@@ -16,7 +16,7 @@ from services.download_direct import (
     search_soulseek_direct,
 )
 from services.soulseek import is_connected
-from deps import get_current_user
+from deps import get_current_user, require_permission, CurrentUser
 
 logger = logging.getLogger(__name__)
 
@@ -43,7 +43,7 @@ class DirectDownloadResponse(BaseModel):
 
 
 @router.get("/status")
-def get_soulseek_status(user: User = Depends(get_current_user)) -> dict:
+def get_soulseek_status(user: CurrentUser = Depends(require_permission("can_use_soulseek"))) -> dict:
     return {
         "connected": is_connected(),
     }
@@ -52,7 +52,7 @@ def get_soulseek_status(user: User = Depends(get_current_user)) -> dict:
 @router.post("/search")
 async def search(
     body: SearchQuery,
-    user: User = Depends(get_current_user),
+    user: CurrentUser = Depends(require_permission("can_use_soulseek")),
 ) -> dict:
     if not is_connected():
         raise HTTPException(status_code=503, detail="Soulseek not connected")
@@ -72,7 +72,7 @@ async def search(
 async def download(
     body: DownloadRequest,
     background_tasks: BackgroundTasks,
-    user: User = Depends(get_current_user),
+    user: CurrentUser = Depends(require_permission("can_use_soulseek")),
 ) -> DirectDownloadResponse:
     if not is_connected():
         raise HTTPException(status_code=503, detail="Soulseek not connected")
@@ -136,7 +136,7 @@ async def download(
 
 
 @router.get("/downloads")
-def get_downloads(user: User = Depends(get_current_user)) -> dict:
+def get_downloads(user: CurrentUser = Depends(require_permission("can_use_soulseek"))) -> dict:
     return {
         "active": get_active_downloads(),
         "recent": get_download_history(),

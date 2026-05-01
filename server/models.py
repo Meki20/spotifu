@@ -17,6 +17,33 @@ class User(SQLModel, table=True):
     username: str = Field(unique=True, index=True, max_length=255)
     hashed_password: str = Field(max_length=128)
     preferences_json: Optional[str] = Field(default=None, max_length=32768)
+    is_admin: bool = Field(default=False, index=True)
+
+
+class UserPermission(SQLModel, table=True):
+    __tablename__ = "user_permissions"
+    user_id: int = Field(foreign_key="users.id", primary_key=True)
+    can_play: bool = Field(default=False)
+    can_download: bool = Field(default=False)
+    can_use_soulseek: bool = Field(default=False)
+    can_access_apis: bool = Field(default=False)
+    can_view_recently_downloaded: bool = Field(default=False)
+
+
+class SearchHistory(SQLModel, table=True):
+    __tablename__ = "search_history"
+    id: Optional[int] = Field(default=None, primary_key=True)
+    user_id: int = Field(foreign_key="users.id", index=True, ondelete="CASCADE")
+    query: str = Field(max_length=512)
+    searched_at: datetime = Field(default_factory=datetime.utcnow, index=True)
+
+
+class UserRecentlyPlayed(SQLModel, table=True):
+    __tablename__ = "user_recently_played"
+    id: Optional[int] = Field(default=None, primary_key=True)
+    user_id: int = Field(foreign_key="users.id", index=True, ondelete="CASCADE")
+    track_id: int = Field(foreign_key="tracks.id", index=True)
+    played_at: datetime = Field(default_factory=datetime.utcnow, index=True)
 
 
 class Track(SQLModel, table=True):

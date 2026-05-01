@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
 from sqlmodel import Session
 from database import get_session
-from deps import get_current_user
+from deps import get_current_user, require_permission, CurrentUser
 from models import User
 from services.providers import MetadataService
 from services.providers import musicbrainz
@@ -102,7 +102,7 @@ async def get_artist_images(
     artist_id: str,
     artist_name: str | None = Query(default=None),
     session: Session = Depends(get_session),
-    user: User = Depends(get_current_user),
+    user: CurrentUser = Depends(require_permission("can_access_apis")),
 ):
     banner_idx, picture_idx = _load_idx(artist_id)
 

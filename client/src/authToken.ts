@@ -8,3 +8,12 @@ export function isTokenExpired(token: string): boolean {
     return true
   }
 }
+
+export function getIsAdminFromToken(token: string): boolean {
+  try {
+    const payload = JSON.parse(atob(token.split('.')[1]))
+    return Boolean(payload.is_admin)
+  } catch {
+    return false
+  }
+}

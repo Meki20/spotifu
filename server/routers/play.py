@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks
 from pydantic import BaseModel
 from sqlmodel import Session, select
 from database import engine, get_session
-from deps import get_current_user
+from deps import get_current_user, require_permission, CurrentUser
 from models import Track, TrackStatus, User
 from services.providers import musicbrainz as mb_provider
 from services.download import download_track_background
@@ -240,9 +240,9 @@ async def download_track(
     id: str,
     background_tasks: BackgroundTasks,
     session: Session = Depends(get_session),
-    user: User = Depends(get_current_user),
+    user: CurrentUser = Depends(require_permission("can_download")),
 ):
-    """Explicit download trigger for any provider."""
+    """Explicit download trigger for any provider. Requires can_download permission."""
     if provider == "local":
         track_id = int(id)
         track = session.get(Track, track_id)

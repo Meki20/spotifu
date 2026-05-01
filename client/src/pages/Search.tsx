@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useMemo, useCallback } from 'react'
-import { useQuery, useQueryClient } from '@tanstack/react-query'
+import { useQuery, useQueryClient, useMutation } from '@tanstack/react-query'
 import { useVirtualizer } from '@tanstack/react-virtual'
 import { type Track, usePlayerStore } from '../stores/playerStore'
 import { useNavigate, useLocation } from 'react-router-dom'
@@ -17,7 +17,6 @@ import { useContextMenuActions } from '../contexts/ContextMenuProvider'
 import { useAuthStore } from '../stores/authStore'
 import { PollyLoading } from '../components/PollyLoading'
 
-const RECENT_SEARCHES_KEY = 'spotifu_recent_searches'
 const MAX_RECENT = 20
 
 interface TrackSection {
@@ -58,6 +57,17 @@ async function searchHybrid(q: string, signal?: AbortSignal): Promise<HybridSear
   const res = await authFetch(`/search/hybrid?q=${encodeURIComponent(q)}`, { signal })
   if (!res.ok) throw new Error('Search failed')
   return res.json()
+}
+
+async function fetchSearchHistory(): Promise<string[]> {
+  const res = await authFetch('/search/history')
+  if (!res.ok) throw new Error('Failed to fetch search history')
+  return res.json()
+}
+
+async function clearSearchHistory(): Promise<void> {
+  const res = await authFetch('/search/history', { method: 'DELETE' })
+  if (!res.ok) throw new Error('Failed to clear search history')
 }
 
 type SimilarStreamEvent =
@@ -111,23 +121,26 @@ export default function Search() {
   const { enqueue } = useArtistPrefetch({ drainMs: 520 })
 
   const [cachedIds, setCachedIds] = useState<Set<string>>(new Set())
-  const [recentSearches, setRecentSearches] = useState<string[]>([])
 
-  // Load recent searches from localStorage
-  useEffect(() => {
-    try {
-      const stored = localStorage.getItem(RECENT_SEARCHES_KEY)
-      if (stored) setRecentSearches(JSON.parse(stored))
-    } catch {}
-  }, [])
+  const { data: recentSearches = [], refetch: refetchSearchHistory } = useQuery({
+    queryKey: ['search-history'],
+    queryFn: fetchSearchHistory,
+    enabled: !!token,
+  })
 
-  // Save search term to recent searches
-  function saveSearchTerm(q: string) {
-    if (!q.trim() || q.length < 2) return
-    const trimmed = q.trim()
-    const next = [trimmed, ...recentSearches.filter(s => s !== trimmed)].slice(0, MAX_RECENT)
-    setRecentSearches(next)
-    localStorage.setItem(RECENT_SEARCHES_KEY, JSON.stringify(next))
+  const clearHistoryMutation = useMutation({
+    mutationFn: clearSearchHistory,
+    onSuccess: () => {
+      queryClient.setQueryData<string[]>(['search-history'], [])
+    },
+  })
+
+  function handleClearSearchHistory() {
+    clearHistoryMutation.mutate()
+  }
+
+  function handleRecentSearchClick(term: string) {
+    setQuery(term)
   }
 
   useEffect(() => {
@@ -161,7 +174,7 @@ export default function Search() {
       .then((result) => {
         if (!controller.signal.aborted) {
           setHybridData(result)
-          saveSearchTerm(q)
+          refetchSearchHistory()
           setHybridLoading(false)
         }
       })
@@ -205,12 +218,17 @@ export default function Search() {
     queryKey: ['search-local', debouncedQuery],
     queryFn: async () => {
       const result = await searchLocal(debouncedQuery)
-      saveSearchTerm(debouncedQuery)
       return result
     },
     enabled:
       debouncedQuery.length > 2 && localOnly && isPlausibleSearchQuery(debouncedQuery),
   })
+
+  useEffect(() => {
+    if (localResults) {
+      refetchSearchHistory()
+    }
+  }, [localResults])
 
   const isLoading = localOnly ? localLoading : hybridLoading
   const error = localOnly ? localError : hybridError
@@ -403,10 +421,7 @@ export default function Search() {
               Recent Searches
             </span>
             <button
-              onClick={() => {
-                setRecentSearches([])
-                localStorage.removeItem(RECENT_SEARCHES_KEY)
-              }}
+              onClick={handleClearSearchHistory}
               style={{
                 fontFamily: "'Barlow Condensed', sans-serif",
                 fontSize: 12,
@@ -423,7 +438,7 @@ export default function Search() {
             {recentSearches.map((term, i) => (
               <button
                 key={i}
-                onClick={() => setQuery(term)}
+                onClick={() => handleRecentSearchClick(term)}
                 className="px-3 py-1 rounded text-sm transition-colors"
                 style={{
                   background: '#1A1210',

@@ -8,10 +8,15 @@ interface TrackRowFullProps {
   downloadState?: { status: string; percent?: number }
   coverBatchLoading?: boolean
   playlistStyleCover?: boolean
+  showAlbum?: boolean
+  showStatus?: boolean
+  showDuration?: boolean
+  showCover?: boolean
   onCoverResolved?: (recordingMbid: string, url: string) => void
   onPlay: (track: any) => void
   onContextMenu?: (e: React.MouseEvent, track: any) => void
   onHoverArtist?: (artistId: string, albumIds?: string[]) => void
+  style?: React.CSSProperties
 }
 
 /**
@@ -26,18 +31,24 @@ export default function TrackRowFull({
   downloadState,
   coverBatchLoading = false,
   playlistStyleCover = false,
+  showAlbum = true,
+  showStatus = true,
+  showDuration = false,
+  showCover = true,
   onCoverResolved,
   onPlay,
   onContextMenu,
   onHoverArtist,
+  style,
 }: TrackRowFullProps) {
   return (
     <TrackRow
       track={track}
       index={index}
-      showAlbum
-      showStatus
-      showCover
+      showAlbum={showAlbum}
+      showStatus={showStatus}
+      showDuration={showDuration}
+      showCover={showCover}
       coverBatchLoading={coverBatchLoading}
       playlistStyleCover={playlistStyleCover}
       onCoverResolved={onCoverResolved}
@@ -47,6 +58,7 @@ export default function TrackRowFull({
       onPlay={onPlay}
       onContextMenu={onContextMenu}
       onHoverArtist={onHoverArtist}
+      style={style}
     />
   )
 }

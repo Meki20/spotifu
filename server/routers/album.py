@@ -30,11 +30,13 @@ async def get_album(
                 mb_id=t.get("mbid", ""),
                 title=t.get("title", ""),
                 artist=t.get("artist", data.get("artist", "")),
+                artist_credit=t.get("artist_credit"),
                 album=t.get("album", data.get("title", "")),
                 album_cover=t.get("cover") or t.get("album_cover"),
                 duration=t.get("duration", 0),
                 is_cached=bool(t.get("is_cached")),
-                mb_release_id=t.get("mbid") or t.get("mb_release_id"),
+                mb_release_id=t.get("mb_release_id"),
+                mb_release_group_id=t.get("mb_release_group_id"),
                 mb_artist_id=t.get("mb_artist_id"),
             )
             for t in tracks

@@ -2440,23 +2440,37 @@ async def _get_release_with_tracks(release_mbid: str, *, light: bool = False) ->
 
         artist_credit = data.get("artist-credit", [{}])
         artist_mbid = artist_credit[0].get("artist", {}).get("id") if artist_credit else None
-        track_rows = [
-            {
-                "mbid": r.get("recording", {}).get("id") or r.get("id"),
-                "title": r.get("title", "") or r.get("recording", {}).get("title", ""),
-                "duration": r.get("length", 0) // 1000 if r.get("length") else 0,
-                "position": r.get("position", 0),
-                "preview_url": None,
-                "source": "musicbrainz",
-            }
-            for r in data.get("media", [{}])[0].get("tracks", [])
-            if r.get("recording", {}).get("id") or r.get("id")
-        ]
+        rg = data.get("release-group")
+        rg_id = rg.get("id") if isinstance(rg, dict) else None
+        track_rows = []
+        for r in data.get("media", [{}])[0].get("tracks", []):
+            rec = r.get("recording", {}) or {}
+            rec_id = rec.get("id") if isinstance(rec, dict) else None
+            track_id = rec_id or r.get("id")
+            if not track_id:
+                continue
+            track_artist_credit = _artist_credit_string(rec) if rec else ""
+            track_mb_artist_id = _first_artist_mbid_from_recording(rec) if rec else None
+            track_rows.append(
+                {
+                    "mbid": track_id,
+                    "title": r.get("title", "") or (rec.get("title", "") if rec else ""),
+                    "duration": r.get("length", 0) // 1000 if r.get("length") else 0,
+                    "position": r.get("position", 0),
+                    "preview_url": None,
+                    "source": "musicbrainz",
+                    "artist_credit": track_artist_credit,
+                    "mb_artist_id": track_mb_artist_id,
+                    "mb_release_id": data["id"],
+                    "mb_release_group_id": rg_id,
+                }
+            )
         return {
             "mbid": data["id"],
             "title": data.get("title", ""),
             "artist": artist_credit[0].get("name", "") if artist_credit else "",
             "artist_mb_id": artist_mbid,
+            "mb_release_group_id": rg_id,
             "cover": cover_url,
             "release_date": data.get("date"),
             "nb_tracks": len(track_rows),

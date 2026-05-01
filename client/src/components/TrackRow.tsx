@@ -1,6 +1,6 @@
 import { memo } from 'react'
 import { Play, Computer } from 'lucide-react'
-import { displayArtist } from '../utils/trackHelpers'
+import { displayArtist, formatDuration } from '../utils/trackHelpers'
 import { PollyLoading } from './PollyLoading'
 import PlaylistTrackCover from './PlaylistTrackCover'
 
@@ -13,6 +13,7 @@ interface TrackRowProps {
   index?: number
   showAlbum?: boolean
   showStatus?: boolean
+  showDuration?: boolean
   showCover?: boolean
   /** Pulse placeholder while batch cover URLs are still loading (``mb_id`` but no ``album_cover``). */
   coverBatchLoading?: boolean
@@ -33,6 +34,7 @@ const TrackRowImpl = ({
   index,
   showAlbum = false,
   showStatus = false,
+  showDuration = false,
   showCover = true,
   coverBatchLoading = false,
   playlistStyleCover = false,
@@ -165,6 +167,14 @@ const TrackRowImpl = ({
           )}
         </span>
       )}
+      {!showStatus && showDuration && (
+        <span
+          className="text-xs tabular-nums text-right shrink-0"
+          style={{ fontFamily: "'Barlow Semi Condensed', monospace", color: '#4A413C' }}
+        >
+          {downloadState?.status === 'downloading' ? `${downloadState.percent ?? 0}%` : formatDuration(track.duration)}
+        </span>
+      )}
     </div>
   )
 }
@@ -181,6 +191,7 @@ export default memo(TrackRowImpl, (prev, next) => {
     prev.downloadState?.percent === next.downloadState?.percent &&
     prev.isPlaying === next.isPlaying &&
     prev.isCached === next.isCached &&
+    prev.showDuration === next.showDuration &&
     prev.onPlay === next.onPlay
   )
 })

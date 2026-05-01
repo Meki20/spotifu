@@ -10,7 +10,8 @@ import { requestMbDownload } from '../stores/downloadBusyStore'
 import { useDownloadStates } from '../hooks/useDownloadStates'
 import { useArtistPrefetch } from '../hooks/useArtistPrefetch'
 import ContextMenu from '../components/ContextMenu'
-import { toTrack, formatDuration } from '../utils/trackHelpers'
+import TrackRowFull from '../components/TrackRowFull'
+import { toTrack } from '../utils/trackHelpers'
 import { PollyLoading } from '../components/PollyLoading'
 import { fetchReleaseGroupCover } from '../api/covers'
 
@@ -24,9 +25,10 @@ function albumTrackToControllerTrack(track: any, album: any, cover: string | nul
   return toTrack(track, {
     album: album?.title ?? '',
     album_cover: cover ?? album?.cover ?? null,
-    mb_release_id: album?.id?.includes('-') ? album.id : null,
-    mb_release_group_id: album?.id?.includes('-') ? album.id : null,
-    mb_artist_id: album?.artist_mb_id ?? null,
+    mb_release_id: album?.mbid ?? null,
+    mb_release_group_id: album?.mb_release_group_id ?? null,
+    mb_artist_id: track?.mb_artist_id ?? album?.artist_mb_id ?? null,
+    artist_credit: track?.artist_credit ?? null,
   })
 }
 
@@ -51,6 +53,8 @@ export default function AlbumPage() {
       return res.json()
     },
     enabled: !!albumId,
+    staleTime: 1000 * 60 * 10,
+    gcTime: 1000 * 60 * 30,
   })
 
   const [cover, setCover] = useState<string | null>(null)
@@ -210,7 +214,7 @@ export default function AlbumPage() {
 
       <div className="px-6 pb-10">
         <div
-          className="grid grid-cols-[auto_1fr_auto] gap-4 px-1 py-2 text-xs uppercase tracking-widest"
+          className="grid grid-cols-[auto_1fr_auto] gap-4 px-4 py-2 text-xs uppercase tracking-widest"
           style={{
             fontFamily: "'Barlow Condensed', sans-serif",
             fontWeight: 700,
@@ -227,57 +231,21 @@ export default function AlbumPage() {
           const isCurrentlyPlaying = hasCur && Boolean(tid) && curMb === tid
           const mbid = tid || ''
           const isCached = Boolean(track.is_cached) || (mbid !== '' && cachedMbIds.has(mbid))
-          const titleColor = isCurrentlyPlaying ? '#b4003e' : isCached ? '#E8DDD0' : '#4A413C'
-          const downloadPercent = mbid ? downloadStates[mbid]?.percent : undefined
-          const isDownloading = mbid ? downloadStates[mbid]?.status === 'downloading' : false
           return (
-            <div
+            <TrackRowFull
               key={track.mb_id || i}
-              className="grid grid-cols-[auto_1fr_auto] gap-4 px-1 py-2 items-center rounded cursor-pointer group"
-              style={{ borderBottom: '1px solid #1A1210' }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.background = '#1A1210'
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.background = 'transparent'
-              }}
-              onClick={() => playTrack(track)}
+              track={track}
+              index={i}
+              isPlaying={isCurrentlyPlaying}
+              isCached={isCached}
+              downloadState={mbid ? downloadStates[mbid] : undefined}
+              showAlbum={false}
+              showStatus={false}
+              showDuration
+              showCover={false}
+              onPlay={() => playTrack(track)}
               onContextMenu={(e) => handleContextMenu(e, track)}
-            >
-              <div className="relative w-8 h-8 shrink-0 flex items-center justify-center">
-                <span
-                  className="text-sm tabular-nums group-hover:hidden"
-                  style={{
-                    fontFamily: "'Barlow Semi Condensed', monospace",
-                    color: isCurrentlyPlaying ? '#b4003e' : '#4A413C',
-                  }}
-                >
-                  {isCurrentlyPlaying ? '▶' : i + 1}
-                </span>
-                <span
-                  className="absolute inset-0 hidden group-hover:flex items-center justify-center"
-                  style={{ color: '#b4003e' }}
-                >
-                  <Play size={12} fill="currentColor" className="shrink-0" />
-                </span>
-              </div>
-              <p
-                className="min-w-0 text-sm truncate"
-                style={{
-                  fontFamily: "'Barlow Semi Condensed', monospace",
-                  color: titleColor,
-                  fontWeight: isCurrentlyPlaying ? 600 : 400,
-                }}
-              >
-                {track.title}
-              </p>
-              <span
-                className="text-xs tabular-nums text-right shrink-0"
-                style={{ fontFamily: "'Barlow Semi Condensed', monospace", color: '#4A413C' }}
-              >
-                {isDownloading ? `${downloadPercent ?? 0}%` : formatDuration(track.duration)}
-              </span>
-            </div>
+            />
           )
         })}
       </div>
@@ -286,13 +254,18 @@ export default function AlbumPage() {
         <ContextMenu
           x={contextMenu.x}
           y={contextMenu.y}
-          track={{ ...contextMenu.track, artist: contextMenu.track.artist ?? album?.artist }}
+          track={albumTrackToControllerTrack(contextMenu.track, album, displayCover)}
           onPlay={() => { playTrack(contextMenu.track); setContextMenu(null) }}
           onDownload={() => { downloadTrack(contextMenu.track); setContextMenu(null) }}
-          onAddToQueue={() => { controller.addToQueue(toTrack(contextMenu.track)); setContextMenu(null) }}
+          onAddToQueue={() => { controller.addToQueue(albumTrackToControllerTrack(contextMenu.track, album, displayCover)); setContextMenu(null) }}
           onGoToArtist={() => {
-            const aid = album?.artist_mb_id
+            const aid = contextMenu.track?.mb_artist_id ?? album?.artist_mb_id
             if (aid) navigate(`/artist/${aid}`)
+            setContextMenu(null)
+          }}
+          onGoToAlbum={() => {
+            const albumIdNav = album?.mb_release_group_id ?? album?.mbid ?? albumId
+            if (albumIdNav) navigate(`/album/${albumIdNav}`)
             setContextMenu(null)
           }}
           onClose={() => setContextMenu(null)}

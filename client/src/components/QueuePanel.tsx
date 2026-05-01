@@ -13,6 +13,19 @@ function NowPlayingCard({ track }: { track: Track }) {
   const artists = displayStr.split(',').map((s) => s.trim()).filter(Boolean)
   const mainArtistName = artists[0] || ''
   const extraArtists = artists.slice(1)
+
+  const goToArtistByName = async (name: string) => {
+    try {
+      const res = await authFetch(`/artist?q=${encodeURIComponent(name)}`)
+      if (!res.ok) return
+      const data = (await res.json()) as { artist_mbid?: string }
+      if (data.artist_mbid) {
+        navigate(`/artist/${data.artist_mbid}`)
+      }
+    } catch {
+      // ignore
+    }
+  }
   return (
     <div className="w-full">
       <div
@@ -57,7 +70,17 @@ function NowPlayingCard({ track }: { track: Track }) {
             {mainArtistName}
           </span>
           {extraArtists.map((name, i) => (
-            <span key={i} style={{ color: 'rgba(232,221,208,0.70)' }}>{`, ${name}`}</span>
+            <span
+              key={i}
+              className="hover:underline cursor-pointer"
+              style={{ color: 'rgba(232,221,208,0.70)' }}
+              onClick={(e) => {
+                e.stopPropagation()
+                goToArtistByName(name)
+              }}
+            >
+              {`, ${name}`}
+            </span>
           ))}
         </div>
         <div

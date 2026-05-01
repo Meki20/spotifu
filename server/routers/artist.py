@@ -3,10 +3,10 @@ import difflib
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
-from sqlmodel import Session
+from sqlmodel import Session, select
 from database import get_session
 from deps import get_current_user, require_permission, CurrentUser
-from models import User
+from models import User, MbArtist, MbArtistAlias
 from services.artist_alias_cache import norm_alias, upsert_from_mb_artist_json
 from services.providers import MetadataService
 from services.providers import musicbrainz
@@ -125,6 +125,63 @@ async def search_artist(
     if not query_norm:
         raise HTTPException(status_code=400, detail="Query is empty")
 
+    # --- Try alias cache first ---
+    try:
+        alias_row = session.exec(
+            select(MbArtistAlias, MbArtist)
+            .join(MbArtist, MbArtistAlias.artist_mbid == MbArtist.artist_mbid)
+            .where(MbArtistAlias.alias_norm == query_norm)
+        ).first()
+    except Exception:
+        alias_row = None
+
+    if alias_row:
+        alias_rec, artist_rec = alias_row
+        mbid = artist_rec.artist_mbid
+        name = artist_rec.canonical_name
+
+        # Gather all aliases for this artist
+        try:
+            alias_rows = session.exec(
+                select(MbArtistAlias).where(MbArtistAlias.artist_mbid == mbid)
+            ).all()
+            aliases = list({a.alias_raw for a in alias_rows if a.alias_raw})
+        except Exception:
+            aliases = []
+
+        # Image cache lookup (same as MB-hit path)
+        ft = _get_cache("cover_fanart_artist", mbid)
+        adb = _get_cache("cover_audiodb_artist", mbid)
+        ddg = _get_cache("cover_ddg_thumb", name)
+        image_url = (
+            (ft or {}).get("thumb")
+            or (adb or {}).get("thumb")
+            or (ddg or {}).get("thumb")
+            or None
+        )
+
+        if not image_url:
+            try:
+                svc = MetadataService(session)
+                asyncio.create_task(svc.load_artist_visuals(mbid, artist_name=name))
+            except Exception:
+                pass
+
+        return ArtistSearchResponse(
+            artist_mbid=mbid,
+            name=name,
+            sort_name=artist_rec.sort_name,
+            disambiguation=None,
+            country=None,
+            type=None,
+            score=0.0,
+            mb_score=0,
+            match_type="cache",
+            aliases=aliases,
+            image_url=image_url,
+        )
+
+    # --- Cache miss: fall through to MusicBrainz ---
     async with musicbrainz.mb_interactive_calls():
         resp = await musicbrainz._mb_get(
             f"{musicbrainz.MUSICBRAINZ_API}/artist",

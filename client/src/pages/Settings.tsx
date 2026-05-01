@@ -70,6 +70,7 @@ export default function Settings() {
   const [detectNewFilesOpen, setDetectNewFilesOpen] = useState(false)
   const [adminUsers, setAdminUsers] = useState<UserWithPermissions[]>([])
   const [adminUsersLoading, setAdminUsersLoading] = useState(false)
+  const [expandedUserId, setExpandedUserId] = useState<number | null>(null)
   const prefetch = usePrefetchSettingsStore((s) => s.prefetch)
   const applyServerPrefetch = usePrefetchSettingsStore((s) => s.applyServerPrefetch)
   const trackListRef = useRef<HTMLDivElement>(null)
@@ -514,101 +515,6 @@ export default function Settings() {
         Settings
       </h1>
 
-      {isAdmin && (
-        <section className="mb-6 p-4 rounded" style={{ background: '#1A1210', border: '1px solid #3D2820' }}>
-          <div style={sectionLabelStyle}>User Management</div>
-          {adminUsersLoading ? (
-            <p style={{ color: '#9A8E84' }}>Loading users...</p>
-          ) : (
-            <div className="space-y-3 mt-4">
-              {adminUsers.map((user) => (
-                <div key={user.id} className="p-4 rounded" style={{ background: '#261A14', border: '1px solid #3D2820' }}>
-                  <div className="flex items-center justify-between mb-3">
-                    <div className="flex items-center gap-3">
-                      <div
-                        className="w-10 h-10 rounded-full flex items-center justify-center"
-                        style={{ background: '#b4003e' }}
-                      >
-                        <span className="text-white font-bold text-lg">{user.username[0].toUpperCase()}</span>
-                      </div>
-                      <div>
-                        <span className="text-white font-medium text-lg">{user.username}</span>
-                        {user.is_admin && (
-                          <span
-                            className="ml-2 text-xs px-2 py-0.5 rounded"
-                            style={{ background: '#b4003e', color: '#E8DDD0' }}
-                          >
-                            Admin
-                          </span>
-                        )}
-                      </div>
-                    </div>
-                    {!user.is_admin && (
-                      <button
-                        onClick={() => handleDeleteUser(user.id)}
-                        className="p-2 rounded transition-colors"
-                        style={{ background: 'rgba(196, 48, 43, 0.15)', color: '#b4003e' }}
-                        title="Delete user"
-                      >
-                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                          <path d="M3 6h18"></path>
-                          <path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"></path>
-                          <path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"></path>
-                        </svg>
-                      </button>
-                    )}
-                  </div>
-
-                  {user.is_admin ? (
-                    <div className="flex gap-4 text-sm" style={{ color: '#9A8E84' }}>
-                      <span>Has full access to all features</span>
-                    </div>
-                  ) : (
-                    <div className="grid grid-cols-2 gap-3">
-                      <div className="flex items-center justify-between p-2 rounded" style={{ background: '#1A1210' }}>
-                        <span className="text-sm" style={{ color: '#E8DDD0' }}>Play tracks</span>
-                        <Toggle
-                          on={user.permissions?.can_play ?? false}
-                          onChange={(v) => handlePermissionChange(user.id, 'can_play', v)}
-                        />
-                      </div>
-                      <div className="flex items-center justify-between p-2 rounded" style={{ background: '#1A1210' }}>
-                        <span className="text-sm" style={{ color: '#E8DDD0' }}>Download tracks</span>
-                        <Toggle
-                          on={user.permissions?.can_download ?? false}
-                          onChange={(v) => handlePermissionChange(user.id, 'can_download', v)}
-                        />
-                      </div>
-                      <div className="flex items-center justify-between p-2 rounded" style={{ background: '#1A1210' }}>
-                        <span className="text-sm" style={{ color: '#E8DDD0' }}>Use Soulseek</span>
-                        <Toggle
-                          on={user.permissions?.can_use_soulseek ?? false}
-                          onChange={(v) => handlePermissionChange(user.id, 'can_use_soulseek', v)}
-                        />
-                      </div>
-                      <div className="flex items-center justify-between p-2 rounded" style={{ background: '#1A1210' }}>
-                        <span className="text-sm" style={{ color: '#E8DDD0' }}>Access APIs</span>
-                        <Toggle
-                          on={user.permissions?.can_access_apis ?? false}
-                          onChange={(v) => handlePermissionChange(user.id, 'can_access_apis', v)}
-                        />
-                      </div>
-                      <div className="flex items-center justify-between p-2 rounded" style={{ background: '#1A1210' }}>
-                        <span className="text-sm" style={{ color: '#E8DDD0' }}>View Recently Downloaded</span>
-                        <Toggle
-                          on={user.permissions?.can_view_recently_downloaded ?? false}
-                          onChange={(v) => handlePermissionChange(user.id, 'can_view_recently_downloaded', v)}
-                        />
-                      </div>
-                    </div>
-                  )}
-                </div>
-              ))}
-            </div>
-          )}
-        </section>
-      )}
-
       {/* Soulseek section */}
       <section className="mb-6">
         <div style={sectionLabelStyle}>Soulseek / Downloads</div>
@@ -769,6 +675,118 @@ export default function Settings() {
           />
         </div>
       </section>
+
+      {isAdmin && (
+        <section className="mb-6 p-4 rounded" style={{ background: '#1A1210', border: '1px solid #3D2820' }}>
+          <div style={sectionLabelStyle}>User Management</div>
+          {adminUsersLoading ? (
+            <p style={{ color: '#9A8E84' }}>Loading users...</p>
+          ) : (
+            <div className="space-y-2 mt-4">
+              {adminUsers.map((user) => {
+                const isExpanded = expandedUserId === user.id
+                return (
+                  <div key={user.id} className="rounded" style={{ background: isExpanded ? '#261A14' : '#1A1210', border: '1px solid #3D2820' }}>
+                    <button
+                      onClick={() => setExpandedUserId(isExpanded ? null : user.id)}
+                      className="w-full flex items-center justify-between p-3"
+                    >
+                      <div className="flex items-center gap-3">
+                        <div
+                          className="w-8 h-8 rounded-full flex items-center justify-center"
+                          style={{ background: '#b4003e' }}
+                        >
+                          <span className="text-white font-bold">{user.username[0].toUpperCase()}</span>
+                        </div>
+                        <div className="text-left">
+                          <span className="text-white font-medium">{user.username}</span>
+                          {user.is_admin && (
+                            <span
+                              className="ml-2 text-xs px-1.5 py-0.5 rounded"
+                              style={{ background: '#b4003e', color: '#E8DDD0' }}
+                            >
+                              Admin
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                      <svg
+                        xmlns="http://www.w3.org/2000/svg"
+                        width="16"
+                        height="16"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="#9A8E84"
+                        strokeWidth="2"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        style={{ transform: isExpanded ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 0.2s' }}
+                      >
+                        <path d="M6 9l6 6 6-6"></path>
+                      </svg>
+                    </button>
+
+                    {isExpanded && (
+                      <div className="px-3 pb-3">
+                        {user.is_admin ? (
+                          <div className="text-sm p-3 rounded" style={{ background: '#1A1210', color: '#9A8E84' }}>
+                            Has full access to all features
+                          </div>
+                        ) : (
+                          <div className="space-y-2">
+                            <div className="flex items-center justify-between p-2 rounded" style={{ background: '#1A1210' }}>
+                              <span className="text-sm" style={{ color: '#E8DDD0' }}>Play tracks</span>
+                              <Toggle
+                                on={user.permissions?.can_play ?? false}
+                                onChange={(v) => handlePermissionChange(user.id, 'can_play', v)}
+                              />
+                            </div>
+                            <div className="flex items-center justify-between p-2 rounded" style={{ background: '#1A1210' }}>
+                              <span className="text-sm" style={{ color: '#E8DDD0' }}>Download tracks</span>
+                              <Toggle
+                                on={user.permissions?.can_download ?? false}
+                                onChange={(v) => handlePermissionChange(user.id, 'can_download', v)}
+                              />
+                            </div>
+                            <div className="flex items-center justify-between p-2 rounded" style={{ background: '#1A1210' }}>
+                              <span className="text-sm" style={{ color: '#E8DDD0' }}>Use Soulseek</span>
+                              <Toggle
+                                on={user.permissions?.can_use_soulseek ?? false}
+                                onChange={(v) => handlePermissionChange(user.id, 'can_use_soulseek', v)}
+                              />
+                            </div>
+                            <div className="flex items-center justify-between p-2 rounded" style={{ background: '#1A1210' }}>
+                              <span className="text-sm" style={{ color: '#E8DDD0' }}>Access APIs</span>
+                              <Toggle
+                                on={user.permissions?.can_access_apis ?? false}
+                                onChange={(v) => handlePermissionChange(user.id, 'can_access_apis', v)}
+                              />
+                            </div>
+                            <div className="flex items-center justify-between p-2 rounded" style={{ background: '#1A1210' }}>
+                              <span className="text-sm" style={{ color: '#E8DDD0' }}>View Recently Downloaded</span>
+                              <Toggle
+                                on={user.permissions?.can_view_recently_downloaded ?? false}
+                                onChange={(v) => handlePermissionChange(user.id, 'can_view_recently_downloaded', v)}
+                              />
+                            </div>
+                            <button
+                              onClick={() => handleDeleteUser(user.id)}
+                              className="w-full p-2 rounded transition-colors mt-2"
+                              style={{ background: 'rgba(196, 48, 43, 0.15)', color: '#b4003e' }}
+                            >
+                              Delete user
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                )
+              })}
+            </div>
+          )}
+        </section>
+      )}
 
       {/* Prefetching */}
       <section className="mb-6">

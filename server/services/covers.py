@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import json
 import logging
 import os
@@ -18,6 +19,12 @@ EntityKind = Literal["recording", "release", "release_group"]
 
 _POS_TTL = timedelta(days=180)
 _NEG_TTL = timedelta(hours=24)
+
+# Be nice to CAA: limit concurrent requests so we don't hammer their free service.
+_CAA_SEMAPHORE = asyncio.Semaphore(3)
+
+# In-flight CAA request coalescing: "caa:{kind}:{mbid}" -> Future[url|None]
+_caa_inflight: dict[str, asyncio.Future[str | None]] = {}
 
 
 @dataclass(frozen=True)
@@ -66,6 +73,225 @@ def _read_cached_cover(session: Session, *, entity_kind: EntityKind, entity_id: 
     if age <= _NEG_TTL:
         return CoverResult(url=None, hit=True)
     return None
+
+
+def _read_cached_cover_with_fallback(
+    session: Session, *, entity_kind: EntityKind, entity_id: str
+) -> CoverResult | None:
+    """Read cached cover with recording→release→release_group fallback.
+
+    For recordings, if the direct recording cache misses, look up local release/rg IDs
+    and check if *those* already have a cached cover. If so, backfill the recording
+    link in the same session so future requests are direct hits.
+    """
+    direct = _read_cached_cover(session, entity_kind=entity_kind, entity_id=entity_id)
+    if direct is not None:
+        return direct
+
+    if entity_kind != "recording":
+        return None
+
+    ids_map = _resolve_recording_ids_local(session, [entity_id])
+    meta = ids_map.get(entity_id, {})
+    rel_id = meta.get("release")
+    rg_id = meta.get("release_group")
+    if not rel_id and not rg_id:
+        return None
+
+    clauses: list[str] = []
+    params: dict[str, str] = {}
+    if rel_id:
+        clauses.append("(cl.entity_kind = 'release' AND cl.entity_id = :rel)")
+        params["rel"] = rel_id
+    if rg_id:
+        clauses.append("(cl.entity_kind = 'release_group' AND cl.entity_id = :rg)")
+        params["rg"] = rg_id
+
+    where = " OR ".join(clauses)
+    row = session.exec(
+        text(
+            f"""
+            SELECT ca.id, ca.url
+            FROM cover_links cl
+            JOIN cover_assets ca ON ca.id = cl.asset_id
+            WHERE cl.found = TRUE AND ({where})
+            ORDER BY CASE cl.entity_kind
+                WHEN 'release' THEN 1
+                WHEN 'release_group' THEN 2
+                ELSE 9
+            END,
+            cl.fetched_at DESC
+            LIMIT 1
+            """
+        ),
+        params=params,
+    ).first()
+
+    if not row:
+        return None
+
+    asset_id, url = row
+    # Backfill recording link so next time it's a direct cache hit.
+    _upsert_link(
+        session,
+        entity_kind="recording",
+        entity_id=entity_id,
+        asset_id=int(asset_id),
+        found=True,
+        source="fallback",
+    )
+    return CoverResult(url=str(url) if url else None, hit=False)
+
+
+def _read_cached_covers_batch(
+    session: Session, *, entity_kind: EntityKind, entity_ids: list[str]
+) -> dict[str, CoverResult]:
+    """Batch read cover cache. Returns only valid (non-stale) entries."""
+    if not entity_ids:
+        return {}
+
+    placeholders = ", ".join(f":p{i}" for i in range(len(entity_ids)))
+    params: dict[str, Any] = {f"p{i}": v for i, v in enumerate(entity_ids)}
+    params["kind"] = entity_kind
+
+    rows = session.exec(
+        text(
+            f"""
+            SELECT cl.entity_id, cl.found, cl.fetched_at, ca.url
+            FROM cover_links cl
+            LEFT JOIN cover_assets ca ON ca.id = cl.asset_id
+            WHERE cl.entity_kind = :kind AND cl.entity_id IN ({placeholders})
+            """
+        ),
+        params=params,
+    ).all()
+
+    out: dict[str, CoverResult] = {}
+    now = _now_utc()
+    for eid, found, fetched_at, url in rows:
+        try:
+            age = now - fetched_at
+        except Exception:
+            age = _POS_TTL
+
+        if bool(found):
+            if age <= _POS_TTL:
+                out[eid] = CoverResult(url=str(url) if url else None, hit=True)
+            # stale positive: omit so caller treats as miss
+        else:
+            if age <= _NEG_TTL:
+                out[eid] = CoverResult(url=None, hit=True)
+            # stale negative: omit so caller treats as miss
+
+    return out
+
+
+def _resolve_recording_ids_local(session: Session, mbids: list[str]) -> dict[str, dict[str, str]]:
+    """Look up mb_release_id / mb_release_group_id for recording MBIDs from local tables."""
+    if not mbids:
+        return {}
+
+    out: dict[str, dict[str, str]] = {}
+    placeholders = ", ".join(f":p{i}" for i in range(len(mbids)))
+    params: dict[str, Any] = {f"p{i}": v for i, v in enumerate(mbids)}
+
+    # tracks
+    rows = session.exec(
+        text(
+            f"SELECT mb_id, mb_release_id, mb_release_group_id FROM tracks WHERE mb_id IN ({placeholders})"
+        ),
+        params=params,
+    ).all()
+    for mb_id, rel_id, rg_id in rows:
+        d = out.setdefault(mb_id, {})
+        if rel_id:
+            d["release"] = rel_id
+        if rg_id:
+            d["release_group"] = rg_id
+
+    # playlist_items
+    rows = session.exec(
+        text(
+            f"SELECT mb_recording_id, mb_release_id, mb_release_group_id FROM playlist_items WHERE mb_recording_id IN ({placeholders})"
+        ),
+        params=params,
+    ).all()
+    for mb_id, rel_id, rg_id in rows:
+        d = out.setdefault(mb_id, {})
+        if rel_id and "release" not in d:
+            d["release"] = rel_id
+        if rg_id and "release_group" not in d:
+            d["release_group"] = rg_id
+
+    # mb_lookup_cache
+    rows = session.exec(
+        text(
+            f"SELECT mb_id, mb_release_id, mb_release_group_id FROM mb_lookup_cache WHERE mb_id IN ({placeholders})"
+        ),
+        params=params,
+    ).all()
+    for mb_id, rel_id, rg_id in rows:
+        d = out.setdefault(mb_id, {})
+        if rel_id and "release" not in d:
+            d["release"] = rel_id
+        if rg_id and "release_group" not in d:
+            d["release_group"] = rg_id
+
+    return out
+
+
+async def _caa_fetch_direct(kind: Literal["release", "release_group"], mbid: str) -> str | None:
+    """Fetch cover from CAA with concurrency limit and request coalescing."""
+    cache_key = f"caa:{kind}:{mbid}"
+
+    existing = _caa_inflight.get(cache_key)
+    if existing is not None:
+        return await existing
+
+    loop = asyncio.get_running_loop()
+    fut = loop.create_future()
+    _caa_inflight[cache_key] = fut
+
+    try:
+        async with _CAA_SEMAPHORE:
+            from services.providers._http import CAA_CLIENT
+
+            path = f"/release-group/{mbid}/front-250" if kind == "release_group" else f"/release/{mbid}/front-250"
+
+            for attempt in range(3):
+                try:
+                    resp = await CAA_CLIENT.get(path)
+                    if resp.status_code == 200:
+                        content_type = resp.headers.get("content-type", "")
+                        if "image" in content_type:
+                            url = str(resp.url)
+                            fut.set_result(url)
+                            return url
+                        fut.set_result(None)
+                        return None
+                    if resp.status_code == 404:
+                        fut.set_result(None)
+                        return None
+                    if resp.status_code in (429, 502, 503, 504) and attempt < 2:
+                        await asyncio.sleep(0.5 * (attempt + 1))
+                        continue
+                    fut.set_result(None)
+                    return None
+                except (Exception):
+                    if attempt < 2:
+                        await asyncio.sleep(0.3)
+                        continue
+                    fut.set_result(None)
+                    return None
+    except asyncio.CancelledError:
+        fut.cancel()
+        raise
+    except Exception as e:
+        if not fut.done():
+            fut.set_exception(e)
+        raise
+    finally:
+        _caa_inflight.pop(cache_key, None)
 
 
 def _upsert_asset(session: Session, *, url: str) -> int:
@@ -134,79 +360,50 @@ async def _fetch_cover_url(kind: EntityKind, entity_id: str) -> tuple[str | None
         - url: cover url or None
         - meta_ids: optional mapping of discovered ids: {release, release_group}
     """
-    from services.providers import musicbrainz
-
     if kind == "release_group":
-        # Uses existing provider helper (may still touch legacy MBEntityCache; ok for now).
-        from services.providers.musicbrainz import _caa_release_group_front_url, CAA_SIZE_LIST
-
-        async with musicbrainz.mb_interactive_calls():
-            url = await _caa_release_group_front_url(entity_id, CAA_SIZE_LIST)
+        url = await _caa_fetch_direct("release_group", entity_id)
         return (url if isinstance(url, str) and url else None), None
 
     if kind == "release":
-        from services.providers.musicbrainz import _caa_front_url, CAA_SIZE_LIST
-
-        async with musicbrainz.mb_interactive_calls():
-            url = await _caa_front_url(entity_id, CAA_SIZE_LIST)
+        url = await _caa_fetch_direct("release", entity_id)
         return (url if isinstance(url, str) and url else None), None
 
-    # recording
-    async with musicbrainz.mb_interactive_calls():
-        meta = await musicbrainz.get_track(entity_id)
-    url = (meta or {}).get("album_cover")
-    url_str = url if isinstance(url, str) and url else None
+    # recording: resolve release/rg IDs locally first, then CAA, then MB fallback.
     meta_ids: dict[str, str] = {}
-    rid = (meta or {}).get("mb_release_id")
-    rgid = (meta or {}).get("mb_release_group_id")
-    if isinstance(rid, str) and rid:
-        meta_ids["release"] = rid
-    if isinstance(rgid, str) and rgid:
-        meta_ids["release_group"] = rgid
+    with Session(engine) as session:
+        ids_map = _resolve_recording_ids_local(session, [entity_id])
+        meta_ids = ids_map.get(entity_id, {})
 
-    # If MB didn't give us release IDs (e.g. no official_pick), derive them from raw recording payload.
-    if not meta_ids.get("release") and not meta_ids.get("release_group"):
-        try:
-            from services.providers.musicbrainz import _get_recording_with_releases, official_releases_latest_first
+    url_str = None
+    if meta_ids.get("release_group"):
+        url_str = await _caa_fetch_direct("release_group", meta_ids["release_group"])
+    if not url_str and meta_ids.get("release"):
+        url_str = await _caa_fetch_direct("release", meta_ids["release"])
 
-            async with musicbrainz.mb_interactive_calls():
-                raw = await _get_recording_with_releases(entity_id)
-            release_list = (raw or {}).get("releases") or []
-            if isinstance(release_list, list) and release_list:
-                official = official_releases_latest_first(release_list)
-                primary = official[0] if official else (release_list[0] if isinstance(release_list[0], dict) else {})
-                if isinstance(primary, dict):
-                    rid2 = primary.get("id")
-                    if isinstance(rid2, str) and rid2:
-                        meta_ids["release"] = rid2
-                    rg = primary.get("release-group") or {}
-                    if isinstance(rg, dict):
-                        rgid2 = rg.get("id")
-                        if isinstance(rgid2, str) and rgid2:
-                            meta_ids["release_group"] = rgid2
-        except Exception:
-            pass
-
-    # Fallback: if recording cover is missing, try album cover via RG/release.
+    # Fallback to MB API only if local IDs didn't yield a cover or weren't found.
     if not url_str:
-        try:
-            from services.providers.musicbrainz import (
-                _caa_front_url,
-                _caa_release_group_front_url,
-                CAA_SIZE_LIST,
-            )
+        from services.providers import musicbrainz
 
-            async with musicbrainz.mb_interactive_calls():
-                if meta_ids.get("release_group"):
-                    u = await _caa_release_group_front_url(meta_ids["release_group"], CAA_SIZE_LIST)
-                    if isinstance(u, str) and u:
-                        url_str = u
-                if not url_str and meta_ids.get("release"):
-                    u = await _caa_front_url(meta_ids["release"], CAA_SIZE_LIST)
-                    if isinstance(u, str) and u:
-                        url_str = u
-        except Exception:
-            pass
+        async with musicbrainz.mb_interactive_calls():
+            meta = await musicbrainz.get_track(entity_id)
+        url_str = (meta or {}).get("album_cover")
+        url_str = url_str if isinstance(url_str, str) and url_str else None
+        rid = (meta or {}).get("mb_release_id")
+        rgid = (meta or {}).get("mb_release_group_id")
+        if isinstance(rid, str) and rid:
+            meta_ids["release"] = rid
+        if isinstance(rgid, str) and rgid:
+            meta_ids["release_group"] = rgid
+
+        if not url_str:
+            if meta_ids.get("release_group"):
+                u = await _caa_fetch_direct("release_group", meta_ids["release_group"])
+                if isinstance(u, str) and u:
+                    url_str = u
+            if not url_str and meta_ids.get("release"):
+                u = await _caa_fetch_direct("release", meta_ids["release"])
+                if isinstance(u, str) and u:
+                    url_str = u
 
     # Final fallback: extract cover art from the downloaded local audio file.
     if not url_str:
@@ -382,8 +579,10 @@ async def get_cover_url(entity_kind: EntityKind, entity_id: str) -> CoverResult:
         return CoverResult(url=None, hit=True)
 
     with Session(engine) as session:
-        cached = _read_cached_cover(session, entity_kind=entity_kind, entity_id=entity_id)
+        cached = _read_cached_cover_with_fallback(session, entity_kind=entity_kind, entity_id=entity_id)
         if cached is not None:
+            # If it was a fallback hit, the recording link was already backfilled in the same session.
+            session.commit()
             return cached
 
     url, meta_ids = await _fetch_cover_url(entity_kind, entity_id)
@@ -418,18 +617,195 @@ async def get_cover_url(entity_kind: EntityKind, entity_id: str) -> CoverResult:
 
 
 async def get_cover_urls_batch(entity_kind: EntityKind, ids: list[str]) -> dict[str, str | None]:
-    # Basic sequential batch (keeps logic simple; can be optimized later).
+    """Batch cover resolution optimized for minimal DB connections and CAA politeness.
+
+    - One DB read for cache lookup (all IDs at once).
+    - For recordings: one DB read to resolve release/rg IDs locally.
+    - Concurrent CAA fetches with a 3-connection semaphore + request coalescing.
+    - One DB transaction to write all results.
+    """
+    clean_ids = [(raw or "").strip() for raw in ids or [] if raw and (raw or "").strip()]
+    if not clean_ids:
+        return {}
+
     out: dict[str, str | None] = {}
-    for raw in ids or []:
-        k = (raw or "").strip()
-        if not k:
-            continue
-        try:
-            res = await get_cover_url(entity_kind, k)
-            out[k] = res.url
-        except Exception:
-            logger.debug("cover batch fetch failed kind=%s id=%s", entity_kind, k, exc_info=True)
-            out[k] = None
+    uncached: list[str] = []
+
+    # 1. Batch cache read
+    with Session(engine) as session:
+        cached = _read_cached_covers_batch(session, entity_kind=entity_kind, entity_ids=clean_ids)
+        for eid in clean_ids:
+            if eid in cached:
+                out[eid] = cached[eid].url
+            else:
+                uncached.append(eid)
+
+    if not uncached:
+        return out
+
+    # 2. For recordings, batch-resolve local IDs and check release/rg cache fallback
+    local_ids_map: dict[str, dict[str, str]] = {}
+    if entity_kind == "recording":
+        with Session(engine) as session:
+            local_ids_map = _resolve_recording_ids_local(session, uncached)
+            # Check if release/rg covers are already cached; backfill recording links.
+            rec_ids_with_fallback: list[str] = []
+            rel_ids: list[str] = []
+            rg_ids: list[str] = []
+            rec_to_rel: dict[str, str] = {}
+            rec_to_rg: dict[str, str] = {}
+            for rec_id, meta in local_ids_map.items():
+                if rec_id not in uncached:
+                    continue
+                if meta.get("release"):
+                    rel_ids.append(meta["release"])
+                    rec_to_rel[rec_id] = meta["release"]
+                if meta.get("release_group"):
+                    rg_ids.append(meta["release_group"])
+                    rec_to_rg[rec_id] = meta["release_group"]
+                rec_ids_with_fallback.append(rec_id)
+
+            if rec_ids_with_fallback:
+                all_fallback_ids = list(set(rel_ids + rg_ids))
+                if all_fallback_ids:
+                    placeholders = ", ".join(f":f{i}" for i in range(len(all_fallback_ids)))
+                    params: dict[str, Any] = {f"f{i}": v for i, v in enumerate(all_fallback_ids)}
+                    fb_rows = session.exec(
+                        text(
+                            f"""
+                            SELECT cl.entity_kind, cl.entity_id, ca.id, ca.url
+                            FROM cover_links cl
+                            JOIN cover_assets ca ON ca.id = cl.asset_id
+                            WHERE cl.found = TRUE
+                              AND cl.entity_kind IN ('release', 'release_group')
+                              AND cl.entity_id IN ({placeholders})
+                            """
+                        ),
+                        params=params,
+                    ).all()
+
+                    # Map release/rg id -> (asset_id, url)
+                    fb_by_id: dict[str, tuple[int, str]] = {}
+                    for fb_kind, fb_eid, fb_aid, fb_url in fb_rows:
+                        fb_by_id[fb_eid] = (int(fb_aid), str(fb_url) if fb_url else "")
+
+                    for rec_id in rec_ids_with_fallback:
+                        rel = rec_to_rel.get(rec_id)
+                        rg = rec_to_rg.get(rec_id)
+                        hit = None
+                        if rel and rel in fb_by_id:
+                            hit = fb_by_id[rel]
+                        elif rg and rg in fb_by_id:
+                            hit = fb_by_id[rg]
+                        if hit:
+                            asset_id, url = hit
+                            _upsert_link(
+                                session,
+                                entity_kind="recording",
+                                entity_id=rec_id,
+                                asset_id=asset_id,
+                                found=True,
+                                source="fallback",
+                            )
+                            out[rec_id] = url if url else None
+                            uncached.remove(rec_id)
+
+            session.commit()
+
+    # 3. Concurrent fetch for each uncached ID
+    async def _fetch_one(eid: str) -> tuple[str | None, dict[str, str] | None]:
+        if entity_kind == "recording":
+            meta = dict(local_ids_map.get(eid, {}))
+            url = None
+            if meta.get("release_group"):
+                url = await _caa_fetch_direct("release_group", meta["release_group"])
+            if not url and meta.get("release"):
+                url = await _caa_fetch_direct("release", meta["release"])
+
+            if not url:
+                from services.providers import musicbrainz
+                async with musicbrainz.mb_interactive_calls():
+                    mb_meta = await musicbrainz.get_track(eid)
+                url = (mb_meta or {}).get("album_cover")
+                url = url if isinstance(url, str) and url else None
+                rid = (mb_meta or {}).get("mb_release_id")
+                rgid = (mb_meta or {}).get("mb_release_group_id")
+                if isinstance(rid, str) and rid:
+                    meta["release"] = rid
+                if isinstance(rgid, str) and rgid:
+                    meta["release_group"] = rgid
+
+                if not url:
+                    if meta.get("release_group"):
+                        u = await _caa_fetch_direct("release_group", meta["release_group"])
+                        if isinstance(u, str) and u:
+                            url = u
+                    if not url and meta.get("release"):
+                        u = await _caa_fetch_direct("release", meta["release"])
+                        if isinstance(u, str) and u:
+                            url = u
+
+            if not url:
+                try:
+                    from models import Track, TrackStatus
+                    from sqlmodel import select as sa_select
+                    with Session(engine) as _s:
+                        _track = _s.exec(
+                            sa_select(Track).where(
+                                Track.mb_id == eid,
+                                Track.status == TrackStatus.READY,
+                                Track.local_file_path.isnot(None),  # type: ignore[union-attr]
+                            ).limit(1)
+                        ).first()
+                    if _track and _track.local_file_path and _track.id is not None:
+                        url = _extract_local_cover(_track.local_file_path, _track.id)
+                except Exception:
+                    logger.debug("Local cover fallback failed for recording %s", eid, exc_info=True)
+
+            return url, (meta or None)
+        else:
+            url = await _caa_fetch_direct(entity_kind, eid)  # type: ignore[arg-type]
+            return url, None
+
+    tasks = [_fetch_one(eid) for eid in uncached]
+    results = await asyncio.gather(*tasks, return_exceptions=True)
+
+    # 4. Batch write all results in a single transaction
+    with Session(engine) as session:
+        for eid, result in zip(uncached, results):
+            if isinstance(result, Exception):
+                logger.debug("cover batch fetch failed kind=%s id=%s", entity_kind, eid, exc_info=result)
+                _upsert_link(session, entity_kind=entity_kind, entity_id=eid, asset_id=None, found=False)
+                out[eid] = None
+                continue
+
+            url, meta_ids = result
+            if url:
+                asset_id = _upsert_asset(session, url=url)
+                _upsert_link(session, entity_kind=entity_kind, entity_id=eid, asset_id=asset_id, found=True)
+                if meta_ids:
+                    if meta_ids.get("release"):
+                        _upsert_link(
+                            session,
+                            entity_kind="release",
+                            entity_id=meta_ids["release"],
+                            asset_id=asset_id,
+                            found=True,
+                        )
+                    if meta_ids.get("release_group"):
+                        _upsert_link(
+                            session,
+                            entity_kind="release_group",
+                            entity_id=meta_ids["release_group"],
+                            asset_id=asset_id,
+                            found=True,
+                        )
+            else:
+                _upsert_link(session, entity_kind=entity_kind, entity_id=eid, asset_id=None, found=False)
+            out[eid] = url
+
+        session.commit()
+
     return out
 
 

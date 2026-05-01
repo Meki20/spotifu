@@ -14,7 +14,14 @@ if DATABASE_URL == _DEFAULT_DATABASE_URL:
         "DATABASE_URL not set, using built-in dev default. Set DATABASE_URL "
         "explicitly for anything beyond local development."
     )
-engine = create_engine(DATABASE_URL, echo=False, pool_pre_ping=True)
+engine = create_engine(
+    DATABASE_URL,
+    echo=False,
+    pool_pre_ping=True,
+    pool_size=20,
+    max_overflow=40,
+    pool_timeout=30,
+)
 
 
 def create_db():

@@ -9,6 +9,7 @@ credentials.json
 CLAUDE.md
 .claude/
 SEARCH.md
+AGENTS.md
 
 # Python
 __pycache__/

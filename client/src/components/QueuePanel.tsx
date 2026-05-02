@@ -5,7 +5,7 @@ import { Link, useNavigate } from 'react-router-dom'
 import { useShallow } from 'zustand/react/shallow'
 import { usePlayerStore, type Track, type PlayerState } from '../stores/playerStore'
 import * as controller from '../playback/controller'
-import { authFetch } from '../api'
+import { authFetch, mediaUrl } from '../api'
 
 function NowPlayingCard({ track }: { track: Track }) {
   const navigate = useNavigate()
@@ -379,7 +379,7 @@ export default function QueuePanel(_: QueuePanelProps) {
             <div className="rounded-md overflow-hidden" style={{ border: '1px solid rgba(61,40,32,0.5)', background: 'rgba(26,18,16,0.35)' }}>
               <div className="w-full" style={{ height: 92, background: '#16100B' }}>
                 {artistImages?.banner ? (
-                  <img src={artistImages.banner} alt="" className="w-full h-full object-cover block" loading="lazy" />
+                  <img src={mediaUrl(artistImages.banner)} alt="" className="w-full h-full object-cover block" loading="lazy" />
                 ) : (
                   <div className="w-full h-full animate-pulse" style={{ background: 'linear-gradient(90deg, rgba(22,16,11,1) 0%, rgba(28,20,16,1) 50%, rgba(22,16,11,1) 100%)' }} />
                 )}

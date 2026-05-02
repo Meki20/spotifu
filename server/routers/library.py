@@ -451,7 +451,7 @@ async def list_recently_downloaded(
             mb_release_id=t.mb_release_id,
             mb_release_group_id=t.mb_release_group_id,
             release_date=t.release_date,
-            genre=t.genre,
+            tags=t.tags,
         )
         for t in tracks
     ]
@@ -524,7 +524,7 @@ async def list_recently_played(
             mb_release_id=t.mb_release_id,
             mb_release_group_id=t.mb_release_group_id,
             release_date=t.release_date,
-            genre=t.genre,
+            tags=t.tags,
         )
         for t in ordered_tracks
     ]

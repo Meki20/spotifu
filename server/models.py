@@ -71,7 +71,7 @@ class Track(SQLModel, table=True):
     mb_release_group_id: Optional[str] = Field(default=None, max_length=64)
     preview_url: Optional[str] = Field(default=None, max_length=2000)
     release_date: Optional[str] = Field(default=None, max_length=64)
-    genre: Optional[str] = Field(default=None, max_length=255)
+    tags: Optional[str] = Field(default=None, max_length=255)
     added_at: Optional[datetime] = Field(default_factory=datetime.utcnow, index=True)
     last_played_at: Optional[datetime] = Field(default=None, index=True)
     __table_args__ = (

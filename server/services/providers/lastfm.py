@@ -534,14 +534,15 @@ async def track_top_tags(
     artist: str | None = None,
     track_mbid: str | None = None,
 ) -> list[dict[str, Any]]:
-    """Top tags/genres for a track. Prefer MBID, then (track + artist) fallback."""
+    """Top tags/genres for a track. Falls back to artist tags if track has none."""
     base_params: dict[str, Any] = {"method": "track.gettoptags", "autocorrect": 1}
     attempts: list[dict[str, Any]] = []
-    if track_mbid:
-        attempts.append({**base_params, "mbid": track_mbid})
     if track and artist:
         attempts.append({**base_params, "track": track, "artist": artist})
-
+    if track_mbid:
+        attempts.append({**base_params, "mbid": track_mbid})
+    if not attempts:
+        return []
     for p in attempts:
         try:
             payload = await _get(p)
@@ -551,6 +552,7 @@ async def track_top_tags(
         top = payload.get("toptags") or payload.get("tags") or {}
         tags = _extract_tags((top.get("tag") if isinstance(top, dict) else None))
         if tags:
+            logger.info("[lastfm] track_top_tags found %d tags for track=%s artist=%s", len(tags), track, artist)
             return [t.to_dict() for t in tags]
         logger.debug(
             "[lastfm] track_top_tags empty (%s): keys=%s top_keys=%s",
@@ -558,7 +560,19 @@ async def track_top_tags(
             list(payload.keys()) if isinstance(payload, dict) else None,
             list(top.keys()) if isinstance(top, dict) else None,
         )
+        logger.info("[lastfm] track_top_tags full response for (%s): %s", p, payload)
         if _looks_like_lastfm_not_found(payload):
             continue
+    if artist:
+        try:
+            artist_tags_payload = await _get({"method": "artist.gettoptags", "artist": artist, "autocorrect": 1})
+        except LastFMError as e:
+            logger.debug("[lastfm] artist_gettoptags failed: %s", e)
+            return []
+        artist_tags_top = artist_tags_payload.get("toptags") or {}
+        artist_tags = _extract_tags((artist_tags_top.get("tag") if isinstance(artist_tags_top, dict) else None))
+        if artist_tags:
+            logger.info("[lastfm] track_top_tags falling back to artist tags for artist=%s: %d tags", artist, len(artist_tags))
+            return [t.to_dict() for t in artist_tags]
     return []
 

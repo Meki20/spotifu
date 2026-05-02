@@ -229,6 +229,25 @@ async def _run_download(track_id: int, title: str, artist: str, album: str = "",
                         mb_id_for_ws = mb_id_resolved
                 except Exception:
                     logger.exception("mb resolve_id after download for track_id=%s", track_id)
+            if track.title and track.artist:
+                logger.info("[tags]Fetching tags for track_id=%s artist=%s title=%s",
+                    track_id, track.artist, track.title)
+                try:
+                    from services.providers import lastfm
+                    tags = await lastfm.track_top_tags(
+                        track=track.title,
+                        artist=track.artist,
+                    )
+                    if tags:
+                        import json
+                        track.tags = json.dumps([t.get("name") for t in tags if t.get("name")])
+                        logger.info("[tags]Fetched %d tags for track_id=%s: %s", len(tags), track_id, track.tags)
+                    else:
+                        logger.info("[tags]No tags found for track_id=%s", track_id)
+                except Exception:
+                    logger.info("[tags]Failed to fetch tags for track_id=%s", track_id, exc_info=True)
+            else:
+                logger.info("[tags]Skipping tag fetch for track_id=%s: no mb_id or artist/title available", track_id)
             mb_recording_id_for_cover = track.mb_id
             mb_release_id_for_cover = track.mb_release_id
             mb_rg_id_for_cover = track.mb_release_group_id

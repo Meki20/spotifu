@@ -31,6 +31,15 @@ def create_db():
 
 def _migrate():
     migrations = [
+        """
+        DO $$
+        BEGIN
+            IF EXISTS (SELECT 1 FROM information_schema.columns
+                       WHERE table_name='tracks' AND column_name='genre') THEN
+                ALTER TABLE tracks RENAME COLUMN genre TO tags;
+            END IF;
+        END $$;
+        """,
         "ALTER TABLE mb_lookup_cache ADD COLUMN IF NOT EXISTS artist_credit VARCHAR",
         "ALTER TABLE mb_lookup_cache ADD COLUMN IF NOT EXISTS mb_artist_id VARCHAR",
         "ALTER TABLE mb_lookup_cache ADD COLUMN IF NOT EXISTS mb_release_id VARCHAR",

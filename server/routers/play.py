@@ -30,7 +30,7 @@ class PlayResponse(BaseModel):
     mb_release_id: str | None = None
     mb_release_group_id: str | None = None
     release_date: str | None = None
-    genre: str | None = None
+    tags: str | None = None
     quality: str | None = None
 
 
@@ -73,7 +73,7 @@ def _get_or_create_track_by_mb(session: Session, mbid: str, meta: dict | None) -
             mb_release_group_id=meta.get("mb_release_group_id"),
             preview_url=meta.get("preview_url"),
             release_date=meta.get("release_date"),
-            genre=meta.get("genre"),
+            tags=meta.get("genre"),
             status=TrackStatus.FETCHING,
             local_file_path=None,
         )
@@ -154,7 +154,7 @@ async def play(
             mb_release_id=track.mb_release_id,
             mb_release_group_id=track.mb_release_group_id,
             release_date=track.release_date,
-            genre=track.genre,
+            tags=track.tags,
             quality=track.quality if is_ready else None,
         )
 
@@ -182,7 +182,7 @@ async def play(
                 mb_release_id=existing.mb_release_id,
                 mb_release_group_id=existing.mb_release_group_id,
                 release_date=existing.release_date,
-                genre=existing.genre,
+                tags=existing.tags,
                 quality=existing.quality,
             )
 
@@ -226,7 +226,7 @@ async def play(
             mb_release_id=track.mb_release_id,
             mb_release_group_id=track.mb_release_group_id,
             release_date=track.release_date,
-            genre=track.genre,
+            tags=track.tags,
             quality=track.quality if is_ready else None,
         )
 

@@ -36,4 +36,4 @@ class TrackOut(BaseModel):
     mb_release_group_id: str | None = None
     mb_artist_id: str | None = None
     release_date: str | None = None
-    genre: str | None = None
+    tags: str | None = None

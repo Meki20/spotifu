@@ -381,7 +381,7 @@ class ApplyRequest(BaseModel):
     mb_release_id: str | None = None
     mb_release_group_id: str | None = None
     release_date: str | None = None
-    genre: str | None = None
+    tags: str | None = None
 
 
 class ApplyResponse(BaseModel):
@@ -854,7 +854,7 @@ async def apply_reconciliation_match(
     track.mb_release_id = body.mb_release_id
     track.mb_release_group_id = body.mb_release_group_id
     track.release_date = body.release_date
-    track.genre = body.genre
+    track.tags = body.tags
 
     session.add(track)
     session.commit()

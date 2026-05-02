@@ -247,7 +247,7 @@ async def _run_download(track_id: int, title: str, artist: str, album: str = "",
                 except Exception:
                     logger.info("[tags]Failed to fetch tags for track_id=%s", track_id, exc_info=True)
             else:
-                logger.info("[tags]Skipping tag fetch for track_id=%s: no mb_id or artist/title available", track_id)
+                logger.info("[tags]Skipping tag fetch for track_id=%s: no artist/title available", track_id)
             mb_recording_id_for_cover = track.mb_id
             mb_release_id_for_cover = track.mb_release_id
             mb_rg_id_for_cover = track.mb_release_group_id

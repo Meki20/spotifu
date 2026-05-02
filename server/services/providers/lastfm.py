@@ -539,8 +539,6 @@ async def track_top_tags(
     attempts: list[dict[str, Any]] = []
     if track and artist:
         attempts.append({**base_params, "track": track, "artist": artist})
-    if track_mbid:
-        attempts.append({**base_params, "mbid": track_mbid})
     if not attempts:
         return []
     for p in attempts:

@@ -332,6 +332,7 @@ class ReconciliationTrackItem(BaseModel):
     mb_release_id: str | None = None
     mb_release_group_id: str | None = None
     missing_fields: list[str]
+    tags: str | None = None
 
 
 class ReconciliationTracksResponse(BaseModel):
@@ -353,6 +354,7 @@ class MatchResult(BaseModel):
     original_artist_credit: str | None = None
     original_album: str
     original_mb_release_group_id: str | None = None
+    original_tags: str | None = None
     matched_title: str | None = None
     matched_artist: str | None = None
     matched_artist_credit: str | None = None
@@ -364,6 +366,7 @@ class MatchResult(BaseModel):
     mb_score: int | None = None
     phase: str | None = None
     matched: bool
+    tags: str | None = None
 
 
 class ResolveResponse(BaseModel):
@@ -376,7 +379,7 @@ class ApplyRequest(BaseModel):
     artist: str
     artist_credit: str | None = None
     album: str
-    mb_id: str
+    mb_id: str | None = None
     mb_artist_id: str | None = None
     mb_release_id: str | None = None
     mb_release_group_id: str | None = None
@@ -398,6 +401,8 @@ def _get_missing_fields(track: Track) -> list[str]:
         missing.append("mb_release_id")
     if not track.mb_release_group_id:
         missing.append("mb_release_group_id")
+    if not track.tags:
+        missing.append("tags")
     return missing
 
 
@@ -412,7 +417,7 @@ def get_reconciliation_tracks(
     total = session.exec(
         select(func.count(Track.id)).where(
             Track.status == TrackStatus.READY,
-            (Track.mb_id == None) | (Track.mb_artist_id == None) | (Track.mb_release_id == None),  # noqa: E711
+            (Track.mb_id == None) | (Track.mb_artist_id == None) | (Track.mb_release_id == None) | (Track.tags == None),  # noqa: E711
         )
     ).one()
 
@@ -421,7 +426,7 @@ def get_reconciliation_tracks(
         select(Track)
         .where(
             Track.status == TrackStatus.READY,
-            (Track.mb_id == None) | (Track.mb_artist_id == None) | (Track.mb_release_id == None),  # noqa: E711
+            (Track.mb_id == None) | (Track.mb_artist_id == None) | (Track.mb_release_id == None) | (Track.tags == None),  # noqa: E711
         )
         .order_by(Track.id)
         .limit(page_size)
@@ -441,6 +446,7 @@ def get_reconciliation_tracks(
                 mb_release_id=t.mb_release_id,
                 mb_release_group_id=t.mb_release_group_id,
                 missing_fields=_get_missing_fields(t),
+                tags=t.tags,
             )
             for t in rows
         ],
@@ -451,6 +457,30 @@ def get_reconciliation_tracks(
     )
 
 
+def _track_needs_mb_resolution(track: Track) -> bool:
+    return not track.mb_id or not track.mb_artist_id or not track.mb_release_id or not track.mb_release_group_id
+
+
+def _track_needs_tags_only(track: Track) -> bool:
+    return track.mb_id and track.mb_artist_id and track.mb_release_id and track.mb_release_group_id and not track.tags
+
+
+async def _fetch_tags_for_track(track: Track) -> str | None:
+    from services.providers import lastfm
+    artist = track.artist
+    title = track.title
+    if not artist or not title:
+        return None
+    try:
+        tags = await lastfm.track_top_tags(track=title, artist=artist)
+        if tags:
+            import json
+            return json.dumps([t.get("name") for t in tags if t.get("name")])
+    except Exception:
+        pass
+    return None
+
+
 @router.post("/reconciliation/resolve", response_model=ResolveResponse)
 async def resolve_reconciliation_tracks(
     body: ResolveRequest,
@@ -458,6 +488,7 @@ async def resolve_reconciliation_tracks(
     session: Session = Depends(get_session),
 ):
     from services.providers import musicbrainz
+    from services.providers import lastfm
     from services.playlist_import import (
         _resolve_batch_verbatim,
         ImportInputRow,
@@ -476,12 +507,21 @@ async def resolve_reconciliation_tracks(
     all_tracks = [session.get(Track, tid) for tid in body.track_ids]
     all_tracks = [t for t in all_tracks if t]
 
-    # Split into full (have artist+title+album) and incomplete
+    # Split into: tracks needing MB resolution, tracks needing tags only
+    mb_needing_tracks: list[Track] = []
+    tags_only_tracks: list[Track] = []
+    for track in all_tracks:
+        if _track_needs_mb_resolution(track):
+            mb_needing_tracks.append(track)
+        elif _track_needs_tags_only(track):
+            tags_only_tracks.append(track)
+
+    # Split MB-needing into full (have artist+title+album) and incomplete
     full_rows: list[ImportInputRow] = []
     incomplete_tracks: list[Track] = []
 
     row_idx = 0
-    for track in all_tracks:
+    for track in mb_needing_tracks:
         artist = track.artist or ""
         title = track.title or ""
         album = track.album or ""
@@ -526,6 +566,7 @@ async def resolve_reconciliation_tracks(
                 original_artist_credit=track.artist_credit,
                 original_album=track.album,
                 original_mb_release_group_id=track.mb_release_group_id,
+                original_tags=track.tags,
                 matched_title=meta.get("title"),
                 matched_artist=meta.get("artist"),
                 matched_artist_credit=meta.get("artist_credit"),
@@ -546,6 +587,7 @@ async def resolve_reconciliation_tracks(
                 original_artist_credit=track.artist_credit,
                 original_album=track.album,
                 original_mb_release_group_id=track.mb_release_group_id,
+                original_tags=track.tags,
                 matched=False,
             )
 
@@ -572,6 +614,7 @@ async def resolve_reconciliation_tracks(
                 original_artist_credit=track.artist_credit,
                 original_album=track.album,
                 original_mb_release_group_id=track.mb_release_group_id,
+                original_tags=track.tags,
                 matched=False,
             )
 
@@ -584,13 +627,14 @@ async def resolve_reconciliation_tracks(
                 meta = musicbrainz.recording_to_playlist_meta(best, album_hint=album)
                 if meta and meta.get("mbid"):
                     score = best.get("score", 0)
-                    return MatchResult(
+                    result = MatchResult(
                         track_id=track.id,
                         original_title=track.title,
                         original_artist=track.artist,
                         original_artist_credit=track.artist_credit,
                         original_album=track.album,
                         original_mb_release_group_id=track.mb_release_group_id,
+                        original_tags=track.tags,
                         matched_title=meta.get("title"),
                         matched_artist=meta.get("artist"),
                         matched_artist_credit=meta.get("artist_credit"),
@@ -603,6 +647,11 @@ async def resolve_reconciliation_tracks(
                         phase=meta.get("_resolve_phase"),
                         matched=True,
                     )
+                    # Fetch tags for matched track
+                    if not track.tags:
+                        result.tags = await _fetch_tags_for_track(track)
+                        await asyncio.sleep(0.3)
+                    return result
         except Exception:
             pass
 
@@ -613,6 +662,7 @@ async def resolve_reconciliation_tracks(
             original_artist_credit=track.artist_credit,
             original_album=track.album,
             original_mb_release_group_id=track.mb_release_group_id,
+            original_tags=track.tags,
             matched=False,
         )
 
@@ -625,27 +675,50 @@ async def resolve_reconciliation_tracks(
         incomplete_qn_map[track.id] = qn
         await asyncio.sleep(1.2)
 
-    # Build final results list in original order
+    # Build results for MB-needing tracks
     track_id_to_qn: dict[int, str] = {}
     for qn, track in track_map.items():
         track_id_to_qn[track.id] = qn
     for track in incomplete_tracks:
         track_id_to_qn[track.id] = incomplete_qn_map[track.id]
 
-    # If we have results from resolve (full rows processed first), add them
-    for track in all_tracks:
+    for track in mb_needing_tracks:
         qn = track_id_to_qn.get(track.id)
-        if qn and qn in results_map:
-            results.append(results_map[qn])
+        existing = results_map.get(qn)
+        if existing:
+            existing.original_tags = track.tags
+            results.append(existing)
         else:
-            # Fallback - shouldn't happen but include all tracks
             results.append(MatchResult(
                 track_id=track.id,
                 original_title=track.title,
                 original_artist=track.artist,
+                original_artist_credit=track.artist_credit,
                 original_album=track.album,
+                original_mb_release_group_id=track.mb_release_group_id,
+                original_tags=track.tags,
                 matched=False,
             ))
+
+    # For tracks needing only tags, create a MatchResult with current MB data and fetch tags
+    for track in tags_only_tracks:
+        tags = await _fetch_tags_for_track(track)
+        await asyncio.sleep(0.3)
+        results.append(MatchResult(
+            track_id=track.id,
+            original_title=track.title,
+            original_artist=track.artist,
+            original_artist_credit=track.artist_credit,
+            original_album=track.album,
+            original_mb_release_group_id=track.mb_release_group_id,
+            original_tags=track.tags,
+            mb_id=track.mb_id,
+            mb_artist_id=track.mb_artist_id,
+            mb_release_id=track.mb_release_id,
+            mb_release_group_id=track.mb_release_group_id,
+            matched=True,
+            tags=tags,
+        ))
 
     return ResolveResponse(results=results)
 
@@ -668,25 +741,36 @@ async def resolve_reconciliation_tracks_stream(
     import json
     from fastapi.responses import StreamingResponse
 
+    _yielded_track_ids: set[int] = set()
+
     async def event_stream():
         track_map: dict[str, Track] = {}
         memo: dict[str, ResolveOutcome] = {}
         stats: dict[str, int] = {"memo_hit": 0, "db_cache_hit": 0, "live_lookup": 0, "matched": 0, "unmatched": 0}
 
-        # Fetch all tracks first
         all_tracks = [session.get(Track, tid) for tid in body.track_ids]
         all_tracks = [t for t in all_tracks if t]
 
-        # Split into full (have artist+title+album) and incomplete
+        yield f"data: {json.dumps({'type': 'start', 'total': len(all_tracks)})}\n\n"
+
+        # Split into MB-needing and tags-only
+        mb_needing_tracks: list[Track] = []
+        tags_only_tracks: list[Track] = []
+        for track in all_tracks:
+            if _track_needs_mb_resolution(track):
+                mb_needing_tracks.append(track)
+            elif _track_needs_tags_only(track):
+                tags_only_tracks.append(track)
+
+        # Split MB-needing into full and incomplete
         full_rows: list[ImportInputRow] = []
         incomplete_tracks: list[Track] = []
 
         row_idx = 0
-        for track in all_tracks:
+        for track in mb_needing_tracks:
             artist = track.artist or ""
             title = track.title or ""
             album = track.album or ""
-
             if artist and title and album:
                 qn = _query_normalized(artist, title, album)
                 row = ImportInputRow(
@@ -703,31 +787,35 @@ async def resolve_reconciliation_tracks_stream(
             else:
                 incomplete_tracks.append(track)
 
-        # Send initial count
-        yield f"data: {json.dumps({'type': 'start', 'total': len(all_tracks)})}\n\n"
-
-        # Process full rows using 4-pass batch resolver
-        batch_size = 5
-        processed = 0
-
-        for i in range(0, len(full_rows), batch_size):
-            batch = full_rows[i : i + batch_size]
-            await _resolve_batch_verbatim(session, batch, memo=memo, stats=stats)
+        # Stream full rows individually as they are resolved
+        for i in range(0, len(full_rows), 1):
+            single_row = [full_rows[i]]
+            await _resolve_batch_verbatim(session, single_row, memo=memo, stats=stats)
             await asyncio.sleep(1.2)
 
-            # Yield results from this batch
             for qn, outcome in memo.items():
                 track = track_map.get(qn)
                 if not track:
                     continue
 
+                if track.id in _yielded_track_ids:
+                    continue
+
+                tags = track.tags if track.tags else None
                 if outcome.state.name == "MATCHED" and outcome.meta:
                     meta = outcome.meta
+                    # Fetch tags after MB match
+                    if not tags:
+                        tags = await _fetch_tags_for_track(track)
+                        await asyncio.sleep(0.3)
                     result = MatchResult(
                         track_id=track.id,
                         original_title=track.title,
                         original_artist=track.artist,
+                        original_artist_credit=track.artist_credit,
                         original_album=track.album,
+                        original_mb_release_group_id=track.mb_release_group_id,
+                        original_tags=track.tags,
                         matched_title=meta.get("title"),
                         matched_artist=meta.get("artist"),
                         matched_artist_credit=meta.get("artist_credit"),
@@ -739,26 +827,59 @@ async def resolve_reconciliation_tracks_stream(
                         mb_score=int(outcome.confidence * 100) if outcome.confidence else None,
                         phase=outcome.phase,
                         matched=True,
+                        tags=tags,
                     )
                 else:
                     result = MatchResult(
                         track_id=track.id,
                         original_title=track.title,
                         original_artist=track.artist,
+                        original_artist_credit=track.artist_credit,
                         original_album=track.album,
+                        original_mb_release_group_id=track.mb_release_group_id,
+                        original_tags=track.tags,
                         matched=False,
                     )
-                processed += 1
-                yield f"data: {json.dumps({'type': 'result', 'result': result.model_dump(), 'processed': processed})}\n\n"
+                _yielded_track_ids.add(track.id)
+                yield f"data: {json.dumps({'type': 'result', 'result': result.model_dump()})}\n\n"
 
-        # Handle incomplete tracks with simple lucene query
+        # Stream incomplete tracks one by one
         for track in incomplete_tracks:
             result = await resolve_incomplete_stream(track)
-            processed += 1
-            yield f"data: {json.dumps({'type': 'result', 'result': result.model_dump(), 'processed': processed})}\n\n"
+            # Fetch tags after MB resolution
+            if result.matched and not result.tags:
+                result.tags = await _fetch_tags_for_track(track)
+                await asyncio.sleep(0.3)
+            result.original_tags = track.tags
+            _yielded_track_ids.add(track.id)
+            yield f"data: {json.dumps({'type': 'result', 'result': result.model_dump()})}\n\n"
             await asyncio.sleep(1.2)
 
-        yield f"data: {json.dumps({'type': 'done', 'processed': processed})}\n\n"
+        # Stream tags-only tracks directly without MB resolution
+        for track in tags_only_tracks:
+            tags = await _fetch_tags_for_track(track)
+            await asyncio.sleep(0.3)
+            result = MatchResult(
+                track_id=track.id,
+                original_title=track.title,
+                original_artist=track.artist,
+                original_artist_credit=track.artist_credit,
+                original_album=track.album,
+                original_mb_release_group_id=track.mb_release_group_id,
+                original_tags=track.tags,
+                mb_id=track.mb_id,
+                mb_artist_id=track.mb_artist_id,
+                mb_release_id=track.mb_release_id,
+                mb_release_group_id=track.mb_release_group_id,
+                matched=True,
+                tags=tags,
+            )
+            _yielded_track_ids.add(track.id)
+            yield f"data: {json.dumps({'type': 'result', 'result': result.model_dump()})}\n\n"
+
+        yield f"data: {json.dumps({'type': 'done'})}\n\n"
+
+    _yielded_track_ids: set[int] = set()
 
     async def resolve_incomplete_stream(track: Track) -> MatchResult:
         from services.providers import musicbrainz
@@ -785,6 +906,7 @@ async def resolve_reconciliation_tracks_stream(
                 original_artist_credit=track.artist_credit,
                 original_album=track.album,
                 original_mb_release_group_id=track.mb_release_group_id,
+                original_tags=track.tags,
                 matched=False,
             )
 
@@ -804,6 +926,7 @@ async def resolve_reconciliation_tracks_stream(
                         original_artist_credit=track.artist_credit,
                         original_album=track.album,
                         original_mb_release_group_id=track.mb_release_group_id,
+                        original_tags=track.tags,
                         matched_title=meta.get("title"),
                         matched_artist=meta.get("artist"),
                         matched_artist_credit=meta.get("artist_credit"),
@@ -826,6 +949,7 @@ async def resolve_reconciliation_tracks_stream(
             original_artist_credit=track.artist_credit,
             original_album=track.album,
             original_mb_release_group_id=track.mb_release_group_id,
+            original_tags=track.tags,
             matched=False,
         )
 

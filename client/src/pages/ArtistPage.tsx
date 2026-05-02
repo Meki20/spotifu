@@ -556,7 +556,7 @@ export default function ArtistPage() {
         <ImagePickerModal
           isOpen={showImagePicker}
           onClose={() => setShowImagePicker(false)}
-          artistId={artistId}
+          artistId={artistId || ''}
           artistName={artist.name}
           banners={artistImages?.banners ?? []}
           thumbs={artistImages?.thumbs ?? []}

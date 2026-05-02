@@ -45,6 +45,7 @@ interface MatchResult {
   original_artist_credit: string | null
   original_album: string
   original_mb_release_group_id: string | null
+  original_tags: string | null
   matched_title: string | null
   matched_artist: string | null
   matched_artist_credit: string | null
@@ -56,6 +57,7 @@ interface MatchResult {
   mb_score: number | null
   phase: string | null
   matched: boolean
+  tags: string | null
 }
 
 interface ApplyResult {
@@ -79,6 +81,7 @@ type Props = {
 
 export default function ReconciliationModal({ open, onClose }: Props) {
   const [page, setPage] = useState(1)
+  const [trackPage, setTrackPage] = useState(1)
   const [totalPages, setTotalPages] = useState(1)
   const [totalTracks, setTotalTracks] = useState(0)
   const [tracks, setTracks] = useState<ReconciliationTrack[]>([])
@@ -94,6 +97,9 @@ export default function ReconciliationModal({ open, onClose }: Props) {
   const [editingId, setEditingId] = useState<number | null>(null)
   const [manualMbId, setManualMbId] = useState('')
   const [mbidLoading, setMbidLoading] = useState(false)
+  const [editedTags, setEditedTags] = useState<Record<number, string[]>>({})
+  const [addingTagId, setAddingTagId] = useState<number | null>(null)
+  const [newTagInput, setNewTagInput] = useState('')
 
   const [additionalExpanded, setAdditionalExpanded] = useState(false)
   const [additionalTracks, setAdditionalTracks] = useState<DownloadedTrack[]>([])
@@ -102,10 +108,12 @@ export default function ReconciliationModal({ open, onClose }: Props) {
   const [additionalOffset, setAdditionalOffset] = useState(0)
   const [additionalHasMore, setAdditionalHasMore] = useState(true)
   const additionalSearchTimeoutRef = useRef<number | null>(null)
+  const resolutionControllerRef = useRef<AbortController | null>(null)
 
   useEffect(() => {
     if (open) {
       setPage(1)
+      setTrackPage(1)
       setResolveResults([])
       setDecisions({})
       setApplyResults([])
@@ -215,16 +223,20 @@ export default function ReconciliationModal({ open, onClose }: Props) {
   }
 
   async function runResolution() {
+    resolutionControllerRef.current = new AbortController()
+    const controller = resolutionControllerRef.current
     setResolving(true)
     setPage(2)
     setResolveResults([])
     setProcessedCount(0)
+    setCoverArt({})
 
     try {
-      const response = await authFetch('/settings/reconciliation/resolve', {
+      const response = await authFetch('/settings/reconciliation/resolve/stream', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ track_ids: Array.from(selected) }),
+        signal: controller.signal,
       })
 
       if (!response.ok) {
@@ -235,30 +247,80 @@ export default function ReconciliationModal({ open, onClose }: Props) {
         return
       }
 
-      const data = (await response.json()) as { results: MatchResult[] }
-      setResolveResults(data.results)
-      setProcessedCount(data.results.length)
+      const reader = response.body?.getReader()
+      const decoder = new TextDecoder()
+      let buffer = ''
 
-      const newCoverArtMap: Record<number, { old: string | null; new: string | null }> = {}
-      for (const result of data.results) {
-        newCoverArtMap[result.track_id] = { old: null, new: null }
-        if (result.original_mb_release_group_id) {
-          const oldUrl = await fetchReleaseGroupCover(result.original_mb_release_group_id)
-          newCoverArtMap[result.track_id].old = oldUrl
-        }
-        if (result.matched && result.mb_release_group_id) {
-          const url = await fetchReleaseGroupCover(result.mb_release_group_id)
-          newCoverArtMap[result.track_id].new = url
+      while (reader) {
+        const { done, value } = await reader.read()
+        if (done) break
+
+        buffer += decoder.decode(value, { stream: true })
+        const lines = buffer.split('\n')
+        buffer = lines.pop() || ''
+
+        for (const line of lines) {
+          if (!line.startsWith('data: ')) continue
+          try {
+            const data = JSON.parse(line.slice(6))
+            if (data.type === 'start') {
+              // Total tracks announced
+            } else if (data.type === 'result') {
+              const result = data.result as MatchResult
+              setResolveResults(prev => {
+                const existing = prev.findIndex(r => r.track_id === result.track_id)
+                if (existing >= 0) {
+                  const updated = [...prev]
+                  updated[existing] = result
+                  return updated
+                }
+                return [...prev, result]
+              })
+              setProcessedCount(prev => prev + 1)
+
+              // Fetch cover art for this result
+              if (result.original_mb_release_group_id && !coverArt[result.track_id]?.old) {
+                const oldUrl = await fetchReleaseGroupCover(result.original_mb_release_group_id)
+                setCoverArt(prev => ({
+                  ...prev,
+                  [result.track_id]: { ...prev[result.track_id], old: oldUrl }
+                }))
+              }
+              if (result.matched && result.mb_release_group_id && !coverArt[result.track_id]?.new) {
+                const newUrl = await fetchReleaseGroupCover(result.mb_release_group_id)
+                setCoverArt(prev => ({
+                  ...prev,
+                  [result.track_id]: { ...prev[result.track_id], new: newUrl }
+                }))
+              }
+            } else if (data.type === 'done') {
+              break
+            }
+          } catch (e) {
+            console.error('Failed to parse SSE message:', e)
+          }
         }
       }
-      setCoverArt(newCoverArtMap)
     } catch (err) {
-      console.error('Resolve error:', err)
-      alert(`Resolve error: ${err}`)
+      if (err instanceof Error && err.name === 'AbortError') {
+        console.log('Resolution cancelled')
+      } else {
+        console.error('Resolve error:', err)
+        alert(`Resolve error: ${err}`)
+      }
     } finally {
       setResolving(false)
     }
   }
+
+  useEffect(() => {
+    return () => {
+      if (resolutionControllerRef.current) {
+        resolutionControllerRef.current.abort()
+      }
+      setResolving(false)
+    }
+  }, [])
 
   async function acceptMatch(result: MatchResult) {
     if (!result.matched || !result.mb_id) return
@@ -267,23 +329,28 @@ export default function ReconciliationModal({ open, onClose }: Props) {
 
     setApplying(true)
     try {
-      await authFetch('/settings/reconciliation/apply', {
+      const res = await authFetch('/settings/reconciliation/apply', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           track_id: result.track_id,
-          title: result.matched_title,
-          artist: result.matched_artist,
+          title: result.matched_title || result.original_title || '',
+          artist: result.matched_artist || result.original_artist || '',
           artist_credit: result.matched_artist_credit,
-          album: result.matched_album,
-          mb_id: result.mb_id,
+          album: result.matched_album || result.original_album || '',
+          mb_id: result.mb_id || null,
           mb_artist_id: result.mb_artist_id,
           mb_release_id: result.mb_release_id,
           mb_release_group_id: result.mb_release_group_id,
           release_date: null,
-          genre: null,
+          tags: JSON.stringify(editedTags[result.track_id] ?? getResultTags(result)),
         }),
       })
+
+      if (!res.ok) {
+        const errText = await res.text()
+        console.error('Apply failed:', res.status, errText)
+      }
 
       const newCoverArt = result.mb_release_group_id
         ? await fetchReleaseGroupCover(result.mb_release_group_id)
@@ -291,7 +358,7 @@ export default function ReconciliationModal({ open, onClose }: Props) {
 
       setCoverArt((prev) => ({
         ...prev,
-        [result.track_id]: { old: null, new: newCoverArt },
+        [result.track_id]: { old: prev[result.track_id]?.old ?? null, new: newCoverArt },
       }))
 
       setApplyResults((prev) => [
@@ -319,6 +386,41 @@ export default function ReconciliationModal({ open, onClose }: Props) {
 
   function rejectMatch(result: MatchResult) {
     setDecisions((d) => ({ ...d, [result.track_id]: 'reject' }))
+  }
+
+  function getResultTags(result: MatchResult): string[] {
+    if (editedTags[result.track_id]) return editedTags[result.track_id]
+    try {
+      const tags = JSON.parse(result.tags || '[]')
+      return Array.isArray(tags) ? tags : []
+    } catch {
+      return []
+    }
+  }
+
+  function removeTag(result: MatchResult, tagToRemove: string) {
+    const currentTags = getResultTags(result)
+    setEditedTags((prev) => ({
+      ...prev,
+      [result.track_id]: currentTags.filter((t) => t !== tagToRemove),
+    }))
+  }
+
+  function addTag(result: MatchResult) {
+    const trimmed = newTagInput.trim()
+    if (!trimmed) return
+    const currentTags = getResultTags(result)
+    if (currentTags.includes(trimmed)) {
+      setNewTagInput('')
+      setAddingTagId(null)
+      return
+    }
+    setEditedTags((prev) => ({
+      ...prev,
+      [result.track_id]: [...currentTags, trimmed],
+    }))
+    setNewTagInput('')
+    setAddingTagId(null)
   }
 
   async function handleManualMbidSearch(result: MatchResult) {
@@ -367,25 +469,25 @@ setResolveResults(prev => prev.map(r => r.track_id === result.track_id ? updated
   if (!open) return null
 
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center"
-      style={{ background: 'rgba(0,0,0,0.8)' }}
-    >
-      <div
-        className="w-full max-w-2xl max-h-[85vh] flex flex-col rounded-lg overflow-hidden"
-        style={{ background: '#1A1210', border: '1px solid #3D2820' }}
+<div
+        className="fixed inset-0 z-50 flex items-start justify-center pt-4 pb-24 px-4"
+        style={{ background: 'rgba(0,0,0,0.8)', overflowY: 'auto' }}
       >
-        {/* Header */}
         <div
-          className="flex items-center justify-between px-6 py-4 shrink-0"
-          style={{ borderBottom: '1px solid #3D2820' }}
+          className="w-full max-w-3xl max-h-[calc(100vh-140px)] flex flex-col rounded-lg overflow-hidden"
+          style={{ background: '#1A1210', border: '1px solid #3D2820' }}
         >
-          <h2
-            className="text-xl font-bold"
-            style={{ fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 800, color: '#E8DDD0', letterSpacing: '0.02em' }}
+          {/* Header */}
+          <div
+            className="flex items-center justify-between px-4 py-2 shrink-0"
+            style={{ borderBottom: '1px solid #3D2820' }}
           >
-            RECONCILE TRACKS
-          </h2>
+            <h2
+              className="text-lg font-bold"
+              style={{ fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 800, color: '#E8DDD0', letterSpacing: '0.02em' }}
+            >
+              RECONCILE
+            </h2>
           <button
             onClick={onClose}
             className="p-1 rounded hover:bg-[#3D2820]"
@@ -396,7 +498,7 @@ setResolveResults(prev => prev.map(r => r.track_id === result.track_id ? updated
         </div>
 
         {/* Page indicator */}
-        <div className="flex items-center justify-center gap-2 py-3 shrink-0" style={{ borderBottom: '1px solid #3D2820' }}>
+        <div className="flex items-center justify-center gap-3 py-2 shrink-0" style={{ borderBottom: '1px solid #3D2820' }}>
           <div
             className="w-8 h-8 rounded flex items-center justify-center text-sm font-semibold"
             style={{
@@ -430,7 +532,7 @@ setResolveResults(prev => prev.map(r => r.track_id === result.track_id ? updated
         </div>
 
         {/* Content */}
-        <div className="flex-1 overflow-y-auto p-6">
+        <div className="flex-1 overflow-y-auto p-3">
           {page === 1 && (
             <>
               <p className="text-sm mb-4" style={{ fontFamily: "'Barlow Semi Condensed', sans-serif", color: '#9A8E84' }}>
@@ -476,19 +578,19 @@ setResolveResults(prev => prev.map(r => r.track_id === result.track_id ? updated
                   {/* Pagination */}
                   <div className="flex items-center justify-between mb-4">
                     <button
-                      onClick={() => { const p = Math.max(1, page - 1); setPage(p); fetchTracksAndSelect(p); }}
-                      disabled={page <= 1}
+                      onClick={() => { const p = Math.max(1, trackPage - 1); setTrackPage(p); fetchTracksAndSelect(p); }}
+                      disabled={trackPage <= 1}
                       className="p-2 rounded disabled:opacity-50"
                       style={{ color: '#9A8E84' }}
                     >
                       <ChevronLeft size={20} />
                     </button>
                     <span style={{ fontFamily: "'Barlow Semi Condensed', sans-serif", color: '#9A8E84' }}>
-                      Page {page} of {totalPages}
+                      Page {trackPage} of {totalPages}
                     </span>
                     <button
-                      onClick={() => { const p = Math.min(totalPages, page + 1); setPage(p); fetchTracksAndSelect(p); }}
-                      disabled={page >= totalPages}
+                      onClick={() => { const p = Math.min(totalPages, trackPage + 1); setTrackPage(p); fetchTracksAndSelect(p); }}
+                      disabled={trackPage >= totalPages}
                       className="p-2 rounded disabled:opacity-50"
                       style={{ color: '#9A8E84' }}
                     >
@@ -649,38 +751,37 @@ setResolveResults(prev => prev.map(r => r.track_id === result.track_id ? updated
 
           {page === 2 && (
             <>
-              <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center justify-between mb-2">
                 <button
                   onClick={() => setPage(1)}
-                  className="flex items-center gap-1 px-3 py-1.5 text-sm border rounded"
+                  className="flex items-center gap-1 px-2 py-1 text-xs border rounded"
                   style={{ fontFamily: "'Barlow Condensed', sans-serif", color: '#9A8E84', borderColor: '#3D2820' }}
                 >
-                  <ChevronLeft size={16} />
+                  <ChevronLeft size={14} />
                   Back
                 </button>
                 <div className="flex items-center gap-2">
                   {resolving && (
                     <div className="flex items-center gap-2" style={{ color: '#b4003e' }}>
-                      <Loader2 className="animate-spin" size={16} />
-                      <span style={{ fontFamily: "'Barlow Semi Condensed', sans-serif", fontSize: '0.875rem' }}>
-                        Processing {processedCount}/{selected.size}...
+                      <Loader2 className="animate-spin" size={14} />
+                      <span style={{ fontFamily: "'Barlow Semi Condensed', sans-serif", fontSize: '0.75rem' }}>
+                        {processedCount}/{selected.size}
                       </span>
                     </div>
                   )}
-                  <span className="text-sm" style={{ fontFamily: "'Barlow Semi Condensed', sans-serif", color: '#9A8E84' }}>
-                    {resolveResults.filter((r) => r.matched).length} resolved •{' '}
-                    {resolveResults.filter((r) => !r.matched).length} no match
+                  <span className="text-xs" style={{ fontFamily: "'Barlow Semi Condensed', sans-serif", color: '#9A8E84' }}>
+                    {resolveResults.filter((r) => r.matched).length} found • {resolveResults.filter((r) => !r.matched).length} no match
                   </span>
                 </div>
               </div>
 
-              <div className="space-y-4 mb-6">
+              <div className="space-y-2 mb-4">
                 {resolveResults.map((result) => {
                   const decision = decisions[result.track_id]
                   return (
                     <div
                       key={result.track_id}
-                      className="p-4 rounded"
+                      className="p-3 rounded"
                       style={{
                         background: decision === 'accept' ? 'rgba(180, 0, 62, 0.1)' : decision === 'reject' ? 'rgba(61, 40, 32, 0.5)' : '#231815',
                         border: `1px solid ${decision === 'accept' ? 'rgba(180, 0, 62, 0.3)' : decision === 'reject' ? '#3D2820' : '#3D2820'}`,
@@ -690,7 +791,7 @@ setResolveResults(prev => prev.map(r => r.track_id === result.track_id ? updated
                       <div className="flex items-start justify-between gap-4">
                         <div className="flex items-start gap-3 flex-1 min-w-0">
                           <div
-                            className="w-16 h-16 rounded shrink-0 overflow-hidden"
+                            className="w-12 h-12 rounded shrink-0 overflow-hidden"
                             style={{ background: '#1A1210', border: '1px solid #3D2820' }}
                           >
                             {result.original_mb_release_group_id &&
@@ -702,34 +803,50 @@ setResolveResults(prev => prev.map(r => r.track_id === result.track_id ? updated
                               />
                             ) : (
                               <div className="w-full h-full flex items-center justify-center" style={{ color: '#3D2820' }}>
-                                <span className="text-xs" style={{ fontFamily: "'Barlow Condensed', sans-serif" }}>No Cover</span>
+                                <span className="text-xs" style={{ fontFamily: "'Barlow Condensed', sans-serif" }}>—</span>
                               </div>
                             )}
                           </div>
                           <div className="flex-1 min-w-0">
-                            <p className="text-xs uppercase mb-2" style={{ fontFamily: "'Barlow Condensed', sans-serif", color: '#6B5E56' }}>
-                              Original
-                            </p>
-                            <p className="text-sm" style={{ fontFamily: "'Barlow Semi Condensed', sans-serif", color: '#E8DDD0' }}>
-                              {result.original_title}
-                            </p>
-                            <p className="text-xs" style={{ fontFamily: "'Barlow Semi Condensed', sans-serif", color: '#9A8E84' }}>
+                            <div className="flex items-center gap-1 mb-0.5">
+                              <p className="text-xs truncate" style={{ fontFamily: "'Barlow Semi Condensed', sans-serif", color: '#E8DDD0' }}>
+                                {result.original_title}
+                              </p>
+                            </div>
+                            <p className="text-xs truncate" style={{ fontFamily: "'Barlow Semi Condensed', sans-serif", color: '#9A8E84' }}>
                               {result.original_artist}
                             </p>
                             {result.original_artist_credit && (
-                              <p className="text-xs" style={{ fontFamily: "'Barlow Semi Condensed', sans-serif", color: '#6B5E56' }}>
+                              <p className="text-xs truncate" style={{ fontFamily: "'Barlow Semi Condensed', sans-serif", color: '#6B5E56' }}>
                                 {result.original_artist_credit}
                               </p>
                             )}
-                            <p className="text-xs" style={{ fontFamily: "'Barlow Semi Condensed', sans-serif", color: '#6B5E56' }}>
-                              {result.original_album}
-                            </p>
+                            {result.original_tags && (() => {
+                              try {
+                                const tags = JSON.parse(result.original_tags)
+                                return Array.isArray(tags) && tags.length > 0 ? (
+                                  <div className="flex flex-wrap gap-1 mt-0.5">
+                                    {tags.map((tag: string) => (
+                                      <span
+                                        key={tag}
+                                        className="text-xs px-1 py-0.5 rounded"
+                                        style={{ background: '#3D2820', color: '#9A8E84', fontFamily: "'Barlow Semi Condensed', sans-serif" }}
+                                      >
+                                        {tag}
+                                      </span>
+                                    ))}
+                                  </div>
+                                ) : null
+                              } catch {
+                                return null
+                              }
+                            })()}
                           </div>
                         </div>
-                        <div style={{ color: '#6B5E56', fontSize: 20 }}>→</div>
-                        <div className="flex items-start gap-3 flex-1 min-w-0">
+                        <div style={{ color: '#6B5E56', fontSize: 16 }}>→</div>
+                        <div className="flex items-start gap-2 flex-1 min-w-0">
                           <div
-                            className="w-16 h-16 rounded shrink-0 overflow-hidden"
+                            className="w-12 h-12 rounded shrink-0 overflow-hidden"
                             style={{ background: '#1A1210', border: '1px solid #3D2820' }}
                           >
                             {result.matched && result.mb_release_group_id && coverArt[result.track_id]?.new ? (
@@ -740,42 +857,87 @@ setResolveResults(prev => prev.map(r => r.track_id === result.track_id ? updated
                               />
                             ) : !result.matched || !result.mb_release_group_id ? (
                               <div className="w-full h-full flex items-center justify-center" style={{ color: '#3D2820' }}>
-                                <span className="text-xs" style={{ fontFamily: "'Barlow Condensed', sans-serif" }}>No Cover</span>
+                                <span className="text-xs" style={{ fontFamily: "'Barlow Condensed', sans-serif" }}>—</span>
                               </div>
                             ) : (
                               <div className="w-full h-full flex items-center justify-center" style={{ color: '#3D2820' }}>
-                                <Loader2 className="animate-spin" size={20} />
+                                <Loader2 className="animate-spin" size={16} />
                               </div>
                             )}
                           </div>
                           <div className="flex-1 min-w-0">
-                            <p className="text-xs uppercase mb-2" style={{ fontFamily: "'Barlow Condensed', sans-serif", color: '#b4003e' }}>
-                              Match
-                            </p>
                             {result.matched ? (
                               <>
-                                <p className="text-sm" style={{ fontFamily: "'Barlow Semi Condensed', sans-serif", color: '#E8DDD0' }}>
-                                  {result.matched_title}
-                                </p>
-                                <p className="text-xs" style={{ fontFamily: "'Barlow Semi Condensed', sans-serif", color: '#9A8E84' }}>
+                                <div className="flex items-center gap-1 mb-0.5">
+                                  <p className="text-xs truncate" style={{ fontFamily: "'Barlow Semi Condensed', sans-serif", color: '#E8DDD0' }}>
+                                    {result.matched_title}
+                                  </p>
+                                </div>
+                                <p className="text-xs truncate" style={{ fontFamily: "'Barlow Semi Condensed', sans-serif", color: '#9A8E84' }}>
                                   {result.matched_artist}
                                 </p>
                                 {result.matched_artist_credit && (
-                                  <p className="text-xs" style={{ fontFamily: "'Barlow Semi Condensed', sans-serif", color: '#6B5E56' }}>
+                                  <p className="text-xs truncate" style={{ fontFamily: "'Barlow Semi Condensed', sans-serif", color: '#6B5E56' }}>
                                     {result.matched_artist_credit}
                                   </p>
                                 )}
-                                <p className="text-xs mt-1" style={{ fontFamily: "'Barlow Semi Condensed', sans-serif", color: '#6B5E56' }}>
+                                <p className="text-xs truncate" style={{ fontFamily: "'Barlow Semi Condensed', sans-serif", color: '#6B5E56' }}>
                                   {result.matched_album}
                                 </p>
-                                <p className="text-xs mt-1" style={{ fontFamily: "'Barlow Semi Condensed', sans-serif", color: '#6B5E56' }}>
-                                  MBID: {result.mb_id?.slice(0, 8)}... • {result.phase === 'Set by user' ? 'Set by user' : `Score: ${result.mb_score}%`}
+                                <p className="text-xs" style={{ fontFamily: "'Barlow Semi Condensed', sans-serif", color: '#6B5E56' }}>
+                                  {result.phase === 'Set by user' ? 'Manual' : result.mb_score != null ? `Score: ${result.mb_score}%` : null}
                                 </p>
+                                <div className="flex flex-wrap gap-1 mt-0.5">
+                                  {getResultTags(result).map((tag: string) => (
+                                    <span
+                                      key={tag}
+                                      className="group relative text-xs px-1 py-0.5 rounded flex items-center gap-0.5 cursor-pointer"
+                                      style={{ background: '#b4003e33', color: '#E8DDD0', fontFamily: "'Barlow Semi Condensed', sans-serif" }}
+                                      onClick={() => removeTag(result, tag)}
+                                      title="Click to remove"
+                                    >
+                                      <span className="group-hover:brightness-150 transition-all">{tag}</span>
+                                      <span className="opacity-0 group-hover:opacity-100 transition-opacity ml-0.5" style={{ color: '#E8DDD0' }}>
+                                        <X size={10} />
+                                      </span>
+                                    </span>
+                                  ))}
+                                  {addingTagId === result.track_id ? (
+                                    <input
+                                      type="text"
+                                      value={newTagInput}
+                                      onChange={(e) => setNewTagInput(e.target.value)}
+                                      onKeyDown={(e) => { if (e.key === 'Enter') addTag(result); if (e.key === 'Escape') { setAddingTagId(null); setNewTagInput('') } }}
+                                      onBlur={() => { addTag(result) }}
+                                      autoFocus
+                                      className="w-20 px-1 py-0.5 text-xs rounded"
+                                      style={{ background: '#1A1210', border: '1px solid #b4003e', color: '#E8DDD0', fontFamily: "'Barlow Semi Condensed', sans-serif" }}
+                                    />
+                                  ) : (
+                                    <button
+                                      onClick={() => setAddingTagId(result.track_id)}
+                                      className="text-xs px-1 py-0.5 rounded"
+                                      style={{ background: '#3D2820', color: '#9A8E84', fontFamily: "'Barlow Semi Condensed', sans-serif" }}
+                                    >
+                                      +
+                                    </button>
+                                  )}
+                                  {getResultTags(result).length > 0 && (
+                                    <button
+                                      onClick={() => setEditedTags((prev) => ({ ...prev, [result.track_id]: [] }))}
+                                      className="text-xs px-1 py-0.5 rounded"
+                                      style={{ background: '#3D2820', color: '#6B5E56', fontFamily: "'Barlow Semi Condensed', sans-serif" }}
+                                      title="Clear all tags"
+                                    >
+                                      Clear
+                                    </button>
+                                  )}
+                                </div>
                               </>
                             ) : (
                               <>
-                                <p className="text-sm" style={{ fontFamily: "'Barlow Semi Condensed', sans-serif", color: '#9A8E84' }}>
-                                  No match found
+                                <p className="text-xs" style={{ fontFamily: "'Barlow Semi Condensed', sans-serif", color: '#9A8E84' }}>
+                                  No match
                                 </p>
                                 {!decision && (
                                   <button
@@ -794,15 +956,15 @@ setResolveResults(prev => prev.map(r => r.track_id === result.track_id ? updated
                       </div>
 
                       {!decision && result.matched && (
-                        <div className="flex items-center gap-2 mt-3">
+                        <div className="flex items-center gap-1.5 mt-2">
                           <button
                             onClick={() => acceptMatch(result)}
                             disabled={applying}
-                            className="p-1.5 rounded"
+                            className="p-1 rounded"
                             style={{ background: '#b4003e', color: '#E8DDD0' }}
                             title="Accept"
                           >
-                            <Check size={16} />
+                            <Check size={14} />
                           </button>
                           <button
                             onClick={() => rejectMatch(result)}
@@ -812,18 +974,20 @@ setResolveResults(prev => prev.map(r => r.track_id === result.track_id ? updated
                           >
                             <XCircle size={16} />
                           </button>
-                          <button
-                            onClick={() => { setEditingId(result.track_id); setManualMbId(result.mb_id || '') }}
-                            className="p-1.5 rounded"
-                            style={{ background: '#3D2820', color: '#9A8E84' }}
-                            title="Edit MBID"
-                          >
-                            <Pencil size={16} />
-                          </button>
+                          {result.mb_score != null && (
+                            <button
+                              onClick={() => { setEditingId(result.track_id); setManualMbId(result.mb_id || '') }}
+                              className="p-1.5 rounded"
+                              style={{ background: '#3D2820', color: '#9A8E84' }}
+                              title="Edit MBID"
+                            >
+                              <Pencil size={16} />
+                            </button>
+                          )}
                         </div>
                       )}
 
-                      {editingId === result.track_id && (
+                      {editingId === result.track_id && result.mb_score != null && (
                         <div className="mt-3 p-3 rounded" style={{ background: '#231815', border: '1px solid #3D2820' }}>
                           <div className="flex items-center gap-2">
                             <input
@@ -881,16 +1045,14 @@ setResolveResults(prev => prev.map(r => r.track_id === result.track_id ? updated
                 })}
               </div>
 
-              <div className="flex items-center justify-between pt-4" style={{ borderTop: '1px solid #3D2820' }}>
-                <p className="text-sm" style={{ fontFamily: "'Barlow Semi Condensed', sans-serif", color: '#9A8E84' }}>
-                  Accepted: <span style={{ color: '#E8DDD0' }}>{acceptedCount}</span> • Rejected:{' '}
-                  <span style={{ color: '#E8DDD0' }}>{rejectedCount}</span> • Pending:{' '}
-                  <span style={{ color: '#E8DDD0' }}>{pendingCount}</span>
+              <div className="flex items-center justify-between pt-3" style={{ borderTop: '1px solid #3D2820' }}>
+                <p className="text-xs" style={{ fontFamily: "'Barlow Semi Condensed', sans-serif", color: '#9A8E84' }}>
+                  {acceptedCount} ✓ • {rejectedCount} ✗ • {pendingCount} pending
                 </p>
                 <button
                   onClick={() => setPage(3)}
                   disabled={pendingCount > 0}
-                  className="px-6 py-2 text-sm font-semibold rounded transition-colors"
+                  className="px-4 py-1.5 text-xs font-semibold rounded transition-colors"
                   style={{
                     fontFamily: "'Barlow Condensed', sans-serif",
                     fontWeight: 600,
@@ -901,7 +1063,7 @@ setResolveResults(prev => prev.map(r => r.track_id === result.track_id ? updated
                     cursor: pendingCount > 0 ? 'not-allowed' : 'pointer',
                   }}
                 >
-                  {pendingCount > 0 ? `Decide on all first (${pendingCount} pending)` : 'Apply & Close'}
+                  {pendingCount > 0 ? `${pendingCount} pending` : 'Apply'}
                 </button>
               </div>
             </>
@@ -940,8 +1102,8 @@ setResolveResults(prev => prev.map(r => r.track_id === result.track_id ? updated
                           className="w-12 h-12 rounded overflow-hidden shrink-0"
                           style={{ background: '#1A1210', border: '1px solid #3D2820' }}
                         >
-                          {result.old_cover_art ? (
-                            <img src={result.old_cover_art} alt="Old cover" className="w-full h-full object-cover" />
+                          {coverArt[result.track_id]?.old ? (
+                            <img src={coverArt[result.track_id].old!} alt="Old cover" className="w-full h-full object-cover" />
                           ) : (
                             <div className="w-full h-full flex items-center justify-center" style={{ color: '#3D2820', fontSize: '0.5rem', fontFamily: "'Barlow Condensed', sans-serif" }}>No Cover</div>
                           )}
@@ -951,8 +1113,8 @@ setResolveResults(prev => prev.map(r => r.track_id === result.track_id ? updated
                           className="w-12 h-12 rounded overflow-hidden shrink-0"
                           style={{ background: '#1A1210', border: '1px solid #3D2820' }}
                         >
-                          {result.new_cover_art ? (
-                            <img src={result.new_cover_art} alt="New cover" className="w-full h-full object-cover" />
+                          {coverArt[result.track_id]?.new ? (
+                            <img src={coverArt[result.track_id].new!} alt="New cover" className="w-full h-full object-cover" />
                           ) : (
                             <div className="w-full h-full flex items-center justify-center" style={{ color: '#3D2820', fontSize: '0.5rem', fontFamily: "'Barlow Condensed', sans-serif" }}>No Cover</div>
                           )}

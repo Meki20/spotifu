@@ -3,6 +3,13 @@ import { isTokenExpired } from './authToken'
 
 export const API = import.meta.env.VITE_API_URL ?? 'http://localhost:1985'
 
+/** Prepend API origin to server-relative URLs (e.g. /covers/artist-local/...). */
+export function mediaUrl(url: string | null | undefined): string | undefined {
+  if (!url) return undefined
+  if (url.startsWith('/')) return `${API}${url}`
+  return url
+}
+
 function mergeFetchSignal(userSignal: AbortSignal | null | undefined): AbortSignal {
   const timeoutSignal = AbortSignal.timeout(15_000)
   if (userSignal) {

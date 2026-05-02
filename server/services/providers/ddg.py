@@ -32,13 +32,30 @@ def _ddg_cache_is_usable(c: Any) -> bool:
 
 
 async def search_artist_thumb(artist_name: str) -> dict[str, Any] | None:
-    """Search DDG Images for artist thumbnail (square)."""
+    """Search DDG Images for artist thumbnail (square), with caching."""
     return await _ddg_search(artist_name, "square", "cover_ddg_thumb")
 
 
 async def search_artist_banner(artist_name: str) -> dict[str, Any] | None:
-    """Search DDG Images for artist banner."""
+    """Search DDG Images for artist banner, with caching."""
     return await _ddg_search(artist_name, "banner", "cover_ddg_banner")
+
+
+async def search_uncached(query: str) -> list[str]:
+    """Run a DDG image search with a custom query, no caching."""
+    if not _DDGS_AVAILABLE:
+        return []
+    try:
+        import asyncio
+        loop = asyncio.get_event_loop()
+        results = await loop.run_in_executor(
+            None,
+            lambda: list(DDGS().images(query, max_results=10)),
+        )
+        return [r["image"] for r in results if r.get("image")]
+    except Exception as e:
+        logger.warning("DDG uncached search %r: exception=%s", query, e)
+        return []
 
 
 async def _ddg_search(artist_name: str, variant: str, cache_kind: str) -> dict[str, Any] | None:

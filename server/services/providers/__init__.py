@@ -2,6 +2,7 @@ import asyncio
 import copy
 import json
 import logging
+import os
 import time
 from collections import OrderedDict
 from datetime import datetime, timedelta
@@ -19,6 +20,15 @@ logger = logging.getLogger(__name__)
 _MEM_TTL = 600.0          # hot-tier memory TTL (seconds)
 _DB_SOFT_TTL = timedelta(days=7)   # DB soft TTL — return stale + revalidate in bg
 _COVER_NEG_TTL = timedelta(hours=24)  # how long to cache a cover miss
+
+# Artist local images storage (user-downloaded from DDG)
+_ARTIST_IMAGES_DIR = os.environ.get("CACHE_DIR") or "/home/lukaarch/Documents/src/SpotiFU/cache"
+_ARTIST_IMAGES_SUBDIR = "artist_images"
+
+def _get_artist_images_dir() -> str:
+    d = os.path.join(_ARTIST_IMAGES_DIR, _ARTIST_IMAGES_SUBDIR)
+    os.makedirs(d, exist_ok=True)
+    return d
 
 # In-memory hot-tier caches: key → (timestamp, value) — LRU capped per tier
 _MAX_MEM_PER_TIER = 500
@@ -91,6 +101,19 @@ def _db_set(kind: str, mbid: str, value: Any) -> None:
             session.commit()
     except Exception:
         logger.exception("MBEntityCache _db_set path failed (kind=%s)", kind)
+
+
+def _db_delete(kind: str, mbid: str) -> None:
+    """Delete a cache entry from MBEntityCache."""
+    key = f"{kind}:{mbid}"
+    try:
+        with Session(engine) as session:
+            row = session.get(MBEntityCache, key)
+            if row:
+                session.delete(row)
+                session.commit()
+    except Exception:
+        logger.exception("MBEntityCache _db_delete failed (kind=%s)", kind)
 
 
 def _db_is_fresh(kind: str, mbid: str) -> bool:
@@ -253,15 +276,18 @@ class MetadataService:
         return result
 
     async def load_artist_visuals(self, artist_id: str, *, artist_name: str | None) -> dict[str, Any]:
-        """Fetch fanart, TheAudioDB, and DDG in parallel; fills entity caches. Returns best banner + thumb."""
+        """Fetch fanart and TheAudioDB only; DDG is fetched on-demand via /artist/{id}/ddg-search.
+
+        Returns best banner + thumb from reputable providers (fanart.tv, TheAudioDB).
+        """
         return await self._get_fanart_fallback(artist_id, artist_name=artist_name)
 
     async def _get_fanart_fallback(self, artist_id: str, *, artist_name: str | None = None) -> dict[str, Any]:
-        """Fetch artist images: fanart, TheAudioDB, and DDG run in parallel (no MusicBrainz).
+        """Fetch artist images: fanart and TheAudioDB run in parallel (no DDG, no MusicBrainz).
 
         Each provider writes its own DB cache. Primary ``banner``/``thumb`` follow fanart →
-        theaudiodb → DDG. ``artist_name`` is used for DDG; if missing, one lite ``get_artist_head``
-        call on the provider resolves the name.
+        theaudiodb. ``artist_name`` is used only for logging/debugging here.
+        DDG is fetched on-demand via separate endpoint to avoid invalidating cached URLs.
         """
         try:
             name = (artist_name or "").strip() or None
@@ -289,21 +315,9 @@ class MetadataService:
             async def do_audiodb() -> Any:
                 return await audiodb.get_artist_images(artist_id)
 
-            async def do_ddg_thumb() -> Any:
-                if not name:
-                    return None
-                return await ddg.search_artist_thumb(name)
-
-            async def do_ddg_banner() -> Any:
-                if not name:
-                    return None
-                return await ddg.search_artist_banner(name)
-
-            f_r, a_r, dt_r, db_r = await asyncio.gather(
+            f_r, a_r = await asyncio.gather(
                 do_fanart(),
                 do_audiodb(),
-                do_ddg_thumb(),
-                do_ddg_banner(),
                 return_exceptions=True,
             )
 
@@ -313,7 +327,7 @@ class MetadataService:
                     return None
                 return x
 
-            f_r, a_r, dt_r, db_r = _unwrap(f_r), _unwrap(a_r), _unwrap(dt_r), _unwrap(db_r)
+            f_r, a_r = _unwrap(f_r), _unwrap(a_r)
 
             banner: str | None = None
             thumb: str | None = None
@@ -323,10 +337,6 @@ class MetadataService:
             if a_r and isinstance(a_r, dict):
                 banner = banner or a_r.get("banner")
                 thumb = thumb or a_r.get("thumb")
-            if isinstance(dt_r, dict) and dt_r.get("thumb") and not thumb:
-                thumb = dt_r.get("thumb")
-            if isinstance(db_r, dict) and db_r.get("thumb") and not banner:
-                banner = db_r.get("thumb")
             return {"banner": banner, "thumb": thumb}
         except Exception as e:
             logger.warning(f"[providers] _get_fanart_fallback {artist_id}: exception={e}")

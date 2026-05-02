@@ -1,5 +1,6 @@
 import asyncio
 import difflib
+import os
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
@@ -8,8 +9,9 @@ from database import get_session
 from deps import get_current_user, require_permission, CurrentUser
 from models import User, MbArtist, MbArtistAlias
 from services.artist_alias_cache import norm_alias, upsert_from_mb_artist_json
-from services.providers import MetadataService
+from services.providers import MetadataService, _get_artist_images_dir
 from services.providers import musicbrainz
+from services.providers import _ARTIST_IMAGES_DIR
 from services.providers.musicbrainz import _caa_release_group_front_url, CAA_SIZE_LIST
 router = APIRouter(prefix="/artist", tags=["artist"])
 
@@ -53,10 +55,13 @@ def _all_banners(artist_id: str, artist_name: str | None = None) -> list[str]:
     if adb:
         add(adb.get("banners", []))
 
-    # ddg banners (cache key: cover_ddg_banner, keyed by artist name)
-    if artist_name:
-        ddg_b = _get_cache("cover_ddg_banner", artist_name)
-        add(_ddg_image_urls(ddg_b))
+    # local downloaded images
+    local = _get_cache("cover_artist_local", artist_id)
+    if local:
+        paths = local.get("banner_paths") or ([local["banner_path"]] if local.get("banner_path") else [])
+        for idx, p in enumerate(paths):
+            if p and os.path.isfile(os.path.join(_ARTIST_IMAGES_DIR, p)):
+                banners.append(f"/covers/artist-local/{artist_id}/banner/{idx}")
 
     return banners
 
@@ -79,9 +84,13 @@ def _all_thumbs(artist_id: str, artist_name: str | None = None) -> list[str]:
     if adb:
         add(adb.get("thumbs", []))
 
-    if artist_name:
-        ddg_t = _get_cache("cover_ddg_thumb", artist_name)
-        add(_ddg_image_urls(ddg_t))
+    # local downloaded images
+    local = _get_cache("cover_artist_local", artist_id)
+    if local:
+        paths = local.get("thumb_paths") or ([local["thumb_path"]] if local.get("thumb_path") else [])
+        for idx, p in enumerate(paths):
+            if p and os.path.isfile(os.path.join(_ARTIST_IMAGES_DIR, p)):
+                thumbs.append(f"/covers/artist-local/{artist_id}/thumb/{idx}")
 
     return thumbs
 
@@ -400,3 +409,147 @@ async def get_artist(
         raise HTTPException(status_code=404, detail="Artist not found")
     data["top_tracks"] = []
     return data
+
+
+@router.get("/{artist_id}/ddg-search")
+async def ddg_search_artist_images(
+    artist_id: str,
+    type: str = Query(..., description="square or banner"),
+    q: str | None = Query(default=None, description="custom search query; defaults to artist name + type"),
+    session: Session = Depends(get_session),
+    user: User = Depends(get_current_user),
+):
+    """On-demand DDG image search. Never cached."""
+    if type not in ("square", "banner"):
+        raise HTTPException(status_code=400, detail="type must be 'square' or 'banner'")
+
+    from services.providers import ddg
+
+    if q and q.strip():
+        query = q.strip()
+    else:
+        artist_name: str | None = None
+        head = _get_cache("artist_head", artist_id)
+        if isinstance(head, dict) and (head.get("name") or "").strip():
+            artist_name = (head.get("name") or "").strip()
+
+        if not artist_name:
+            svc = MetadataService(session)
+            async with musicbrainz.mb_interactive_calls():
+                mb = await svc.get_artist_head(artist_id)
+            if mb and (mb.get("name") or "").strip():
+                artist_name = (mb.get("name") or "").strip()
+
+        if not artist_name:
+            raise HTTPException(status_code=400, detail="artist name not known")
+
+        query = f"{artist_name} artist {type}"
+
+    urls = await ddg.search_uncached(query)
+    return {"results": urls}
+
+
+class ImageDownloadRequest(BaseModel):
+    url: str
+    kind: str  # "banner" or "thumb"
+
+
+@router.post("/{artist_id}/images/download")
+async def download_artist_image(
+    artist_id: str,
+    body: ImageDownloadRequest,
+    user: User = Depends(get_current_user),
+):
+    """Download an image from URL and cache locally for this artist."""
+    if body.kind not in ("banner", "thumb"):
+        raise HTTPException(status_code=400, detail="kind must be 'banner' or 'thumb'")
+
+    import aiohttp
+    import uuid
+
+    images_dir = _get_artist_images_dir()
+    ext = ".jpg"
+    if body.url.lower().endswith(".png"):
+        ext = ".png"
+
+    filename = f"{artist_id}_{body.kind}_{uuid.uuid4().hex[:8]}{ext}"
+    filepath = os.path.join(images_dir, filename)
+
+    try:
+        async with aiohttp.ClientSession() as http_session:
+            async with http_session.get(body.url) as resp:
+                if resp.status != 200:
+                    raise HTTPException(status_code=502, detail="Failed to fetch image from source")
+                content = await resp.read()
+        with open(filepath, "wb") as f:
+            f.write(content)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to download image: {e}")
+
+    rel_path = os.path.join("artist_images", filename)
+    from services.providers import _db_set
+    existing = _get_cache("cover_artist_local", artist_id) or {}
+    paths_key = "banner_paths" if body.kind == "banner" else "thumb_paths"
+    old_key = "banner_path" if body.kind == "banner" else "thumb_path"
+    # migrate old single-path format to list
+    current = existing.get(paths_key) or ([existing.pop(old_key)] if existing.get(old_key) else [])
+    existing.pop(old_key, None)
+    existing[paths_key] = current + [rel_path]
+    _db_set("cover_artist_local", artist_id, existing)
+
+    return {
+        "local_url": f"/covers/artist-local/{artist_id}/{body.kind}",
+        "filename": rel_path,
+    }
+
+
+@router.delete("/{artist_id}/images/local")
+async def delete_artist_local_image(
+    artist_id: str,
+    kind: str = Query(..., description="banner or thumb"),
+    idx: int | None = Query(default=None, description="index to delete; omit to delete all of kind"),
+    user: User = Depends(get_current_user),
+):
+    """Delete one or all locally cached images of a kind for this artist."""
+    if kind not in ("banner", "thumb"):
+        raise HTTPException(status_code=400, detail="kind must be 'banner' or 'thumb'")
+
+    local = _get_cache("cover_artist_local", artist_id)
+    if not local:
+        return {"deleted": False}
+
+    paths_key = f"{kind}_paths"
+    old_key = f"{kind}_path"
+    paths = local.get(paths_key) or ([local[old_key]] if local.get(old_key) else [])
+
+    if idx is not None:
+        if idx < 0 or idx >= len(paths):
+            raise HTTPException(status_code=404, detail=f"No local {kind} at index {idx}")
+        p = paths[idx]
+        if p:
+            full = os.path.join(_ARTIST_IMAGES_DIR, p)
+            if os.path.isfile(full):
+                os.remove(full)
+        paths = [p for i, p in enumerate(paths) if i != idx]
+    else:
+        for p in paths:
+            if p:
+                full = os.path.join(_ARTIST_IMAGES_DIR, p)
+                if os.path.isfile(full):
+                    os.remove(full)
+        paths = []
+
+    local.pop(old_key, None)
+    if paths:
+        local[paths_key] = paths
+    else:
+        local.pop(paths_key, None)
+
+    from services.providers import _db_set
+    if local.get("banner_paths") or local.get("thumb_paths"):
+        _db_set("cover_artist_local", artist_id, local)
+    else:
+        from services.providers import _db_delete
+        _db_delete("cover_artist_local", artist_id)
+
+    return {"deleted": True}

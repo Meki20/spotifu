@@ -3,7 +3,7 @@ import { useQuery } from '@tanstack/react-query'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useAuthStore } from '../stores/authStore'
 import { Play, ChevronLeft, ChevronRight, Pencil } from 'lucide-react'
-import { API, authFetch } from '../api'
+import { API, authFetch, mediaUrl } from '../api'
 import { useArtistPrefetch } from '../hooks/useArtistPrefetch'
 import { useArtistTransitionStore } from '../stores/artistTransitionStore'
 import ImagePickerModal from '../components/ImagePickerModal'
@@ -356,8 +356,8 @@ export default function ArtistPage() {
   const sortedEps = sortAlbums(epsOnly)
   const sortedSingles = sortAlbums(singlesOnly)
 
-  const bannerUrl = artistImages?.banner || artist.banner
-  const pictureUrl = artistImages?.thumb || artist.picture
+  const bannerUrl = mediaUrl(artistImages?.banner || artist.banner)
+  const pictureUrl = mediaUrl(artistImages?.thumb || artist.picture)
 
   return (
     <div>
@@ -556,6 +556,8 @@ export default function ArtistPage() {
         <ImagePickerModal
           isOpen={showImagePicker}
           onClose={() => setShowImagePicker(false)}
+          artistId={artistId}
+          artistName={artist.name}
           banners={artistImages?.banners ?? []}
           thumbs={artistImages?.thumbs ?? []}
           bannerIdx={artistImages?.banner_idx ?? 0}
@@ -568,6 +570,7 @@ export default function ArtistPage() {
             })
             refetchImages()
           }}
+          onRefresh={refetchImages}
         />
       )}
     </div>

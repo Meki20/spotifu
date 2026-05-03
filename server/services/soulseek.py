@@ -31,16 +31,10 @@ _SECRETS_FILE = Path(os.environ.get("SECRETS_FILE", "/home/lukaarch/Documents/sr
 
 # Ban-prevention knobs
 _MIN_SEARCH_INTERVAL = 3.0          # seconds between consecutive searches
-_SEARCH_COLLECT_WINDOW = 6.0        # seconds to accumulate results before cutoff
+_SEARCH_COLLECT_WINDOW = 3.0        # seconds to accumulate results before cutoff
 _MAX_CONCURRENT_DOWNLOADS = 2
 _RECONNECT_BACKOFF = 10             # seconds (aioslsk's own reconnect timer)
 _SEARCH_REQUEST_TIMEOUT = 60        # seconds (server-side request TTL)
-# NOTE: early-exit is intentionally strict: the result must be both high-quality
-# and likely-to-start-downloading immediately (good speed + free slots).
-_EXCELLENT_THRESHOLD = 0.94         # early-exit score threshold (composite)
-_EXCELLENT_MIN_COLLECT = 1.5        # seconds: gather a bit before early-exit
-_EXCELLENT_MIN_SPEED = 10_000_000   # bytes/sec: 10MB/s for truly "excellent"
-
 # Download stall: if bytes_transfered is still 0 for this many consecutive progress polls
 # (poll every 0.5s in download_file) → abort and let download.py try the next candidate.
 # 16 ticks at 0.5s ≈ 8s of "stuck at 0%" with no data moving.
@@ -801,9 +795,6 @@ async def search_soulseek(
     long we gather incoming results before returning. `artist`/`title` are used
     for fuzzy path scoring when available.
 
-    Early exit: if any file scores >= _EXCELLENT_THRESHOLD during collection,
-    return immediately with that single best result. Collection continues in
-    aioslsk's background so fallback data is available if needed.
     """
     global _last_search_at
 
@@ -822,10 +813,8 @@ async def search_soulseek(
         _last_search_at = time.monotonic()
 
     _SEARCH_MAX_PEERS = 100   # stop early once we have enough peer responses
-    _EXCELLENT_CHECK_INTERVAL = 0.25  # poll for excellent results every N seconds
 
     seen_files: set[tuple[str, str]] = set()
-    excellent_result: List[Tuple[str, str, int]] | None = None
     avail_by_key: Counter[str] = Counter()
     _candidate_rows: list[tuple[Any, Any, int, str, str]] = []  # (r, f, size, ext, akey)
 
@@ -850,63 +839,23 @@ async def search_soulseek(
                 avail_by_key[akey] += 1
 
     async def _collect_results():
-        nonlocal excellent_result
         elapsed = 0.0
-        interval = _EXCELLENT_CHECK_INTERVAL
+        interval = 0.25
+        max_collect = collect_for
 
-        while elapsed < collect_for:
+        while elapsed < max_collect:
             _ingest_new_results()
-
-            # Re-score all candidates each tick so availability + excellent detection stay fresh.
-            best_excellent: tuple[float, str, str, int] | None = None
-            for r, f, size, ext, akey in _candidate_rows:
-                availability = int(avail_by_key[akey] or 1)
-                score = _score_file(r, f, artist, title, album, availability=availability)
-                if (
-                    elapsed >= _EXCELLENT_MIN_COLLECT
-                    and getattr(r, "has_free_slots", False)
-                    and int(getattr(r, "queue_size", 0) or 0) == 0
-                    and int(r.avg_speed or 0) >= _EXCELLENT_MIN_SPEED
-                    and ext == "flac"
-                    and score >= _EXCELLENT_THRESHOLD
-                ):
-                    cand = (score, r.username, f.filename, size)
-                    if best_excellent is None or cand[0] > best_excellent[0]:
-                        best_excellent = cand
-
-            if best_excellent is not None:
-                score, user, path, size = best_excellent
-                akey_log = _availability_key(path or "")
-                # For debugging: include queue size + speed to understand "stuck in queue" cases.
-                # Note: We only early-exit on queue_size==0 + free slots + high speed, but still log.
-                speed_log = 0
-                queue_log = 0
-                free_log = False
-                for r, f, _size, _ext, _akey in _candidate_rows:
-                    if r.username == user and (f.filename or "") == (path or ""):
-                        speed_log = int(getattr(r, "avg_speed", 0) or 0)
-                        try:
-                            queue_log = int(getattr(r, "queue_size", 0) or 0)
-                        except Exception:
-                            queue_log = 0
-                        free_log = bool(getattr(r, "has_free_slots", False))
-                        break
-                logger.info(
-                    "EXCELLENT result: score=%.3f elapsed=%.2fs user=%r ext=%r availability=%d avg_speed=%dB/s queue_size=%d free_slots=%s path=%r size=%d",
-                    score, elapsed, user,
-                    (path.rsplit(".", 1)[-1].lower() if "." in path else ""),
-                    int(avail_by_key[akey_log] or 1),
-                    speed_log,
-                    queue_log,
-                    free_log,
-                    path, size,
-                )
-                excellent_result = [(user, path, size)]
-                return
 
             if len(request.results) >= _SEARCH_MAX_PEERS:
                 logger.debug("Got %d peers, stopping early", len(request.results))
                 break
+
+            # At 3s: if no candidates yet, extend 2 more seconds; otherwise stop
+            if elapsed >= 3.0 and max_collect == collect_for:
+                if not _candidate_rows:
+                    max_collect = 5.0
+                else:
+                    break
 
             await asyncio.sleep(interval)
             elapsed += interval
@@ -924,11 +873,6 @@ async def search_soulseek(
             _client.searches.remove_request(request)
         except Exception as e:
             logger.debug("remove_request failed (ignored): %s", e)
-
-    # If we found an excellent result, return it immediately
-    if excellent_result is not None:
-        logger.debug("Returning excellent result immediately (score >= %s)", _EXCELLENT_THRESHOLD)
-        return excellent_result
 
     # Final ranking from the same candidate list (no second full scan of raw results).
     _ingest_new_results()

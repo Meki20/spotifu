@@ -147,7 +147,7 @@ async def _run_download(track_id: int, title: str, artist: str, album: str = "",
                 if variant_idx > 0 or i > 0:
                     logger.info("Soulseek retry: %s from %s (%s bytes)", remote_path, username, file_size)
                 try:
-                    abort_on_no_progress = len(results) >= 3 and not (only_candidate or last_in_queue)
+                    abort_on_no_progress = not (only_candidate or last_in_queue)
                     got = await download_file(
                         username,
                         remote_path,

@@ -1048,7 +1048,7 @@ async def download_file(
 
                 # Always-on "didn't start" guard:
                 # If we don't get *any* bytes within ~8s of transfer creation, move on.
-                if bytes_done <= 0 and (now - created_at) >= 8.0:
+                if abort_on_no_progress and bytes_done <= 0 and (now - created_at) >= 8.0:
                     logger.warning(
                         "No-start detected (state=%s bytes=0 for %.1fs); aborting to try next candidate: %s/%s",
                         getattr(getattr(transfer, "state", None), "VALUE", None),

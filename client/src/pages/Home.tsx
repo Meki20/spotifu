@@ -65,6 +65,32 @@ export default function Home() {
 
   const showHottestTracks = hottestTracksWithDef && hottestTracksWithDef.tracks.length > 0
 
+  async function fetchTagMix(): Promise<any[]> {
+    const res = await authFetch('/auto-playlists/tag_mix/tracks')
+    if (!res.ok) {
+      if (res.status === 404) return []
+      throw new Error('Failed to fetch tag mix')
+    }
+    return res.json()
+  }
+
+  const { data: tagMixWithDef } = useQuery({
+    queryKey: ['tag-mix'],
+    queryFn: async () => {
+      const defRes = await authFetch('/auto-playlists')
+      if (!defRes.ok) return null
+      const defs = await defRes.json()
+      const tagMixDef = defs.find((d: any) => d.playlist_type === 'tag_mix')
+      if (!tagMixDef?.is_enabled) return null
+      const tracks = await fetchTagMix()
+      return { definition: tagMixDef, tracks }
+    },
+    enabled: !!token,
+    staleTime: 5 * 60 * 1000,
+  })
+
+  const showTagMix = tagMixWithDef && tagMixWithDef.tracks.length > 0
+
   async function fetchRecentlyDownloaded(): Promise<{ tracks: any[]; hasPermission: boolean }> {
     const res = await authFetch('/playlists/recently-downloaded')
     if (!res.ok) {
@@ -143,48 +169,87 @@ export default function Home() {
         </h1>
       </div>
 
-      {showHottestTracks && (
+      {(showHottestTracks || showTagMix) && (
         <div className="mb-8">
           <div
             className="flex items-center gap-2.5 mb-3"
             style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 16, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.12em', color: '#b4003e' }}
           >
-            {hottestTracksWithDef.definition.name}
+            For You
             <div className="flex-1 h-px" style={{ background: '#261A14' }} />
           </div>
-          <Link
-            to={`/auto-playlist/${hottestTracksWithDef.definition.id}`}
-            className="relative flex items-center gap-3 px-4 py-3 cursor-pointer border transition-colors hover:border-[#b4003e] overflow-hidden"
-            style={{ background: '#1A1210', borderColor: '#3D2820', borderRadius: 4, display: 'inline-flex' }}
-          >
-            {hottestTracksWithDef.definition.cover_url && (
-                <div
-                  className="absolute inset-0 pointer-events-none"
-                  style={{
-                    backgroundImage: `url(${hottestTracksWithDef.definition.cover_url})`,
-                    backgroundSize: 'cover',
-                    backgroundPosition: 'center',
-                    opacity: 0.15,
-                  }}
-                />
-              )}
-              <div
-                className="relative z-10 w-10 h-10 rounded overflow-hidden shrink-0 flex items-center justify-center"
-                style={{ background: '#231815' }}
+          <div className="flex flex-wrap gap-3">
+            {showHottestTracks && (
+              <Link
+                to={`/auto-playlist/${hottestTracksWithDef.definition.id}`}
+                className="relative flex items-center gap-3 px-4 py-3 cursor-pointer border transition-colors hover:border-[#b4003e] overflow-hidden"
+                style={{ background: '#1A1210', borderColor: '#3D2820', borderRadius: 4, display: 'inline-flex', minWidth: 200 }}
               >
-                {hottestTracksWithDef.definition.cover_url ? (
-                  <img src={hottestTracksWithDef.definition.cover_url} alt="" className="w-full h-full object-cover" loading="lazy" />
-                ) : (
-                  <span style={{ fontSize: 16 }}>▦</span>
-                )}
-              </div>
-              <span
-                className="relative z-10 text-xs truncate"
-                style={{ fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 600, color: '#E8DDD0' }}
+                {hottestTracksWithDef.definition.cover_url && (
+                    <div
+                      className="absolute inset-0 pointer-events-none"
+                      style={{
+                        backgroundImage: `url(${hottestTracksWithDef.definition.cover_url})`,
+                        backgroundSize: 'cover',
+                        backgroundPosition: 'center',
+                        opacity: 0.15,
+                      }}
+                    />
+                  )}
+                  <div
+                    className="relative z-10 w-10 h-10 rounded overflow-hidden shrink-0 flex items-center justify-center"
+                    style={{ background: '#231815' }}
+                  >
+                    {hottestTracksWithDef.definition.cover_url ? (
+                      <img src={hottestTracksWithDef.definition.cover_url} alt="" className="w-full h-full object-cover" loading="lazy" />
+                    ) : (
+                      <span style={{ fontSize: 16 }}>▦</span>
+                    )}
+                  </div>
+                  <span
+                    className="relative z-10 text-xs truncate"
+                    style={{ fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 600, color: '#E8DDD0' }}
+                  >
+                    {hottestTracksWithDef.definition.name}
+                  </span>
+              </Link>
+            )}
+            {showTagMix && (
+              <Link
+                to={`/auto-playlist/${tagMixWithDef.definition.id}`}
+                className="relative flex items-center gap-3 px-4 py-3 cursor-pointer border transition-colors hover:border-[#b4003e] overflow-hidden"
+                style={{ background: '#1A1210', borderColor: '#3D2820', borderRadius: 4, display: 'inline-flex', minWidth: 200 }}
               >
-                {hottestTracksWithDef.definition.name}
-              </span>
-          </Link>
+                {tagMixWithDef.definition.cover_url && (
+                    <div
+                      className="absolute inset-0 pointer-events-none"
+                      style={{
+                        backgroundImage: `url(${tagMixWithDef.definition.cover_url})`,
+                        backgroundSize: 'cover',
+                        backgroundPosition: 'center',
+                        opacity: 0.15,
+                      }}
+                    />
+                  )}
+                  <div
+                    className="relative z-10 w-10 h-10 rounded overflow-hidden shrink-0 flex items-center justify-center"
+                    style={{ background: '#231815' }}
+                  >
+                    {tagMixWithDef.definition.cover_url ? (
+                      <img src={tagMixWithDef.definition.cover_url} alt="" className="w-full h-full object-cover" loading="lazy" />
+                    ) : (
+                      <span style={{ fontSize: 16 }}>▦</span>
+                    )}
+                  </div>
+                  <span
+                    className="relative z-10 text-xs truncate"
+                    style={{ fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 600, color: '#E8DDD0' }}
+                  >
+                    {tagMixWithDef.definition.name}
+                  </span>
+              </Link>
+            )}
+          </div>
         </div>
       )}
 

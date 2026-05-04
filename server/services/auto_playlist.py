@@ -1,6 +1,8 @@
+import json
 import math
+import random
 from datetime import datetime, timedelta
-from typing import List
+from typing import List, Tuple
 from sqlmodel import Session, select
 from models import UserRecentlyPlayed, Track, AutoPlaylistDefinition, AutoPlaylistTrack
 
@@ -57,4 +59,124 @@ def generate_hottest_tracks(session: Session, user_id: int, limit: int = 20) -> 
             hotness_score=hotness,
         ))
 
+    return generated_tracks
+
+
+def generate_tag_mix(session: Session, user_id: int, limit: int = 20) -> Tuple[List[AutoPlaylistTrack], str]:
+    statement = (
+        select(UserRecentlyPlayed, Track)
+        .join(Track, UserRecentlyPlayed.track_id == Track.id)
+        .where(UserRecentlyPlayed.user_id == user_id)
+        .where(UserRecentlyPlayed.play_amount > 0)
+        .where(Track.tags.isnot(None))
+    )
+    results = session.exec(statement).all()
+
+    if not results:
+        return [], ""
+
+    played_tracks = [track for _, track in results if track.tags]
+
+    if len(played_tracks) < limit:
+        return [], ""
+
+    all_tags = set()
+    track_tag_map = {}
+    for track in played_tracks:
+        try:
+            tags = json.loads(track.tags)
+        except (json.JSONDecodeError, TypeError):
+            tags = []
+        if tags:
+            track_tag_map[track.id] = tags
+            for tag in tags:
+                all_tags.add(tag)
+
+    if not all_tags:
+        return [], ""
+
+    tag_list = list(all_tags)
+    random.shuffle(tag_list)
+
+    for tag in tag_list:
+        candidates = []
+        for track in played_tracks:
+            tags = track_tag_map.get(track.id, [])
+            if any(tag in t.lower() for t in tags):
+                candidates.append(track)
+
+        if len(candidates) >= limit:
+            return _select_diverse_tracks(candidates, limit, track_tag_map), f"{tag.title()} Mix"
+
+    candidates_with_counts = []
+    for tag in tag_list:
+        count = sum(1 for track in played_tracks if any(tag in t.lower() for t in track_tag_map.get(track.id, [])))
+        candidates_with_counts.append((tag, count))
+
+    candidates_with_counts.sort(key=lambda x: x[1], reverse=True)
+
+    selected_tag = None
+    accumulator = 0
+    total = sum(count for _, count in candidates_with_counts)
+    for tag, count in candidates_with_counts:
+        probability = count / total
+        accumulator += probability
+        if random.random() < accumulator:
+            selected_tag = tag
+            break
+
+    if not selected_tag:
+        selected_tag = tag_list[0]
+
+    final_candidates = []
+    for track in played_tracks:
+        tags = track_tag_map.get(track.id, [])
+        if any(selected_tag in t.lower() for t in tags):
+            final_candidates.append(track)
+
+    return _select_diverse_tracks(final_candidates, limit, track_tag_map), f"{selected_tag.title()} Mix"
+
+
+def _select_diverse_tracks(tracks: List[Track], limit: int, track_tag_map: dict) -> List[AutoPlaylistTrack]:
+    if len(tracks) <= limit:
+        return _build_playlist_tracks(tracks)
+
+    seen_tag_arrays = {}
+    selected = []
+
+    for track in tracks:
+        tags = tuple(sorted(track_tag_map.get(track.id, [])))
+        count = seen_tag_arrays.get(tags, 0)
+
+        if count < 2:
+            selected.append(track)
+            seen_tag_arrays[tags] = count + 1
+
+            if len(selected) >= limit:
+                break
+
+    if len(selected) < limit:
+        for track in tracks:
+            if track not in selected:
+                selected.append(track)
+                if len(selected) >= limit:
+                    break
+
+    return _build_playlist_tracks(selected[:limit])
+
+
+def _build_playlist_tracks(tracks: List[Track]) -> List[AutoPlaylistTrack]:
+    generated_tracks = []
+    for position, track in enumerate(tracks):
+        generated_tracks.append(AutoPlaylistTrack(
+            position=position,
+            title=track.title,
+            artist=track.artist,
+            album=track.album,
+            mb_recording_id=track.mb_id,
+            mb_artist_id=track.mb_artist_id,
+            mb_release_id=track.mb_release_id,
+            track_id=track.id,
+            hotness_score=1.0,
+        ))
     return generated_tracks

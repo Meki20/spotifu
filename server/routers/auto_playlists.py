@@ -6,7 +6,7 @@ from sqlmodel import Session, select, delete, func
 from database import get_session
 from deps import get_current_user
 from models import AutoPlaylistDefinition, AutoPlaylistTrack, User, Track
-from services.auto_playlist import generate_hottest_tracks
+from services.auto_playlist import generate_hottest_tracks, generate_tag_mix
 from services.auto_playlist_covers import generate_playlist_cover
 
 
@@ -100,7 +100,7 @@ def list_auto_playlists(
 
 def _ensure_default_definitions(session: Session, user_id: int):
     """Ensure default auto-playlist definitions exist for a user."""
-    default_types = ["hottest_tracks"]
+    default_types = ["hottest_tracks", "tag_mix"]
     for playlist_type in default_types:
         stmt = select(AutoPlaylistDefinition).where(
             AutoPlaylistDefinition.user_id == user_id,
@@ -110,6 +110,7 @@ def _ensure_default_definitions(session: Session, user_id: int):
         if not existing:
             name_map = {
                 "hottest_tracks": "Your Hottest Tracks",
+                "tag_mix": "Your Tag Mix",
             }
             definition = AutoPlaylistDefinition(
                 user_id=user_id,
@@ -203,7 +204,7 @@ def regenerate_playlist(
     current_user: User = Depends(get_current_user),
     session: Session = Depends(get_session),
 ):
-    if playlist_type not in ["hottest_tracks", "weekly_discovery"]:
+    if playlist_type not in ["hottest_tracks", "weekly_discovery", "tag_mix"]:
         raise HTTPException(status_code=400, detail="Invalid playlist type")
     
     definition = _get_or_create_definition(session, current_user.id, playlist_type)
@@ -226,8 +227,16 @@ def _do_generation(session: Session, definition_id: int, playlist_type: str):
     
     if playlist_type == "hottest_tracks":
         tracks = generate_hottest_tracks(session, definition.user_id, limit=20)
+    elif playlist_type == "tag_mix":
+        tracks, playlist_name = generate_tag_mix(session, definition.user_id, limit=20)
     else:
         tracks = []
+    
+    if not tracks:
+        return
+    
+    if playlist_type == "tag_mix":
+        definition.name = playlist_name
     
     delete_stmt = delete(AutoPlaylistTrack).where(
         AutoPlaylistTrack.definition_id == definition_id
@@ -278,7 +287,7 @@ def generate_playlist(
     current_user: User = Depends(get_current_user),
     session: Session = Depends(get_session),
 ):
-    if playlist_type not in ["hottest_tracks", "weekly_discovery"]:
+    if playlist_type not in ["hottest_tracks", "weekly_discovery", "tag_mix"]:
         raise HTTPException(status_code=400, detail="Invalid playlist type")
     
     definition = _get_or_create_definition(session, current_user.id, playlist_type)

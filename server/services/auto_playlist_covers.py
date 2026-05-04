@@ -4,7 +4,7 @@ from services.marble import make_marble
 from typing import Literal
 
 
-PlaylistCoverType = Literal["hottest_tracks", "weekly_discovery"]
+PlaylistCoverType = Literal["hottest_tracks", "weekly_discovery", "tag_mix"]
 
 
 def generate_playlist_cover(playlist_type: PlaylistCoverType, seed: int = None) -> str:
@@ -15,6 +15,8 @@ def generate_playlist_cover(playlist_type: PlaylistCoverType, seed: int = None) 
         return _generate_hottest_tracks_cover(seed)
     elif playlist_type == "weekly_discovery":
         return _generate_weekly_discovery_cover(seed)
+    elif playlist_type == "tag_mix":
+        return _generate_tag_mix_cover(seed)
     return _generate_default_cover(seed)
 
 
@@ -47,7 +49,25 @@ def _generate_weekly_discovery_cover(seed: int = 13) -> str:
         [1.00, 1.00, 1.00, 1.00],
     ]
     img = make_marble(1000, 1000, seed=seed, color_stops=color_stops)
-    
+
+    buffer = io.BytesIO()
+    img.save(buffer, format="PNG", quality=95)
+    b64 = base64.b64encode(buffer.getvalue()).decode("utf-8")
+    return f"data:image/png;base64,{b64}"
+
+
+def _generate_tag_mix_cover(seed: int = 27) -> str:
+    color_stops = [
+        [0.00, 0.25, 0.00, 0.35],
+        [0.15, 0.40, 0.10, 0.50],
+        [0.30, 0.50, 0.20, 0.60],
+        [0.45, 0.60, 0.30, 0.55],
+        [0.60, 0.75, 0.50, 0.35],
+        [0.75, 0.90, 0.70, 0.20],
+        [1.00, 1.00, 0.85, 0.15],
+    ]
+    img = make_marble(1000, 1000, seed=seed, color_stops=color_stops)
+
     buffer = io.BytesIO()
     img.save(buffer, format="PNG", quality=95)
     b64 = base64.b64encode(buffer.getvalue()).decode("utf-8")

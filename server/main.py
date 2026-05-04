@@ -71,6 +71,7 @@ def run_weekly_autoplaylist_generation():
     from sqlmodel import Session, select, delete
     from datetime import datetime
     from models import AutoPlaylistDefinition, AutoPlaylistTrack, User
+    from services.auto_playlist import generate_hottest_tracks, generate_tag_mix
 
     logger.info("Running weekly auto-playlist generation")
 
@@ -79,42 +80,54 @@ def run_weekly_autoplaylist_generation():
         users = session.exec(stmt).all()
 
         for user in users:
-            def_stmt = select(AutoPlaylistDefinition).where(
-                AutoPlaylistDefinition.user_id == user.id,
-                AutoPlaylistDefinition.playlist_type == "hottest_tracks",
-                AutoPlaylistDefinition.is_enabled == True
-            )
-            definition = session.exec(def_stmt).first()
-
-            if not definition:
-                definition = AutoPlaylistDefinition(
-                    user_id=user.id,
-                    name="Your Hottest Tracks",
-                    playlist_type="hottest_tracks",
-                    is_enabled=True,
+            for playlist_type in ["hottest_tracks", "tag_mix"]:
+                def_stmt = select(AutoPlaylistDefinition).where(
+                    AutoPlaylistDefinition.user_id == user.id,
+                    AutoPlaylistDefinition.playlist_type == playlist_type,
+                    AutoPlaylistDefinition.is_enabled == True
                 )
-                session.add(definition)
-                session.commit()
-                session.refresh(definition)
+                definition = session.exec(def_stmt).first()
 
-            if definition:
-                from services.auto_playlist import generate_hottest_tracks
+                if not definition:
+                    name_map = {
+                        "hottest_tracks": "Your Hottest Tracks",
+                        "tag_mix": "Your Tag Mix",
+                    }
+                    definition = AutoPlaylistDefinition(
+                        user_id=user.id,
+                        name=name_map.get(playlist_type, playlist_type),
+                        playlist_type=playlist_type,
+                        is_enabled=True,
+                    )
+                    session.add(definition)
+                    session.commit()
+                    session.refresh(definition)
 
-                tracks = generate_hottest_tracks(session, user.id, limit=20)
+                if definition:
+                    if playlist_type == "hottest_tracks":
+                        tracks = generate_hottest_tracks(session, user.id, limit=20)
+                    elif playlist_type == "tag_mix":
+                        tracks, playlist_name = generate_tag_mix(session, user.id, limit=20)
+                        if tracks:
+                            definition.name = playlist_name
 
-                delete_stmt = delete(AutoPlaylistTrack).where(
-                    AutoPlaylistTrack.definition_id == definition.id
-                )
-                session.exec(delete_stmt)
+                    if not tracks:
+                        logger.info(f"Not enough data for {playlist_type} for user {user.id}")
+                        continue
 
-                for track in tracks:
-                    track.definition_id = definition.id
-                    session.add(track)
+                    delete_stmt = delete(AutoPlaylistTrack).where(
+                        AutoPlaylistTrack.definition_id == definition.id
+                    )
+                    session.exec(delete_stmt)
 
-                definition.last_generated_at = datetime.utcnow()
-                session.commit()
+                    for track in tracks:
+                        track.definition_id = definition.id
+                        session.add(track)
 
-                logger.info(f"Generated hottest tracks for user {user.id}")
+                    definition.last_generated_at = datetime.utcnow()
+                    session.commit()
+
+                    logger.info(f"Generated {playlist_type} for user {user.id}")
 
 
 @asynccontextmanager

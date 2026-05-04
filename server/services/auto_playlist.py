@@ -62,6 +62,34 @@ def generate_hottest_tracks(session: Session, user_id: int, limit: int = 20) -> 
     return generated_tracks
 
 
+def _tags_match(search_tag: str, track_tag: str) -> bool:
+    search_lower = search_tag.lower()
+    track_lower = track_tag.lower()
+
+    if search_lower in track_lower:
+        return True
+    if track_lower in search_lower:
+        return _are_tags_compatible(search_lower, track_lower)
+    return False
+
+
+def _are_tags_compatible(tag1: str, tag2: str) -> bool:
+    exclude_pairs = [
+        ("male", "female"),
+        ("man", "woman"),
+        ("boys", "girls"),
+        ("male vocal", "female vocal"),
+        ("male vocalist", "female vocalist"),
+    ]
+
+    for a, b in exclude_pairs:
+        has_a = a in tag1 or a in tag2
+        has_b = b in tag1 or b in tag2
+        if has_a and has_b:
+            return False
+    return True
+
+
 def generate_tag_mix(session: Session, user_id: int, limit: int = 20) -> Tuple[List[AutoPlaylistTrack], str]:
     statement = (
         select(UserRecentlyPlayed, Track)
@@ -102,7 +130,7 @@ def generate_tag_mix(session: Session, user_id: int, limit: int = 20) -> Tuple[L
         candidates = []
         for track in played_tracks:
             tags = track_tag_map.get(track.id, [])
-            if any(tag in t.lower() for t in tags):
+            if any(_tags_match(tag, t) for t in tags):
                 candidates.append(track)
 
         if len(candidates) >= limit:
@@ -110,7 +138,7 @@ def generate_tag_mix(session: Session, user_id: int, limit: int = 20) -> Tuple[L
 
     candidates_with_counts = []
     for tag in tag_list:
-        count = sum(1 for track in played_tracks if any(tag in t.lower() for t in track_tag_map.get(track.id, [])))
+        count = sum(1 for track in played_tracks if any(_tags_match(tag, t) for t in track_tag_map.get(track.id, [])))
         candidates_with_counts.append((tag, count))
 
     candidates_with_counts.sort(key=lambda x: x[1], reverse=True)
@@ -131,7 +159,7 @@ def generate_tag_mix(session: Session, user_id: int, limit: int = 20) -> Tuple[L
     final_candidates = []
     for track in played_tracks:
         tags = track_tag_map.get(track.id, [])
-        if any(selected_tag in t.lower() for t in tags):
+        if any(_tags_match(selected_tag, t) for t in tags):
             final_candidates.append(track)
 
     return _select_diverse_tracks(final_candidates, limit, track_tag_map), f"{selected_tag.title()} Mix"

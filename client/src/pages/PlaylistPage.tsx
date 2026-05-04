@@ -1,5 +1,5 @@
 import { useEffect, useState, useMemo } from 'react'
-import { useParams, useNavigate } from 'react-router-dom'
+import { useParams, useNavigate, useLocation } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Play, ArrowLeft, X, FileSpreadsheet, Pencil, Trash2 } from 'lucide-react'
 import * as controller from '../playback/controller'
@@ -7,6 +7,7 @@ import { authFetch } from '../api'
 import { requestMbDownload } from '../stores/downloadBusyStore'
 import {
   fetchPlaylistDetail,
+  fetchAutoPlaylistDetail,
   updatePlaylist,
   deletePlaylist,
   removeTrackFromPlaylist,
@@ -66,8 +67,19 @@ const modalShell = {
 
 export default function PlaylistPage() {
   const { playlistId } = useParams<{ playlistId: string }>()
-  const id = Number(playlistId)
   const navigate = useNavigate()
+  const location = useLocation()
+  const isAutoPlaylist = location.pathname.startsWith('/auto-playlist')
+  const id = Number(playlistId)
+
+  if (isNaN(id)) {
+    return (
+      <div className="flex items-center justify-center h-full" style={{ color: '#9A8E84' }}>
+        Invalid playlist
+      </div>
+    )
+  }
+
   const queryClient = useQueryClient()
   const { currentTrack } = usePlayerStore()
   const { downloadStates, cachedMbIds } = useDownloadStates()
@@ -83,9 +95,10 @@ export default function PlaylistPage() {
   const [addPlOpen, setAddPlOpen] = useState(false)
   const [addPlTrack, setAddPlTrack] = useState<AddToPlaylistTrack | null>(null)
 
+  const queryKey = isAutoPlaylist ? ['auto-playlist', id] : ['playlist', id]
   const { data: playlist, isLoading, error, refetch } = useQuery({
-    queryKey: ['playlist', id],
-    queryFn: () => fetchPlaylistDetail(id),
+    queryKey,
+    queryFn: () => isAutoPlaylist ? fetchAutoPlaylistDetail(id) : fetchPlaylistDetail(id),
     enabled: Number.isFinite(id) && id > 0,
   })
 
@@ -109,12 +122,12 @@ export default function PlaylistPage() {
         description: renameDescription.trim() === '' ? null : renameDescription.trim(),
       }),
     onMutate: async () => {
-      await queryClient.cancelQueries({ queryKey: ['playlist', id] })
-      const previous = queryClient.getQueryData<Awaited<ReturnType<typeof fetchPlaylistDetail>>>(['playlist', id])
+      await queryClient.cancelQueries({ queryKey })
+      const previous = queryClient.getQueryData(queryKey)
       const nextTitle = renameTitle.trim()
       const nextDesc = renameDescription.trim() === '' ? null : renameDescription.trim()
       queryClient.setQueryData(
-        ['playlist', id],
+        queryKey,
         (old: Awaited<ReturnType<typeof fetchPlaylistDetail>> | undefined) =>
         old
           ? { ...old, title: nextTitle, description: nextDesc }
@@ -124,14 +137,14 @@ export default function PlaylistPage() {
     },
     onError: (_e, _v, ctx) => {
       if (ctx?.previous) {
-        queryClient.setQueryData(['playlist', id], ctx.previous)
+        queryClient.setQueryData(queryKey, ctx.previous)
       }
     },
     onSuccess: () => {
       setRenameOpen(false)
     },
     onSettled: () => {
-      queryClient.invalidateQueries({ queryKey: ['playlist', id] })
+      queryClient.invalidateQueries({ queryKey })
       queryClient.invalidateQueries({ queryKey: ['playlists'] })
       queryClient.invalidateQueries({ queryKey: ['home-playlists'] })
     },
@@ -140,7 +153,7 @@ export default function PlaylistPage() {
   const deleteMutation = useMutation({
     mutationFn: () => deletePlaylist(id),
     onSuccess: () => {
-      queryClient.removeQueries({ queryKey: ['playlist', id] })
+      queryClient.removeQueries({ queryKey })
       queryClient.invalidateQueries({ queryKey: ['playlists'] })
       queryClient.invalidateQueries({ queryKey: ['home-playlists'] })
       navigate('/library')
@@ -150,7 +163,7 @@ export default function PlaylistPage() {
   const removeItemMutation = useMutation({
     mutationFn: (itemId: number) => removeTrackFromPlaylist(id, itemId),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['playlist', id] })
+      queryClient.invalidateQueries({ queryKey: queryKey })
     },
   })
 
@@ -158,7 +171,7 @@ export default function PlaylistPage() {
     mutationFn: (cover_image_url: string | null) => updatePlaylist(id, { cover_image_url }),
     onSuccess: () => {
       setCoverOpen(false)
-      queryClient.invalidateQueries({ queryKey: ['playlist', id] })
+      queryClient.invalidateQueries({ queryKey })
       queryClient.invalidateQueries({ queryKey: ['playlists'] })
       queryClient.invalidateQueries({ queryKey: ['home-playlists'] })
     },
@@ -194,14 +207,6 @@ export default function PlaylistPage() {
 
   function downloadItem(item: PlaylistItemDTO) {
     requestMbDownload(authFetch, item.mb_recording_id).catch(console.error)
-  }
-
-  if (!Number.isFinite(id) || id <= 0) {
-    return (
-      <div className="p-6" style={{ color: '#9A8E84', fontFamily: "'Barlow Semi Condensed', sans-serif" }}>
-        Invalid playlist
-      </div>
-    )
   }
 
   if (isLoading) {
@@ -331,34 +336,38 @@ export default function PlaylistPage() {
         >
           <FileSpreadsheet size={20} strokeWidth={1.75} />
         </button>
-        <button
-          type="button"
-          onClick={openRename}
-          className="w-11 h-11 rounded flex items-center justify-center transition-colors hover:border-[#b4003e]"
-          style={{
-            color: '#E8DDD0',
-            border: '1px solid #3D2820',
-            background: 'transparent',
-          }}
-          aria-label="Rename playlist"
-          title="Rename"
-        >
-          <Pencil size={18} strokeWidth={1.75} />
-        </button>
-        <button
-          type="button"
-          onClick={() => setDeleteOpen(true)}
-          className="w-11 h-11 rounded flex items-center justify-center transition-colors hover:border-[#b4003e]"
-          style={{
-            color: '#b4003e',
-            border: '1px solid #b4003e',
-            background: 'transparent',
-          }}
-          aria-label="Delete playlist"
-          title="Delete"
-        >
-          <Trash2 size={18} strokeWidth={1.75} />
-        </button>
+        {!isAutoPlaylist && (
+          <>
+            <button
+              type="button"
+              onClick={openRename}
+              className="w-11 h-11 rounded flex items-center justify-center transition-colors hover:border-[#b4003e]"
+              style={{
+                color: '#E8DDD0',
+                border: '1px solid #3D2820',
+                background: 'transparent',
+              }}
+              aria-label="Rename playlist"
+              title="Rename"
+            >
+              <Pencil size={18} strokeWidth={1.75} />
+            </button>
+            <button
+              type="button"
+              onClick={() => setDeleteOpen(true)}
+              className="w-11 h-11 rounded flex items-center justify-center transition-colors hover:border-[#b4003e]"
+              style={{
+                color: '#b4003e',
+                border: '1px solid #b4003e',
+                background: 'transparent',
+              }}
+              aria-label="Delete playlist"
+              title="Delete"
+            >
+              <Trash2 size={18} strokeWidth={1.75} />
+            </button>
+          </>
+        )}
       </div>
 
       <div className="relative z-[1] px-6 pb-10 overflow-x-auto">

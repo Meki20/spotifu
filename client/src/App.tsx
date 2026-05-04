@@ -54,6 +54,7 @@ function AppContent() {
         <Route path="/settings" element={<Suspense fallback={<LoadingSpinner />}><RouteErrorBoundary name="Settings"><Settings /></RouteErrorBoundary></Suspense>} />
         <Route path="/album/:albumId" element={<Suspense fallback={<LoadingSpinner />}><RouteErrorBoundary name="Album"><AlbumPage /></RouteErrorBoundary></Suspense>} />
         <Route path="/artist/:artistId" element={<Suspense fallback={<LoadingSpinner />}><RouteErrorBoundary name="Artist"><ArtistPage /></RouteErrorBoundary></Suspense>} />
+        <Route path="/auto-playlist/:playlistId" element={<Suspense fallback={<LoadingSpinner />}><RouteErrorBoundary name="AutoPlaylist"><PlaylistPage /></RouteErrorBoundary></Suspense>} />
         <Route path="/playlist/:playlistId" element={<Suspense fallback={<LoadingSpinner />}><RouteErrorBoundary name="Playlist"><PlaylistPage /></RouteErrorBoundary></Suspense>} />
       </Route>
     </Routes>

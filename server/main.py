@@ -1,6 +1,8 @@
 import json
 from contextlib import asynccontextmanager
 import asyncio
+from apscheduler.schedulers.asyncio import AsyncIOScheduler
+from apscheduler.triggers.cron import CronTrigger
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
@@ -31,7 +33,7 @@ for _logger_name, _env_key in (
 logging.getLogger("aioslsk.network").setLevel(logging.CRITICAL)
 logging.getLogger("aioslsk").setLevel(logging.WARNING)
 from routers import (auth_router, search_router, play_router, stream_router,
-                     library_router, settings_router, artist_router, album_router, prefetch_router, covers_router, soulseek_router, admin_router)
+                     library_router, settings_router, artist_router, album_router, prefetch_router, covers_router, soulseek_router, admin_router, auto_playlists_router)
 
 logger = logging.getLogger(__name__)
 
@@ -62,6 +64,57 @@ class ConnectionManager:
 
 
 ws_manager = ConnectionManager()
+scheduler = AsyncIOScheduler()
+
+
+def run_weekly_autoplaylist_generation():
+    from sqlmodel import Session, select, delete
+    from datetime import datetime
+    from models import AutoPlaylistDefinition, AutoPlaylistTrack, User
+
+    logger.info("Running weekly auto-playlist generation")
+
+    with Session(engine) as session:
+        stmt = select(User)
+        users = session.exec(stmt).all()
+
+        for user in users:
+            def_stmt = select(AutoPlaylistDefinition).where(
+                AutoPlaylistDefinition.user_id == user.id,
+                AutoPlaylistDefinition.playlist_type == "hottest_tracks",
+                AutoPlaylistDefinition.is_enabled == True
+            )
+            definition = session.exec(def_stmt).first()
+
+            if not definition:
+                definition = AutoPlaylistDefinition(
+                    user_id=user.id,
+                    name="Your Hottest Tracks",
+                    playlist_type="hottest_tracks",
+                    is_enabled=True,
+                )
+                session.add(definition)
+                session.commit()
+                session.refresh(definition)
+
+            if definition:
+                from services.auto_playlist import generate_hottest_tracks
+
+                tracks = generate_hottest_tracks(session, user.id, limit=20)
+
+                delete_stmt = delete(AutoPlaylistTrack).where(
+                    AutoPlaylistTrack.definition_id == definition.id
+                )
+                session.exec(delete_stmt)
+
+                for track in tracks:
+                    track.definition_id = definition.id
+                    session.add(track)
+
+                definition.last_generated_at = datetime.utcnow()
+                session.commit()
+
+                logger.info(f"Generated hottest tracks for user {user.id}")
 
 
 @asynccontextmanager
@@ -81,6 +134,14 @@ async def lifespan(app: FastAPI):
         loop.default_exception_handler(context)
 
     asyncio.get_event_loop().set_exception_handler(_loop_exception_handler)
+
+    scheduler.add_job(
+        run_weekly_autoplaylist_generation,
+        CronTrigger(day_of_week="mon", hour=0, minute=1),
+        id="weekly_hottest_tracks"
+    )
+    scheduler.start()
+    logger.info("Scheduler started for weekly auto-playlist generation")
 
     try:
         yield
@@ -157,6 +218,7 @@ app.include_router(prefetch_router)
 app.include_router(covers_router)
 app.include_router(soulseek_router)
 app.include_router(admin_router)
+app.include_router(auto_playlists_router)
 
 
 @app.websocket("/ws")

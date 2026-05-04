@@ -249,3 +249,32 @@ class MbArtistAlias(SQLModel, table=True):
 
     created_at: datetime = Field(default_factory=datetime.utcnow)
     last_seen_at: datetime = Field(default_factory=datetime.utcnow, index=True)
+
+
+class AutoPlaylistDefinition(SQLModel, table=True):
+    __tablename__ = "auto_playlist_definitions"
+    id: Optional[int] = Field(default=None, primary_key=True)
+    user_id: int = Field(foreign_key="users.id", index=True, ondelete="CASCADE")
+    name: str = Field(max_length=255)
+    playlist_type: str = Field(max_length=64)
+    config_json: Optional[str] = Field(default=None, max_length=4096)
+    cover_image: Optional[str] = Field(default=None)
+    is_enabled: bool = Field(default=True)
+    last_generated_at: Optional[datetime] = Field(default=None)
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+
+
+class AutoPlaylistTrack(SQLModel, table=True):
+    __tablename__ = "auto_playlist_tracks"
+    id: Optional[int] = Field(default=None, primary_key=True)
+    definition_id: int = Field(foreign_key="auto_playlist_definitions.id", index=True, ondelete="CASCADE")
+    position: int
+    title: str = Field(max_length=255)
+    artist: str = Field(max_length=255)
+    album: Optional[str] = Field(default=None, max_length=255)
+    mb_recording_id: Optional[str] = Field(default=None, max_length=64)
+    mb_artist_id: Optional[str] = Field(default=None, max_length=64)
+    mb_release_id: Optional[str] = Field(default=None, max_length=64)
+    track_id: Optional[int] = Field(default=None, foreign_key="tracks.id", index=True)
+    hotness_score: float
+    generated_at: datetime = Field(default_factory=datetime.utcnow)

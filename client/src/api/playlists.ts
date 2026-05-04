@@ -38,6 +38,12 @@ export async function fetchPlaylistDetail(id: number): Promise<PlaylistDetail> {
   return res.json()
 }
 
+export async function fetchAutoPlaylistDetail(id: number): Promise<PlaylistDetail> {
+  const res = await authFetch(`/auto-playlists/detail/${id}`)
+  if (!res.ok) throw new Error('Failed to load playlist')
+  return res.json()
+}
+
 // Cover lookup moved to /covers/* APIs. See client/src/api/covers.ts.
 
 export async function createPlaylist(body: {

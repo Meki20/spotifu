@@ -44,6 +44,8 @@ def _migrate():
         "ALTER TABLE mb_lookup_cache ADD COLUMN IF NOT EXISTS mb_artist_id VARCHAR",
         "ALTER TABLE mb_lookup_cache ADD COLUMN IF NOT EXISTS mb_release_id VARCHAR",
         "ALTER TABLE mb_lookup_cache ADD COLUMN IF NOT EXISTS mb_release_group_id VARCHAR",
+        "ALTER TABLE auto_playlist_tracks ADD COLUMN IF NOT EXISTS track_id INTEGER REFERENCES tracks(id)",
+        "ALTER TABLE auto_playlist_definitions ADD COLUMN IF NOT EXISTS cover_image TEXT",
         """
         CREATE UNIQUE INDEX IF NOT EXISTS ix_mb_lookup_cache_mb_id
         ON mb_lookup_cache (mb_id) WHERE mb_id IS NOT NULL

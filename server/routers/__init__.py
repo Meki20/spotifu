@@ -1,4 +1,4 @@
-from . import auth, search, play, stream, library, settings, artist, album, prefetch, covers, soulseek, admin
+from . import auth, search, play, stream, library, settings, artist, album, prefetch, covers, soulseek, admin, auto_playlists
 
 auth_router = auth.router
 search_router = search.router
@@ -12,3 +12,4 @@ prefetch_router = prefetch.router
 covers_router = covers.router
 soulseek_router = soulseek.router
 admin_router = admin.router
+auto_playlists_router = auto_playlists.router

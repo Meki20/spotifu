@@ -73,6 +73,18 @@ export default function Settings() {
   const [expandedUserId, setExpandedUserId] = useState<number | null>(null)
   const prefetch = usePrefetchSettingsStore((s) => s.prefetch)
   const applyServerPrefetch = usePrefetchSettingsStore((s) => s.applyServerPrefetch)
+  const [autoPlaylists, setAutoPlaylists] = useState<Array<{
+    id: number
+    name: string
+    playlist_type: string
+    is_enabled: boolean
+    last_generated_at: string | null
+    created_at: string
+    track_count: number
+    cover_url: string
+  }>>([])
+  const [autoPlaylistsLoading, setAutoPlaylistsLoading] = useState(false)
+  const [autoPlaylistStatus, setAutoPlaylistStatus] = useState<Record<number, string>>({})
   const trackListRef = useRef<HTMLDivElement>(null)
   const trackVirtualizer = useVirtualizer({
     count: tracks.length,
@@ -108,6 +120,13 @@ export default function Settings() {
       .then((data) => setTracks(data.tracks || []))
       .catch(console.error)
       .finally(() => setTracksLoading(false))
+
+    setAutoPlaylistsLoading(true)
+    authFetch('/auto-playlists')
+      .then((r) => r.json())
+      .then(setAutoPlaylists)
+      .catch(console.error)
+      .finally(() => setAutoPlaylistsLoading(false))
 
     return subscribeSpotifuWebSocket((data) => {
       if (data.type !== 'soulseek_connected' && data.type !== 'soulseek_error' && data.type !== WS_RECONNECT)
@@ -306,6 +325,39 @@ export default function Settings() {
       setLastfmStatus('Error: ' + String(err))
     } finally {
       setLastfmLoading(false)
+    }
+  }
+
+  async function handleAutoPlaylistToggle(playlistType: string, enabled: boolean) {
+    try {
+      setAutoPlaylistStatus((s) => ({ ...s, [playlistType]: 'Saving...' }))
+      const res = await authFetch(`/auto-playlists/${playlistType}/toggle`, {
+        method: 'PATCH',
+        body: JSON.stringify({ is_enabled: enabled }),
+      })
+      if (!res.ok) throw new Error('Failed to toggle')
+      const updated = await res.json()
+      setAutoPlaylists((prev) =>
+        prev.map((p) => (p.playlist_type === playlistType ? updated : p))
+      )
+      setAutoPlaylistStatus((s) => ({ ...s, [playlistType]: '' }))
+    } catch (err) {
+      setAutoPlaylistStatus((s) => ({ ...s, [playlistType]: 'Error: ' + String(err) }))
+    }
+  }
+
+  async function handleAutoPlaylistRegenerate(playlistType: string) {
+    try {
+      setAutoPlaylistStatus((s) => ({ ...s, [playlistType]: 'Regenerating...' }))
+      const res = await authFetch(`/auto-playlists/${playlistType}/generate`, { method: 'POST' })
+      if (!res.ok) throw new Error('Failed to regenerate')
+      const updated = await res.json()
+      setAutoPlaylists((prev) =>
+        prev.map((p) => (p.playlist_type === playlistType ? updated : p))
+      )
+      setAutoPlaylistStatus((s) => ({ ...s, [playlistType]: '' }))
+    } catch (err) {
+      setAutoPlaylistStatus((s) => ({ ...s, [playlistType]: 'Error: ' + String(err) }))
     }
   }
 
@@ -884,6 +936,89 @@ export default function Settings() {
             </div>
           )
         })()}
+      </section>
+
+      {/* Personalised Playlists */}
+      <section className="mb-6">
+        <div style={sectionLabelStyle}>Personalised Playlists</div>
+        <p className="text-xs mb-4" style={{ fontFamily: "'Barlow Semi Condensed', sans-serif", color: '#9A8E84' }}>
+          Automatically generated playlists based on your listening history. Generated weekly on Mondays at 00:01.
+        </p>
+        {autoPlaylistsLoading ? (
+          <div className="flex items-center gap-2 py-2">
+            <PollyLoading size={28} />
+            <p className="text-xs" style={{ fontFamily: "'Barlow Semi Condensed', sans-serif", color: '#4A413C' }}>loading…</p>
+          </div>
+        ) : autoPlaylists.length === 0 ? (
+          <p className="text-xs" style={{ fontFamily: "'Barlow Semi Condensed', sans-serif", color: '#4A413C' }}>No auto playlists available.</p>
+        ) : (
+          <div className="space-y-3">
+            {autoPlaylists.map((playlist) => (
+              <div
+                key={playlist.id}
+                className="flex items-center gap-4 p-3 rounded"
+                style={{
+                  background: '#1A1210',
+                  border: '1px solid #261A14',
+                }}
+              >
+                <img
+                  src={playlist.cover_url}
+                  alt={playlist.name}
+                  className="w-14 h-14 rounded"
+                  style={{ objectFit: 'cover' }}
+                />
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium" style={{ fontFamily: "'Barlow Semi Condensed', sans-serif", color: '#E8DDD0' }}>
+                    {playlist.name}
+                  </p>
+                  <p className="text-xs" style={{ fontFamily: "'Barlow Semi Condensed', sans-serif", color: '#4A413C' }}>
+                    {playlist.track_count} tracks
+                    {playlist.last_generated_at && (
+                      <> · Last generated: {new Date(playlist.last_generated_at).toLocaleDateString()}</>
+                    )}
+                  </p>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Toggle
+                    on={playlist.is_enabled}
+                    onChange={(enabled) => handleAutoPlaylistToggle(playlist.playlist_type, enabled)}
+                  />
+                  <button
+                    onClick={() => handleAutoPlaylistRegenerate(playlist.playlist_type)}
+                    disabled={autoPlaylistStatus[playlist.id]?.includes('Generating')}
+                    className="px-2 py-1 text-xs font-semibold border transition-colors"
+                    style={{
+                      fontFamily: "'Barlow Condensed', sans-serif",
+                      fontWeight: 600,
+                      textTransform: 'uppercase',
+                      letterSpacing: '0.05em',
+                      background: 'transparent',
+                      color: '#b4003e',
+                      borderColor: '#b4003e',
+                      borderRadius: 4,
+                      cursor: autoPlaylistStatus[playlist.id]?.includes('Generating') ? 'not-allowed' : 'pointer',
+                      opacity: autoPlaylistStatus[playlist.id]?.includes('Generating') ? 0.5 : 1,
+                    }}
+                  >
+                    {autoPlaylistStatus[playlist.id]?.includes('Regenerate') ? 'Regenerating...' : 'Recreate'}
+                  </button>
+                </div>
+              </div>
+            ))}
+            {Object.values(autoPlaylistStatus).some((s) => s && !s.startsWith('Error')) && (
+              <p
+                className="text-xs px-1"
+                style={{
+                  color: '#8EC9A0',
+                  fontFamily: "'Barlow Semi Condensed', sans-serif",
+                }}
+              >
+                {Object.values(autoPlaylistStatus).find((s) => s && !s.startsWith('Error'))}
+              </p>
+            )}
+          </div>
+        )}
       </section>
 
       {/* Downloaded Tracks */}

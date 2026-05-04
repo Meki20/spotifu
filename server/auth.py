@@ -14,7 +14,7 @@ ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 30
 _MIN_SECRET_LEN = 32
 
-_SECRETS_FILE = Path(os.environ.get("SECRETS_FILE", "/home/lukaarch/Documents/src/SpotiFU/.secrets"))
+_SECRETS_FILE = Path(os.environ.get("SECRETS_FILE", Path(__file__).parent.parent / ".secrets"))
 _FORBIDDEN = {"", "change-me-in-production", "changeme", "secret"}
 
 

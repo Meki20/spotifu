@@ -119,21 +119,20 @@ _mb_cooldown_until = 0.0
 # Lower tuple field = higher priority (asyncio.PriorityQueue is a min-heap).
 # Keep a large gap so future mid-tiers can slot between user and background.
 _MB_PRIO_INTERACTIVE = 0
-_MB_PRIO_PREFETCH = 1_000_000
 _mb_call_priority: contextvars.ContextVar[int] = contextvars.ContextVar(
     "mb_call_priority", default=_MB_PRIO_INTERACTIVE
 )
 _mb_req_seq = itertools.count()
-_mb_pq: asyncio.PriorityQueue | None = None
+_mb_pq_important: asyncio.PriorityQueue | None = None
+_mb_pq_passive: asyncio.PriorityQueue | None = None
 _mb_queue_worker: asyncio.Task[None] | None = None
 
 
 @asynccontextmanager
 async def mb_interactive_calls():
-    """User-facing MB work (search, artist/album pages, play, similar stream).
+    """User-facing MB work (search, artist/album pages, play).
 
-    Nested inside ``mb_prefetch_calls()`` this temporarily overrides back to
-    interactive priority until the block exits.
+    These calls go to the IMPORTANT queue and are processed first.
     """
     tok = _mb_call_priority.set(_MB_PRIO_INTERACTIVE)
     try:
@@ -143,9 +142,22 @@ async def mb_interactive_calls():
 
 
 @asynccontextmanager
+async def mb_passive_calls():
+    """Background MB: cover art fetching, download metadata, reconcile, prefetch, import.
+
+    These calls go to the PASSIVE queue and are only processed when IMPORTANT is empty.
+    """
+    tok = _mb_call_priority.set(1)
+    try:
+        yield
+    finally:
+        _mb_call_priority.reset(tok)
+
+
+@asynccontextmanager
 async def mb_prefetch_calls():
-    """Lowest-priority MB: hover prefetch, CSV import resolve, startup reconcile, hybrid stale refresh."""
-    tok = _mb_call_priority.set(_MB_PRIO_PREFETCH)
+    """Deprecated: Use mb_passive_calls() instead. Kept for backward compatibility."""
+    tok = _mb_call_priority.set(1)
     try:
         yield
     finally:
@@ -153,17 +165,42 @@ async def mb_prefetch_calls():
 
 
 def _ensure_mb_queue_worker() -> None:
-    global _mb_pq, _mb_queue_worker
-    if _mb_pq is None:
-        _mb_pq = asyncio.PriorityQueue()
+    global _mb_pq_important, _mb_pq_passive, _mb_queue_worker
+    if _mb_pq_important is None:
+        _mb_pq_important = asyncio.PriorityQueue()
+    if _mb_pq_passive is None:
+        _mb_pq_passive = asyncio.PriorityQueue()
     if _mb_queue_worker is None or _mb_queue_worker.done():
         _mb_queue_worker = asyncio.create_task(_mb_queue_worker_loop(), name="musicbrainz-mb-queue")
 
 
 async def _mb_queue_worker_loop() -> None:
-    assert _mb_pq is not None
+    assert _mb_pq_important is not None
+    assert _mb_pq_passive is not None
     while True:
-        prio, seq, path, params, fut = await _mb_pq.get()
+        # Try IMPORTANT first (non-blocking)
+        try:
+            item = _mb_pq_important.get_nowait()
+        except asyncio.QueueEmpty:
+            # IMPORTANT is empty, wait for either queue
+            important_task = asyncio.create_task(_mb_pq_important.get())
+            passive_task = asyncio.create_task(_mb_pq_passive.get())
+            done, pending = await asyncio.wait(
+                [important_task, passive_task],
+                return_when=asyncio.FIRST_COMPLETED,
+            )
+            for t in pending:
+                t.cancel()
+                try:
+                    await t
+                except asyncio.CancelledError:
+                    pass
+            # Prioritize IMPORTANT if both completed (race condition)
+            if important_task in done:
+                item = important_task.result()
+            else:
+                item = passive_task.result()
+        prio, seq, path, params, fut = item
         try:
             resp = await _mb_get_serial(path, params)
             if not fut.done():
@@ -224,12 +261,14 @@ async def _mb_get_serial(path: str, params: dict[str, Any]) -> httpx.Response:
 async def _mb_get(path: str, params: dict[str, Any]) -> httpx.Response:
     """GET from MusicBrainz (queued, priority-aware) with transient-error retries."""
     _ensure_mb_queue_worker()
-    assert _mb_pq is not None
     loop = asyncio.get_running_loop()
     fut: asyncio.Future[httpx.Response] = loop.create_future()
     prio = int(_mb_call_priority.get())
     seq = next(_mb_req_seq)
-    await _mb_pq.put((prio, seq, path, params, fut))
+    if prio == _MB_PRIO_INTERACTIVE:
+        _mb_pq_important.put_nowait((prio, seq, path, params, fut))
+    else:
+        _mb_pq_passive.put_nowait((prio, seq, path, params, fut))
     return await fut
 
 

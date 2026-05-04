@@ -435,7 +435,7 @@ async def ddg_search_artist_images(
 
         if not artist_name:
             svc = MetadataService(session)
-            async with musicbrainz.mb_interactive_calls():
+            async with musicbrainz.mb_passive_calls():
                 mb = await svc.get_artist_head(artist_id)
             if mb and (mb.get("name") or "").strip():
                 artist_name = (mb.get("name") or "").strip()

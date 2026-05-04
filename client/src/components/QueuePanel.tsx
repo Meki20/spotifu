@@ -6,6 +6,15 @@ import { useShallow } from 'zustand/react/shallow'
 import { usePlayerStore, type Track, type PlayerState } from '../stores/playerStore'
 import * as controller from '../playback/controller'
 import { authFetch, mediaUrl } from '../api'
+import { useCover } from '../hooks/useCover'
+import type { CoverPriority } from '../lib/coverManager'
+
+function QueueCover({ track, className, priority = 'prefetch' }: { track: Track; className: string; priority?: CoverPriority }) {
+  const { url } = useCover(track.mb_id, priority)
+  const src = track.album_cover || url
+  if (!src) return null
+  return <img src={src} alt="" className={className} loading="lazy" />
+}
 
 function NowPlayingCard({ track }: { track: Track }) {
   const navigate = useNavigate()
@@ -35,9 +44,7 @@ function NowPlayingCard({ track }: { track: Track }) {
           boxShadow: '0 14px 40px rgba(0,0,0,0.55), 0 2px 0 rgba(255,255,255,0.03) inset',
         }}
       >
-        {track.album_cover ? (
-          <img src={track.album_cover} alt="" className="w-full h-full object-cover block" />
-        ) : null}
+        <QueueCover track={track} className="w-full h-full object-cover block" priority="viewport" />
         {!track.mb_id && !track.mb_artist_id && !track.mb_release_id && !track.mb_release_group_id && (
           <div
             className="absolute top-2 right-2 p-1.5 rounded"
@@ -129,9 +136,7 @@ function TrackRow({
         className="shrink-0 rounded-md overflow-hidden relative"
         style={{ width: 30, height: 30, background: '#231815' }}
       >
-        {track.album_cover ? (
-          <img src={track.album_cover} alt="" className="w-full h-full object-cover block" loading="lazy" />
-        ) : null}
+        <QueueCover track={track} className="w-full h-full object-cover block" />
         {!track.mb_id && !track.mb_artist_id && !track.mb_release_id && !track.mb_release_group_id && (
           <div
             className="absolute top-0 right-0 p-0.5"

@@ -1076,7 +1076,7 @@ async def run_csv_import_job(
         if not batch:
             continue
         try:
-            async with musicbrainz.mb_prefetch_calls():
+            async with musicbrainz.mb_passive_calls():
                 await _resolve_batch_verbatim(session, batch, memo=memo, stats=stats)
         except Exception as ex:
             stats["live_error"] += 1

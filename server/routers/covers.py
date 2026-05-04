@@ -1,15 +1,24 @@
+import json
 import os
+from pathlib import Path
 
 from fastapi import APIRouter, Depends, HTTPException
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, StreamingResponse
 from pydantic import BaseModel, Field
+from sqlmodel import Session
 
+from database import engine
 from deps import get_current_user
 from models import User
-from services.covers import get_cover_url, get_cover_urls_batch
+from services.covers import (
+    get_cover_url,
+    get_cover_urls_batch,
+    iter_cover_urls_batch,
+    lookup_cached_covers_batch,
+)
 from services.providers import _db_get, _get_artist_images_dir
 
-_CACHE_DIR = os.environ.get("CACHE_DIR") or "/home/lukaarch/Documents/src/SpotiFU/cache"
+_CACHE_DIR = os.environ.get("CACHE_DIR") or str(Path(__file__).parent.parent.parent / "cache")
 
 router = APIRouter(prefix="/covers", tags=["covers"])
 
@@ -44,15 +53,53 @@ async def get_release_cover(release_mbid: str, user: User = Depends(get_current_
     return CoverResponse(url=r.url)
 
 
-@router.post("/recordings", response_model=CoverBatchResponse)
+async def _stream_ndjson(entity_kind, ids: list[str]):
+    async for eid, url in iter_cover_urls_batch(entity_kind, ids):
+        yield (json.dumps({"id": eid, "url": url}) + "\n").encode("utf-8")
+
+
+# NOTE: behind nginx, this route needs `proxy_buffering off` so per-id NDJSON
+# lines reach the browser as they're emitted, not after the whole batch
+# finishes. No GZipMiddleware is installed (see server/main.py); if added,
+# disable for this route too.
+@router.post("/recordings")
 async def batch_recording_covers(body: CoverBatchRequest, user: User = Depends(get_current_user)):
-    urls = await get_cover_urls_batch("recording", body.ids)
+    return StreamingResponse(
+        _stream_ndjson("recording", body.ids),
+        media_type="application/x-ndjson",
+    )
+
+
+@router.post("/release-groups")
+async def batch_release_group_covers(body: CoverBatchRequest, user: User = Depends(get_current_user)):
+    return StreamingResponse(
+        _stream_ndjson("release_group", body.ids),
+        media_type="application/x-ndjson",
+    )
+
+
+@router.post("/recordings/cached", response_model=CoverBatchResponse)
+def cached_recording_covers(body: CoverBatchRequest, user: User = Depends(get_current_user)):
+    """DB-only batch lookup. Returns immediately with cached URLs;
+    ids absent from the response indicate a cache miss the caller must resolve
+    via the streaming endpoint.
+    """
+    with Session(engine) as session:
+        urls = lookup_cached_covers_batch(session, entity_kind="recording", ids=body.ids)
     return CoverBatchResponse(urls=urls)
 
 
-@router.post("/release-groups", response_model=CoverBatchResponse)
-async def batch_release_group_covers(body: CoverBatchRequest, user: User = Depends(get_current_user)):
-    urls = await get_cover_urls_batch("release_group", body.ids)
+@router.post("/release-groups/cached", response_model=CoverBatchResponse)
+def cached_release_group_covers(body: CoverBatchRequest, user: User = Depends(get_current_user)):
+    with Session(engine) as session:
+        urls = lookup_cached_covers_batch(session, entity_kind="release_group", ids=body.ids)
+    return CoverBatchResponse(urls=urls)
+
+
+@router.post("/recordings/eager", response_model=CoverBatchResponse, include_in_schema=False)
+async def batch_recording_covers_eager(body: CoverBatchRequest, user: User = Depends(get_current_user)):
+    """Legacy non-streaming batch — kept for any internal callers."""
+    urls = await get_cover_urls_batch("recording", body.ids)
     return CoverBatchResponse(urls=urls)
 
 

@@ -54,7 +54,7 @@ async def prefetch_artist(
 
     svc = MetadataService(session)
 
-    async with musicbrainz.mb_prefetch_calls():
+    async with musicbrainz.mb_passive_calls():
         album_results = await asyncio.gather(
             *[svc.get_album(aid, light=True) for aid in album_ids_to_fetch]
         )

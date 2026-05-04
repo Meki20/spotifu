@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState, useMemo } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Play, ArrowLeft, X, FileSpreadsheet, Pencil, Trash2 } from 'lucide-react'
@@ -12,9 +12,10 @@ import {
   removeTrackFromPlaylist,
   type PlaylistItemDTO,
 } from '../api/playlists'
+import { coverManager } from '../lib/coverManager'
 import { toTrack, resolveTrackArtUrl } from '../utils/trackHelpers'
 import PlaylistTrackCover from '../components/PlaylistTrackCover'
-import { usePlayerStore, type PlayerState, type Track } from '../stores/playerStore'
+import { usePlayerStore } from '../stores/playerStore'
 import { useDownloadStates } from '../hooks/useDownloadStates'
 import { useArtistPrefetch } from '../hooks/useArtistPrefetch'
 import ContextMenu from '../components/ContextMenu'
@@ -34,7 +35,7 @@ function itemToPlayableTrack(
   // Important: do NOT fall back to playlist cover here.
   // If we do, that "infects" the player/system list with the playlist image and can
   // mask real per-track cached covers (especially for not-yet-downloaded tracks).
-  const art = resolveTrackArtUrl(item) ?? null
+  const art = resolveTrackArtUrl(item) ?? coverManager.peek(mbid).url ?? null
   const streamOnlyWhenReady = isCached && item.track_id
   return toTrack(
     {
@@ -88,33 +89,18 @@ export default function PlaylistPage() {
     enabled: Number.isFinite(id) && id > 0,
   })
 
-  function persistResolvedCover(itemId: number, mbid: string, url: string) {
-    // If the list already resolved an image URL (primary or fallback),
-    // persist it onto the playlist item so the player can reuse it without extra fetches.
-    queryClient.setQueryData(['playlist', id], (old: Awaited<ReturnType<typeof fetchPlaylistDetail>> | undefined) => {
-      if (!old) return old
-      const cur = old.items.find((it) => it.id === itemId)
-      if (cur?.album_cover === url) return old
-      return {
-        ...old,
-        items: old.items.map((it) => (it.id === itemId ? { ...it, album_cover: url } : it)),
-      }
-    })
-
-    usePlayerStore.setState((s: PlayerState) => {
-      const nextUserQueue = (s.userQueue || []).map((t: Track) =>
-        t.mb_id === mbid && t.album_cover !== url ? { ...t, album_cover: url } : t,
-      )
-      const nextSystemList = (s.systemList || []).map((t: Track) =>
-        t.mb_id === mbid && t.album_cover !== url ? { ...t, album_cover: url } : t,
-      )
-      const nextCurrent =
-        s.currentTrack && s.currentTrack.mb_id === mbid && s.currentTrack.album_cover !== url
-          ? { ...s.currentTrack, album_cover: url }
-          : s.currentTrack
-      return { userQueue: nextUserQueue, systemList: nextSystemList, currentTrack: nextCurrent }
-    })
-  }
+  // Hand cover resolution off to the singleton manager: priority-aware,
+  // concurrency-capped, abort-on-/play/-click. Covers stream in incrementally;
+  // the manager dual-writes resolved URLs to React Query + the player store.
+  useEffect(() => {
+    const items = playlist?.items
+    if (!items?.length) return
+    const ids = items
+      .map((item) => (item.mb_recording_id || '').trim())
+      .filter(Boolean)
+    if (ids.length === 0) return
+    coverManager.prime(ids, 'playlist')
+  }, [playlist?.items])
 
   const renameMutation = useMutation({
     mutationFn: () =>
@@ -442,10 +428,7 @@ export default function PlaylistPage() {
                     </span>
                   </div>
                   <div className="flex items-center justify-center shrink-0">
-                    <PlaylistTrackCover
-                      item={item}
-                      onResolved={(url) => persistResolvedCover(item.id, item.mb_recording_id, url)}
-                    />
+                    <PlaylistTrackCover item={item} priority="playlist" />
                   </div>
                   <div className="min-w-0">
                     <p

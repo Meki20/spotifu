@@ -206,7 +206,7 @@ async def reconcile_provider_ids() -> None:
             )
             mb_id = None
             try:
-                async with musicbrainz.mb_prefetch_calls():
+                async with musicbrainz.mb_passive_calls():
                     meta = await musicbrainz.resolve_recording_metadata(
                         track.title, track.artist, track.album
                     )

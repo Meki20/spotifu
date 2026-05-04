@@ -100,6 +100,9 @@ def _get_or_create_track_by_mb(session: Session, mbid: str, meta: dict | None) -
         session.commit()
         return track, False
 
+    if track.status == TrackStatus.FETCHING:
+        return track, True
+
     return track, False
 
 
@@ -186,11 +189,15 @@ async def play(
                 quality=existing.quality,
             )
 
-        async with mb_provider.mb_interactive_calls():
-            meta = await mb_provider.get_track(mbid, include_cover=False)
+        # Skip MB call if track already exists with metadata (from playlist load).
+        # Soulseek search only needs title/artist which are already in the Track row.
+        meta = None
         caa_release_mbids: list[str] = []
-        if meta:
-            caa_release_mbids = list(meta.pop("_caa_release_mbids", []) or [])
+        if existing is None or not (existing.title and existing.artist):
+            async with mb_provider.mb_interactive_calls():
+                meta = await mb_provider.get_track(mbid, include_cover=False)
+            if meta:
+                caa_release_mbids = list(meta.pop("_caa_release_mbids", []) or [])
         track, needs_download = _get_or_create_track_by_mb(session, mbid, meta)
 
         if needs_download:

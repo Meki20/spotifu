@@ -26,8 +26,8 @@ from typing import Any, Awaitable, Callable, Dict, List, Optional, Tuple
 logger = logging.getLogger(__name__)
 logging.getLogger("aioslsk").setLevel(logging.CRITICAL + 1)
 
-CACHE_DIR = os.environ.get("CACHE_DIR", "/home/lukaarch/Documents/src/SpotiFU/cache")
-_SECRETS_FILE = Path(os.environ.get("SECRETS_FILE", "/home/lukaarch/Documents/src/SpotiFU/.secrets"))
+CACHE_DIR = os.environ.get("CACHE_DIR") or str(Path(__file__).parent.parent.parent / "cache")
+_SECRETS_FILE = Path(os.environ.get("SECRETS_FILE", Path(__file__).parent.parent.parent / ".secrets"))
 
 # Ban-prevention knobs
 _MIN_SEARCH_INTERVAL = 3.0          # seconds between consecutive searches

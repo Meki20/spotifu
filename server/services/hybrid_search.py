@@ -690,7 +690,7 @@ class HybridSearchService:
 
     async def _background_refresh(self, query: str, query_normalized: str) -> None:
         try:
-            async with musicbrainz.mb_prefetch_calls():
+            async with musicbrainz.mb_passive_calls():
                 await self._search_live(query, query_normalized)
         except Exception as e:
             logger.debug("background hybrid refresh failed: %s", e)

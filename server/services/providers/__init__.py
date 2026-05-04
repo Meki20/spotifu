@@ -3,6 +3,7 @@ import copy
 import json
 import logging
 import os
+from pathlib import Path
 import time
 from collections import OrderedDict
 from datetime import datetime, timedelta
@@ -22,7 +23,7 @@ _DB_SOFT_TTL = timedelta(days=7)   # DB soft TTL — return stale + revalidate i
 _COVER_NEG_TTL = timedelta(hours=24)  # how long to cache a cover miss
 
 # Artist local images storage (user-downloaded from DDG)
-_ARTIST_IMAGES_DIR = os.environ.get("CACHE_DIR") or "/home/lukaarch/Documents/src/SpotiFU/cache"
+_ARTIST_IMAGES_DIR = os.environ.get("CACHE_DIR") or str(Path(__file__).parent.parent.parent.parent / "cache")
 _ARTIST_IMAGES_SUBDIR = "artist_images"
 
 def _get_artist_images_dir() -> str:

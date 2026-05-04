@@ -4,9 +4,10 @@ import asyncio
 import json
 import logging
 import os
+from pathlib import Path
 from dataclasses import dataclass
 from datetime import datetime, timedelta
-from typing import Any, Literal
+from typing import Any, AsyncIterator, Literal
 
 from sqlalchemy import text
 from sqlmodel import Session, select
@@ -256,7 +257,7 @@ async def _caa_fetch_direct(kind: Literal["release", "release_group"], mbid: str
         async with _CAA_SEMAPHORE:
             from services.providers._http import CAA_CLIENT
 
-            path = f"/release-group/{mbid}/front-250" if kind == "release_group" else f"/release/{mbid}/front-250"
+            path = f"/release-group/{mbid}/front-500" if kind == "release_group" else f"/release/{mbid}/front-500"
 
             for attempt in range(3):
                 try:
@@ -384,7 +385,7 @@ async def _fetch_cover_url(kind: EntityKind, entity_id: str) -> tuple[str | None
     if not url_str:
         from services.providers import musicbrainz
 
-        async with musicbrainz.mb_interactive_calls():
+        async with musicbrainz.mb_passive_calls():
             meta = await musicbrainz.get_track(entity_id)
         url_str = (meta or {}).get("album_cover")
         url_str = url_str if isinstance(url_str, str) and url_str else None
@@ -476,7 +477,7 @@ def _extract_local_cover(local_file_path: str, track_id: int) -> str | None:
             return None
 
         ext = ".png" if "png" in img_mime else ".jpg"
-        cache_dir = os.environ.get("CACHE_DIR") or "/home/lukaarch/Documents/src/SpotiFU/cache"
+        cache_dir = os.environ.get("CACHE_DIR") or str(Path(__file__).parent.parent.parent / "cache")
         covers_dir = os.path.join(cache_dir, "covers")
         os.makedirs(covers_dir, exist_ok=True)
         filename = f"track_{track_id}{ext}"
@@ -616,104 +617,116 @@ async def get_cover_url(entity_kind: EntityKind, entity_id: str) -> CoverResult:
     return CoverResult(url=url, hit=False)
 
 
-async def get_cover_urls_batch(entity_kind: EntityKind, ids: list[str]) -> dict[str, str | None]:
-    """Batch cover resolution optimized for minimal DB connections and CAA politeness.
+async def iter_cover_urls_batch(
+    entity_kind: EntityKind, ids: list[str]
+) -> AsyncIterator[tuple[str, str | None]]:
+    """Yield (id, url|None) per id as soon as each resolves.
 
-    - One DB read for cache lookup (all IDs at once).
-    - For recordings: one DB read to resolve release/rg IDs locally.
-    - Concurrent CAA fetches with a 3-connection semaphore + request coalescing.
-    - One DB transaction to write all results.
+    Cache hits emit immediately. Recording fallback (release/rg cache) emits
+    next. Remaining ids are fetched concurrently via ``asyncio.as_completed``;
+    each network result is upserted in a short-lived ``Session(engine)`` so
+    long-running streams don't pin the SQLAlchemy pool.
     """
     clean_ids = [(raw or "").strip() for raw in ids or [] if raw and (raw or "").strip()]
     if not clean_ids:
-        return {}
+        return
 
-    out: dict[str, str | None] = {}
+    seen: set[str] = set()
     uncached: list[str] = []
 
-    # 1. Batch cache read
+    # 1. Batch cache read — yield each hit immediately.
     with Session(engine) as session:
         cached = _read_cached_covers_batch(session, entity_kind=entity_kind, entity_ids=clean_ids)
-        for eid in clean_ids:
-            if eid in cached:
-                out[eid] = cached[eid].url
-            else:
-                uncached.append(eid)
+    for eid in clean_ids:
+        if eid in cached:
+            seen.add(eid)
+            yield eid, cached[eid].url
+        else:
+            uncached.append(eid)
 
     if not uncached:
-        return out
+        return
 
-    # 2. For recordings, batch-resolve local IDs and check release/rg cache fallback
+    # 2. Recording fallback: see if release/rg cache already covers any uncached ids.
     local_ids_map: dict[str, dict[str, str]] = {}
     if entity_kind == "recording":
         with Session(engine) as session:
             local_ids_map = _resolve_recording_ids_local(session, uncached)
-            # Check if release/rg covers are already cached; backfill recording links.
-            rec_ids_with_fallback: list[str] = []
-            rel_ids: list[str] = []
-            rg_ids: list[str] = []
+
             rec_to_rel: dict[str, str] = {}
             rec_to_rg: dict[str, str] = {}
             for rec_id, meta in local_ids_map.items():
-                if rec_id not in uncached:
-                    continue
                 if meta.get("release"):
-                    rel_ids.append(meta["release"])
                     rec_to_rel[rec_id] = meta["release"]
                 if meta.get("release_group"):
-                    rg_ids.append(meta["release_group"])
                     rec_to_rg[rec_id] = meta["release_group"]
-                rec_ids_with_fallback.append(rec_id)
 
-            if rec_ids_with_fallback:
-                all_fallback_ids = list(set(rel_ids + rg_ids))
-                if all_fallback_ids:
-                    placeholders = ", ".join(f":f{i}" for i in range(len(all_fallback_ids)))
-                    params: dict[str, Any] = {f"f{i}": v for i, v in enumerate(all_fallback_ids)}
-                    fb_rows = session.exec(
-                        text(
-                            f"""
-                            SELECT cl.entity_kind, cl.entity_id, ca.id, ca.url
-                            FROM cover_links cl
-                            JOIN cover_assets ca ON ca.id = cl.asset_id
-                            WHERE cl.found = TRUE
-                              AND cl.entity_kind IN ('release', 'release_group')
-                              AND cl.entity_id IN ({placeholders})
-                            """
-                        ),
-                        params=params,
-                    ).all()
+            fb_ids = list(set(rec_to_rel.values()) | set(rec_to_rg.values()))
+            still_uncached: list[str] = []
+            fallback_hits: list[tuple[str, str | None]] = []
+            if fb_ids:
+                placeholders = ", ".join(f":f{i}" for i in range(len(fb_ids)))
+                params: dict[str, Any] = {f"f{i}": v for i, v in enumerate(fb_ids)}
+                fb_rows = session.exec(
+                    text(
+                        f"""
+                        SELECT cl.entity_kind, cl.entity_id, ca.id, ca.url
+                        FROM cover_links cl
+                        JOIN cover_assets ca ON ca.id = cl.asset_id
+                        WHERE cl.found = TRUE
+                          AND cl.entity_kind IN ('release', 'release_group')
+                          AND cl.entity_id IN ({placeholders})
+                        """
+                    ),
+                    params=params,
+                ).all()
+                rel_map: dict[str, tuple[int, str]] = {}
+                rg_map: dict[str, tuple[int, str]] = {}
+                for fb_kind, fb_eid, fb_aid, fb_url in fb_rows:
+                    if not fb_url:
+                        continue
+                    if fb_kind == "release":
+                        rel_map[fb_eid] = (int(fb_aid), str(fb_url))
+                    elif fb_kind == "release_group":
+                        rg_map[fb_eid] = (int(fb_aid), str(fb_url))
 
-                    # Map release/rg id -> (asset_id, url)
-                    fb_by_id: dict[str, tuple[int, str]] = {}
-                    for fb_kind, fb_eid, fb_aid, fb_url in fb_rows:
-                        fb_by_id[fb_eid] = (int(fb_aid), str(fb_url) if fb_url else "")
-
-                    for rec_id in rec_ids_with_fallback:
-                        rel = rec_to_rel.get(rec_id)
-                        rg = rec_to_rg.get(rec_id)
-                        hit = None
-                        if rel and rel in fb_by_id:
-                            hit = fb_by_id[rel]
-                        elif rg and rg in fb_by_id:
-                            hit = fb_by_id[rg]
-                        if hit:
-                            asset_id, url = hit
-                            _upsert_link(
-                                session,
-                                entity_kind="recording",
-                                entity_id=rec_id,
-                                asset_id=asset_id,
-                                found=True,
-                                source="fallback",
-                            )
-                            out[rec_id] = url if url else None
-                            uncached.remove(rec_id)
+                for rec_id in uncached:
+                    rel = rec_to_rel.get(rec_id)
+                    rg = rec_to_rg.get(rec_id)
+                    hit: tuple[int, str] | None = None
+                    if rel and rel in rel_map:
+                        hit = rel_map[rel]
+                    elif rg and rg in rg_map:
+                        hit = rg_map[rg]
+                    if hit is None:
+                        still_uncached.append(rec_id)
+                        continue
+                    asset_id, url = hit
+                    _upsert_link(
+                        session,
+                        entity_kind="recording",
+                        entity_id=rec_id,
+                        asset_id=asset_id,
+                        found=True,
+                        source="fallback",
+                    )
+                    fallback_hits.append((rec_id, url))
+            else:
+                still_uncached = list(uncached)
 
             session.commit()
 
-    # 3. Concurrent fetch for each uncached ID
-    async def _fetch_one(eid: str) -> tuple[str | None, dict[str, str] | None]:
+        for rec_id, url in fallback_hits:
+            seen.add(rec_id)
+            yield rec_id, url
+
+        uncached = still_uncached
+
+    if not uncached:
+        return
+
+    # 3. Concurrent network fetches; emit each as it completes.
+    async def _fetch_one(eid: str) -> tuple[str, str | None, dict[str, str] | None]:
         if entity_kind == "recording":
             meta = dict(local_ids_map.get(eid, {}))
             url = None
@@ -724,7 +737,7 @@ async def get_cover_urls_batch(entity_kind: EntityKind, ids: list[str]) -> dict[
 
             if not url:
                 from services.providers import musicbrainz
-                async with musicbrainz.mb_interactive_calls():
+                async with musicbrainz.mb_passive_calls():
                     mb_meta = await musicbrainz.get_track(eid)
                 url = (mb_meta or {}).get("album_cover")
                 url = url if isinstance(url, str) and url else None
@@ -762,24 +775,21 @@ async def get_cover_urls_batch(entity_kind: EntityKind, ids: list[str]) -> dict[
                 except Exception:
                     logger.debug("Local cover fallback failed for recording %s", eid, exc_info=True)
 
-            return url, (meta or None)
+            return eid, url, (meta or None)
         else:
             url = await _caa_fetch_direct(entity_kind, eid)  # type: ignore[arg-type]
-            return url, None
+            return eid, url, None
 
-    tasks = [_fetch_one(eid) for eid in uncached]
-    results = await asyncio.gather(*tasks, return_exceptions=True)
+    tasks = [asyncio.create_task(_fetch_one(eid)) for eid in uncached]
+    for completed in asyncio.as_completed(tasks):
+        try:
+            eid, url, meta_ids = await completed
+        except Exception:
+            logger.debug("cover fetch task failed kind=%s", entity_kind, exc_info=True)
+            continue
 
-    # 4. Batch write all results in a single transaction
-    with Session(engine) as session:
-        for eid, result in zip(uncached, results):
-            if isinstance(result, Exception):
-                logger.debug("cover batch fetch failed kind=%s id=%s", entity_kind, eid, exc_info=result)
-                _upsert_link(session, entity_kind=entity_kind, entity_id=eid, asset_id=None, found=False)
-                out[eid] = None
-                continue
-
-            url, meta_ids = result
+        # Per-yield short-lived session — never hold a session across an await.
+        with Session(engine) as session:
             if url:
                 asset_id = _upsert_asset(session, url=url)
                 _upsert_link(session, entity_kind=entity_kind, entity_id=eid, asset_id=asset_id, found=True)
@@ -802,10 +812,22 @@ async def get_cover_urls_batch(entity_kind: EntityKind, ids: list[str]) -> dict[
                         )
             else:
                 _upsert_link(session, entity_kind=entity_kind, entity_id=eid, asset_id=None, found=False)
-            out[eid] = url
+            session.commit()
 
-        session.commit()
+        if eid in seen:
+            continue
+        seen.add(eid)
+        yield eid, url
 
+
+async def get_cover_urls_batch(entity_kind: EntityKind, ids: list[str]) -> dict[str, str | None]:
+    """Eager batch wrapper — collects ``iter_cover_urls_batch`` into a dict.
+
+    Kept for callers that don't need streaming (e.g. legacy non-streaming endpoint).
+    """
+    out: dict[str, str | None] = {}
+    async for eid, url in iter_cover_urls_batch(entity_kind, ids):
+        out[eid] = url
     return out
 
 
@@ -861,6 +883,89 @@ def lookup_cached_cover_best_effort(
         return None
     url = row[0]
     return str(url) if url else None
+
+
+def lookup_cached_covers_batch(
+    session: Session, *, entity_kind: EntityKind, ids: list[str]
+) -> dict[str, str | None]:
+    """Pure DB-only batch lookup. No network, no writes.
+
+    Returns mapping for ids with a fresh (within TTL) cache entry. For
+    recordings, missing ids additionally check the release / release_group
+    cache via the local id mapping. Ids absent from the returned dict mean
+    "not in cache" — caller treats as miss.
+    """
+    clean_ids = [(raw or "").strip() for raw in ids or [] if raw and (raw or "").strip()]
+    if not clean_ids:
+        return {}
+
+    direct = _read_cached_covers_batch(session, entity_kind=entity_kind, entity_ids=clean_ids)
+    out: dict[str, str | None] = {eid: res.url for eid, res in direct.items()}
+
+    if entity_kind != "recording":
+        return out
+
+    missing = [e for e in clean_ids if e not in out]
+    if not missing:
+        return out
+
+    local_map = _resolve_recording_ids_local(session, missing)
+    if not local_map:
+        return out
+
+    rec_to_rel: dict[str, str] = {}
+    rec_to_rg: dict[str, str] = {}
+    for rec, meta in local_map.items():
+        if meta.get("release"):
+            rec_to_rel[rec] = meta["release"]
+        if meta.get("release_group"):
+            rec_to_rg[rec] = meta["release_group"]
+
+    fb_ids = list(set(rec_to_rel.values()) | set(rec_to_rg.values()))
+    if not fb_ids:
+        return out
+
+    placeholders = ", ".join(f":f{i}" for i in range(len(fb_ids)))
+    params: dict[str, Any] = {f"f{i}": v for i, v in enumerate(fb_ids)}
+    rows = session.exec(
+        text(
+            f"""
+            SELECT cl.entity_kind, cl.entity_id, ca.url, cl.fetched_at
+            FROM cover_links cl
+            JOIN cover_assets ca ON ca.id = cl.asset_id
+            WHERE cl.found = TRUE
+              AND cl.entity_kind IN ('release', 'release_group')
+              AND cl.entity_id IN ({placeholders})
+            """
+        ),
+        params=params,
+    ).all()
+    rel_url: dict[str, str] = {}
+    rg_url: dict[str, str] = {}
+    now = _now_utc()
+    for kind, eid, url, fetched_at in rows:
+        if not url:
+            continue
+        try:
+            age = now - fetched_at
+        except Exception:
+            age = _POS_TTL
+        if age > _POS_TTL:
+            continue
+        if kind == "release":
+            rel_url[eid] = str(url)
+        elif kind == "release_group":
+            rg_url[eid] = str(url)
+
+    for rec in missing:
+        rel = rec_to_rel.get(rec)
+        rg = rec_to_rg.get(rec)
+        if rel and rel in rel_url:
+            out[rec] = rel_url[rel]
+        elif rg and rg in rg_url:
+            out[rec] = rg_url[rg]
+
+    return out
 
 
 def attach_playlist_style_covers_mbentity_cache(session: Session, rows: list[Any]) -> None:

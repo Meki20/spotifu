@@ -3,6 +3,10 @@ import { useAuthStore } from '../stores/authStore'
 import { subscribeSpotifuWebSocket } from '../spotifuWebSocket'
 import { API, authFetch } from '../api'
 import { queryClient } from '../queryClient'
+import { coverManager } from '../lib/coverManager'
+
+const PLAY_PAUSE_TOKEN = 'play-click'
+const PLAY_PAUSE_SAFETY_MS = 1500
 
 class PlaybackController {
   private _audio: HTMLAudioElement
@@ -156,6 +160,19 @@ class PlaybackController {
   }
 
   private _playTrack(track: Track): void {
+    // Free the same-origin connection pool before we hit /play/ and /stream/.
+    // Aborts in-flight cover requests; covers resume as soon as /play/ resolves
+    // (or after the safety timer, whichever comes first).
+    coverManager.pause(PLAY_PAUSE_TOKEN)
+    let safetyTimer: ReturnType<typeof setTimeout> | null = setTimeout(
+      () => { safetyTimer = null; coverManager.resume(PLAY_PAUSE_TOKEN) },
+      PLAY_PAUSE_SAFETY_MS,
+    )
+    const resumeCovers = () => {
+      if (safetyTimer !== null) { clearTimeout(safetyTimer); safetyTimer = null }
+      coverManager.resume(PLAY_PAUSE_TOKEN)
+    }
+
     this._audio.pause()
     this._audio.src = ''
     this._audio.load()
@@ -189,6 +206,7 @@ class PlaybackController {
         .catch(() => {
           usePlayerStore.setState({ phase: 'ready' })
         })
+        .finally(resumeCovers)
       authFetch(`/play/local/${track.track_id}`).catch(() => {})
       if (usePlayerStore.getState().systemSource?.kind !== 'recently-played') {
         queryClient.invalidateQueries({ queryKey: ['recently-played'] })
@@ -238,6 +256,7 @@ class PlaybackController {
         console.error('[Controller] fetch failed:', e)
         usePlayerStore.setState({ phase: 'error' })
       })
+      .finally(resumeCovers)
   }
 
   private _advance(autoAdvance: boolean) {

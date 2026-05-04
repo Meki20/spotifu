@@ -1,6 +1,6 @@
 import { X, ListMusic, Computer } from 'lucide-react'
-import { useEffect, useMemo, useState, type ReactNode } from 'react'
-import { useQuery } from '@tanstack/react-query'
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { Link, useNavigate } from 'react-router-dom'
 import { useShallow } from 'zustand/react/shallow'
 import { usePlayerStore, type Track, type PlayerState } from '../stores/playerStore'
@@ -253,6 +253,20 @@ export default function QueuePanel(_: QueuePanelProps) {
     gcTime: 1000 * 60 * 30,
     refetchOnWindowFocus: false,
   })
+
+  const queryClient = useQueryClient()
+  const prevTrackIdRef = useRef(currentTrack?.mb_id || null)
+
+  useEffect(() => {
+    const prevId = prevTrackIdRef.current
+    const newId = currentTrack?.mb_id || null
+
+    if (prevId !== newId && prevId !== null) {
+      queryClient.invalidateQueries({ queryKey: ['queue-artist-images'] })
+    }
+
+    prevTrackIdRef.current = newId
+  }, [currentTrack, queryClient])
 
   const sourceLabel = useMemo(() => {
     if (!systemSource) return 'Next from system'

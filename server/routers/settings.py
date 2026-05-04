@@ -5,7 +5,7 @@ from pydantic import BaseModel
 from sqlmodel import Session, select, delete, func
 from database import get_session, engine
 from deps import get_current_user, require_admin, require_permission, CurrentUser
-from models import User, Track, TrackStatus, MBLookupCache, MBEntityCache, PlaylistItem, CoverLink, CoverAsset, UserRecentlyPlayed
+from models import User, Track, TrackStatus, MBLookupCache, MBEntityCache, PlaylistItem, CoverLink, CoverAsset, UserRecentlyPlayed, AutoPlaylistTrack
 from schemas.track import DownloadedTrackListItem, DownloadedTracksListResponse
 from services.user_preferences import get_stored_prefetch_prefs, merge_prefetch_into_user, PREFETCH_DEFAULTS
 
@@ -215,6 +215,10 @@ def delete_downloaded_track(
     for pi in session.exec(select(PlaylistItem).where(PlaylistItem.track_id == track_id)).all():
         pi.track_id = None
         session.add(pi)
+
+    for apt in session.exec(select(AutoPlaylistTrack).where(AutoPlaylistTrack.track_id == track_id)).all():
+        apt.track_id = None
+        session.add(apt)
 
     for urp in session.exec(select(UserRecentlyPlayed).where(UserRecentlyPlayed.track_id == track_id)).all():
         session.delete(urp)

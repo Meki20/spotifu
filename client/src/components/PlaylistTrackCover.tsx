@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import type { PlaylistItemDTO } from '../api/playlists'
-import { useCover } from '../hooks/useCover'
+import { useCoverWhenVisible } from '../hooks/useCoverWhenVisible'
 import type { CoverPriority } from '../lib/coverManager'
 import { resolveTrackArtUrl } from '../utils/trackHelpers'
 
@@ -29,6 +29,7 @@ export default function PlaylistTrackCover({
   /** Tile size / rounding (default matches playlist row). */
   className?: string
 }) {
+  const containerRef = useRef<HTMLDivElement>(null)
   const recId = recordingMbid(item)
   const primary = resolveTrackArtUrl(item)
   const [primaryBroken, setPrimaryBroken] = useState(false)
@@ -37,7 +38,7 @@ export default function PlaylistTrackCover({
 
   // Only ask the manager if no usable primary URL.
   const needFromManager = Boolean(recId) && (!primary || primaryBroken)
-  const { url: managerUrl, isResolved } = useCover(needFromManager ? recId : '', priority)
+  const { url: managerUrl, isResolved } = useCoverWhenVisible(containerRef, needFromManager ? recId : '', priority)
 
   useEffect(() => {
     onResolvedRef.current = onResolved
@@ -54,23 +55,25 @@ export default function PlaylistTrackCover({
 
   if (!src) {
     if (needFromManager && !isResolved) {
-      return <div className={`${className} animate-pulse bg-[#231815]`} aria-hidden />
+      return <div ref={containerRef} className={`${className} animate-pulse bg-[#231815]`} aria-hidden />
     }
-    return <div className={`${className} bg-[#231815]`} aria-hidden />
+    return <div ref={containerRef} className={`${className} bg-[#231815]`} aria-hidden />
   }
 
   return (
-    <img
-      key={src}
-      src={src}
-      alt=""
-      className={`${className} object-cover bg-[#231815]`}
-      loading="lazy"
-      onError={() => {
-        if (primary && !primaryBroken) {
-          setPrimaryBroken(true)
-        }
-      }}
-    />
+    <div ref={containerRef}>
+      <img
+        key={src}
+        src={src}
+        alt=""
+        className={`${className} object-cover bg-[#231815]`}
+        loading="lazy"
+        onError={() => {
+          if (primary && !primaryBroken) {
+            setPrimaryBroken(true)
+          }
+        }}
+      />
+    </div>
   )
 }

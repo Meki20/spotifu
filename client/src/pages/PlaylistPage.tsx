@@ -102,19 +102,6 @@ export default function PlaylistPage() {
     enabled: Number.isFinite(id) && id > 0,
   })
 
-  // Hand cover resolution off to the singleton manager: priority-aware,
-  // concurrency-capped, abort-on-/play/-click. Covers stream in incrementally;
-  // the manager dual-writes resolved URLs to React Query + the player store.
-  useEffect(() => {
-    const items = playlist?.items
-    if (!items?.length) return
-    const ids = items
-      .map((item) => (item.mb_recording_id || '').trim())
-      .filter(Boolean)
-    if (ids.length === 0) return
-    coverManager.prime(ids, 'playlist')
-  }, [playlist?.items])
-
   const renameMutation = useMutation({
     mutationFn: () =>
       updatePlaylist(id, {

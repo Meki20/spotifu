@@ -6,14 +6,18 @@ import { useShallow } from 'zustand/react/shallow'
 import { usePlayerStore, type Track, type PlayerState } from '../stores/playerStore'
 import * as controller from '../playback/controller'
 import { authFetch, mediaUrl } from '../api'
-import { useCover } from '../hooks/useCover'
+import { useCoverWhenVisible } from '../hooks/useCoverWhenVisible'
 import type { CoverPriority } from '../lib/coverManager'
 
 function QueueCover({ track, className, priority = 'prefetch' }: { track: Track; className: string; priority?: CoverPriority }) {
-  const { url } = useCover(track.mb_id, priority)
+  const containerRef = useRef<HTMLDivElement>(null)
+  const { url } = useCoverWhenVisible(containerRef, track.mb_id, priority)
   const src = track.album_cover || url
-  if (!src) return null
-  return <img src={src} alt="" className={className} loading="lazy" />
+  return (
+    <div ref={containerRef} className={className} style={{ background: '#231815' }}>
+      {src && <img src={src} alt="" className="w-full h-full object-cover block" loading="lazy" />}
+    </div>
+  )
 }
 
 function NowPlayingCard({ track }: { track: Track }) {

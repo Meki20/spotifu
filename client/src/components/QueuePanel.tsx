@@ -190,9 +190,10 @@ export type QueuePanelProps = {
   onClose: () => void
   onOpen: () => void
   maxWidth: number
+  minWidth?: number
 }
 
-export default function QueuePanel({ width, onWidthChange, onClose, onOpen, maxWidth }: QueuePanelProps) {
+export default function QueuePanel({ width, onWidthChange, onClose, onOpen, maxWidth, minWidth = 0 }: QueuePanelProps) {
   const isClosed = width === 0
   const {
     currentTrack,
@@ -264,42 +265,53 @@ export default function QueuePanel({ width, onWidthChange, onClose, onOpen, maxW
     return systemSource.title ? `Next from • ${systemSource.title}` : 'Next from system'
   }, [systemSource])
 
-  // Drag handle state
-  const dragRef = useRef<{
-    startX: number
-    startWidth: number
-    dragging: boolean
-  } | null>(null)
   const panelRef = useRef<HTMLDivElement>(null)
 
   const handleDragMouseDown = (e: React.MouseEvent) => {
     e.preventDefault()
     e.stopPropagation()
-    dragRef.current = {
-      startX: e.clientX,
-      startWidth: width,
-      dragging: true,
-    }
+    const startX = e.clientX
+    const startWidth = width
     document.body.style.cursor = 'ew-resize'
     document.body.style.userSelect = 'none'
 
     const onMouseMove = (moveEvent: MouseEvent) => {
-      if (!dragRef.current) return
-      const dx = moveEvent.clientX - dragRef.current.startX
-      // Dragging left edge to the right = making panel narrower
-      let newWidth = dragRef.current.startWidth - dx
-      newWidth = Math.max(0, Math.min(maxWidth, newWidth))
-      onWidthChange(newWidth)
+      const dx = startX - moveEvent.clientX
+      let newWidth = startWidth + dx
+
+      if (newWidth <= minWidth) {
+        newWidth = 0
+      } else if (newWidth > maxWidth) {
+        newWidth = maxWidth
+      } else if (newWidth < minWidth) {
+        newWidth = minWidth
+      }
+
+      if (panelRef.current) {
+        panelRef.current.style.width = `${newWidth}px`
+      }
     }
 
-    const onMouseUp = () => {
-      if (dragRef.current) {
-        dragRef.current = null
+    const onMouseUp = (moveEvent: MouseEvent) => {
+      const dx = startX - moveEvent.clientX
+      let finalWidth = startWidth + dx
+
+      if (finalWidth <= minWidth) {
+        finalWidth = 0
+      } else if (finalWidth > maxWidth) {
+        finalWidth = maxWidth
+      } else if (finalWidth < minWidth) {
+        finalWidth = minWidth
       }
+
       document.body.style.cursor = ''
       document.body.style.userSelect = ''
       document.removeEventListener('mousemove', onMouseMove)
       document.removeEventListener('mouseup', onMouseUp)
+      if (panelRef.current) {
+        panelRef.current.style.width = ''
+      }
+      onWidthChange(finalWidth)
     }
 
     document.addEventListener('mousemove', onMouseMove)
@@ -399,7 +411,7 @@ export default function QueuePanel({ width, onWidthChange, onClose, onOpen, maxW
               <ListMusic size={16} />
             </div>
             <div
-              className="text-2xl font-bold tracking-wide"
+              className="text-2xl font-bold tracking-wide flex-1"
               style={{
                 fontFamily: "'Barlow Condensed', sans-serif",
                 fontWeight: 800,
@@ -412,20 +424,6 @@ export default function QueuePanel({ width, onWidthChange, onClose, onOpen, maxW
             >
               Queue
             </div>
-            <button
-              type="button"
-              onClick={isClosed ? onOpen : onClose}
-              className="ml-auto w-8 h-8 rounded flex items-center justify-center transition-colors hover:border-[#b4003e]"
-              style={{
-                border: '1px solid #3D2820',
-                background: 'transparent',
-                color: '#9A8E84',
-              }}
-              aria-label={isClosed ? 'Open queue panel' : 'Close queue panel'}
-              title={isClosed ? 'Open queue panel' : 'Close queue panel'}
-            >
-              {isClosed ? <PanelRight size={16} /> : <PanelLeft size={16} />}
-            </button>
           </div>
         </div>
 

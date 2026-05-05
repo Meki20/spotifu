@@ -11,7 +11,7 @@ import { authFetch } from '../api'
 import { fetchPlaylistsList } from '../api/playlists'
 import { useEffect, useState } from 'react'
 
-const QUEUE_MIN_WIDTH = 48
+const QUEUE_MIN_WIDTH = 200
 const QUEUE_DEFAULT_WIDTH = 320
 const QUEUE_MAX_WIDTH = 480
 
@@ -101,9 +101,24 @@ export default function MainLayout() {
 
   useEffect(() => {
     document.documentElement.dataset.sidebarCollapsed = collapsed ? '1' : '0'
-    // queueVisible is now derived: panel is visible when not closed (width > 0)
     document.documentElement.dataset.queueVisible = (!queuePanelClosed).toString()
   }, [collapsed, queuePanelClosed])
+
+  useEffect(() => {
+    const handler = () => {
+      if (queuePanelClosed) {
+        setQueuePanelClosed(false)
+        setQueuePanelWidth(QUEUE_DEFAULT_WIDTH)
+        saveQueuePanelClosed(false)
+        saveQueuePanelWidth(QUEUE_DEFAULT_WIDTH)
+      } else {
+        setQueuePanelClosed(true)
+        saveQueuePanelClosed(true)
+      }
+    }
+    window.addEventListener('spotifu:toggle-queue', handler)
+    return () => window.removeEventListener('spotifu:toggle-queue', handler)
+  }, [queuePanelClosed])
 
   const { data: sidebarPlaylists } = useQuery({
     queryKey: ['playlists'],
@@ -482,6 +497,7 @@ export default function MainLayout() {
             saveQueuePanelWidth(QUEUE_DEFAULT_WIDTH)
           }}
           maxWidth={QUEUE_MAX_WIDTH}
+          minWidth={QUEUE_MIN_WIDTH}
         />
       </div>
 

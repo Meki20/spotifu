@@ -1,5 +1,5 @@
-import { X, ListMusic, Computer } from 'lucide-react'
-import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { X, ListMusic, Computer, PanelLeft, PanelRight } from 'lucide-react'
+import { useEffect, useMemo, useRef, type ReactNode } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { Link, useNavigate } from 'react-router-dom'
 import { useShallow } from 'zustand/react/shallow'
@@ -189,29 +189,16 @@ function TrackRow({
 }
 
 export type QueuePanelProps = {
-  // No user controls; visibility is derived from layout state.
+  width: number
+  onWidthChange: (width: number) => void
+  onClose: () => void
+  onOpen: () => void
+  maxWidth: number
+  minWidth?: number
 }
 
-export default function QueuePanel(_: QueuePanelProps) {
-  const [isVisible, setIsVisible] = useState(true)
-
-  useEffect(() => {
-    const compute = () => {
-      const visible = document.documentElement.dataset.queueVisible === '1'
-      setIsVisible(visible)
-    }
-
-    compute()
-    window.addEventListener('resize', compute)
-
-    const obs = new MutationObserver(compute)
-    obs.observe(document.documentElement, { attributes: true, attributeFilter: ['data-queue-visible'] })
-
-    return () => {
-      window.removeEventListener('resize', compute)
-      obs.disconnect()
-    }
-  }, [])
+export default function QueuePanel({ width, onWidthChange, onClose, onOpen, maxWidth, minWidth = 0 }: QueuePanelProps) {
+  const isClosed = width === 0
   const {
     currentTrack,
     userQueue,
@@ -282,20 +269,115 @@ export default function QueuePanel(_: QueuePanelProps) {
     return systemSource.title ? `Next from • ${systemSource.title}` : 'Next from system'
   }, [systemSource])
 
-  const widthPx = isVisible ? 320 : 0
+  const panelRef = useRef<HTMLDivElement>(null)
+
+  const handleDragMouseDown = (e: React.MouseEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+    const startX = e.clientX
+    const startWidth = width
+    document.body.style.cursor = 'ew-resize'
+    document.body.style.userSelect = 'none'
+
+    const onMouseMove = (moveEvent: MouseEvent) => {
+      const dx = startX - moveEvent.clientX
+      let newWidth = startWidth + dx
+
+      if (newWidth <= minWidth) {
+        newWidth = 0
+      } else if (newWidth > maxWidth) {
+        newWidth = maxWidth
+      } else if (newWidth < minWidth) {
+        newWidth = minWidth
+      }
+
+      if (panelRef.current) {
+        panelRef.current.style.width = `${newWidth}px`
+      }
+    }
+
+    const onMouseUp = (moveEvent: MouseEvent) => {
+      const dx = startX - moveEvent.clientX
+      let finalWidth = startWidth + dx
+
+      if (finalWidth <= minWidth) {
+        finalWidth = 0
+      } else if (finalWidth > maxWidth) {
+        finalWidth = maxWidth
+      } else if (finalWidth < minWidth) {
+        finalWidth = minWidth
+      }
+
+      document.body.style.cursor = ''
+      document.body.style.userSelect = ''
+      document.removeEventListener('mousemove', onMouseMove)
+      document.removeEventListener('mouseup', onMouseUp)
+      if (panelRef.current) {
+        panelRef.current.style.width = ''
+      }
+      onWidthChange(finalWidth)
+    }
+
+    document.addEventListener('mousemove', onMouseMove)
+    document.addEventListener('mouseup', onMouseUp)
+  }
 
   return (
     <div
+      ref={panelRef}
       className="flex flex-col h-full relative shrink-0 overflow-hidden"
       style={{
-        width: widthPx,
-        opacity: isVisible ? 1 : 0,
+        width: width,
+        opacity: isClosed ? 0 : 1,
         background: '#0C0906',
         borderLeft: '1px solid #1C1410',
         transition: 'width 220ms cubic-bezier(0.2, 0.9, 0.2, 1), opacity 120ms ease',
         willChange: 'width, opacity',
       }}
     >
+      {/* Drag handle on the LEFT edge */}
+      {width > 0 && (
+        <div
+          role="separator"
+          aria-valuenow={width}
+          aria-valuemin={0}
+          aria-valuemax={maxWidth}
+          aria-label="Queue panel resizer"
+          onMouseDown={handleDragMouseDown}
+          style={{
+            position: 'absolute',
+            left: 0,
+            top: 0,
+            bottom: 0,
+            width: 6,
+            cursor: 'ew-resize',
+            zIndex: 20,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+          }}
+        >
+          {/* Grabber indicator — vertical dots */}
+          <div
+            style={{
+              width: 2,
+              height: 40,
+              borderRadius: 1,
+              background: '#3D2820',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: 3,
+              justifyContent: 'center',
+              alignItems: 'center',
+            }}
+          >
+            {[...Array(5)].map((_, i) => (
+              <div key={i} style={{ width: 2, height: 2, borderRadius: '50%', background: '#9A8E84' }} />
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* Grain overlay */}
       <div
         className="absolute inset-0 pointer-events-none opacity-7"
@@ -333,7 +415,7 @@ export default function QueuePanel(_: QueuePanelProps) {
               <ListMusic size={16} />
             </div>
             <div
-              className="text-2xl font-bold tracking-wide"
+              className="text-2xl font-bold tracking-wide flex-1"
               style={{
                 fontFamily: "'Barlow Condensed', sans-serif",
                 fontWeight: 800,

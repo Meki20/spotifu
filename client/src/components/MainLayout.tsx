@@ -11,6 +11,10 @@ import { authFetch } from '../api'
 import { fetchPlaylistsList } from '../api/playlists'
 import { useEffect, useState } from 'react'
 
+const QUEUE_MIN_WIDTH = 200
+const QUEUE_DEFAULT_WIDTH = 320
+const QUEUE_MAX_WIDTH = 480
+
 const NAV_ITEMS = [
   { id: '/', icon: Home, label: 'Home' },
   { id: '/search', icon: Search, label: 'Search' },
@@ -24,7 +28,8 @@ export default function MainLayout() {
   const location = useLocation()
   const token = useAuthStore((s) => s.token)
   const [collapsed, setCollapsed] = useState(false)
-  const [queueVisible, setQueueVisible] = useState(true)
+  const [queuePanelWidth, setQueuePanelWidth] = useState(QUEUE_DEFAULT_WIDTH)
+  const [queuePanelClosed, setQueuePanelClosed] = useState(false)
 
   useEffect(() => {
     try {
@@ -44,21 +49,76 @@ export default function MainLayout() {
   }, [collapsed])
 
   useEffect(() => {
+    try {
+      const w = localStorage.getItem('spotifu.queuePanelWidth')
+      if (w) {
+        const parsed = Number(w)
+        if (!isNaN(parsed) && parsed >= QUEUE_MIN_WIDTH && parsed <= QUEUE_MAX_WIDTH) {
+          // eslint-disable-next-line react-hooks/set-state-in-effect
+          setQueuePanelWidth(parsed)
+        }
+      }
+      const c = localStorage.getItem('spotifu.queuePanelClosed')
+      if (c === '1') setQueuePanelClosed(true)
+    } catch {
+      // ignore
+    }
+  }, [])
+
+  const saveQueuePanelWidth = (width: number) => {
+    try {
+      localStorage.setItem('spotifu.queuePanelWidth', String(width))
+    } catch {
+      // ignore
+    }
+  }
+
+  const saveQueuePanelClosed = (closed: boolean) => {
+    try {
+      localStorage.setItem('spotifu.queuePanelClosed', closed ? '1' : '0')
+    } catch {
+      // ignore
+    }
+  }
+
+  useEffect(() => {
     const compute = () => {
       const appW = window.innerWidth || 0
       const screenW = window.screen?.availWidth || window.screen?.width || 0
       const widerThanHalfScreen = screenW > 0 ? appW > screenW * 0.7 : appW >= 1100
-      setQueueVisible(widerThanHalfScreen || collapsed)
+      if (!widerThanHalfScreen && !collapsed) {
+        // Auto-close queue panel on narrow screens
+        if (!queuePanelClosed) {
+          setQueuePanelClosed(true)
+          saveQueuePanelClosed(true)
+        }
+      }
     }
     compute()
     window.addEventListener('resize', compute)
     return () => window.removeEventListener('resize', compute)
-  }, [collapsed])
+  }, [collapsed, queuePanelClosed])
 
   useEffect(() => {
     document.documentElement.dataset.sidebarCollapsed = collapsed ? '1' : '0'
-    document.documentElement.dataset.queueVisible = queueVisible ? '1' : '0'
-  }, [collapsed, queueVisible])
+    document.documentElement.dataset.queueVisible = (!queuePanelClosed).toString()
+  }, [collapsed, queuePanelClosed])
+
+  useEffect(() => {
+    const handler = () => {
+      if (queuePanelClosed) {
+        setQueuePanelClosed(false)
+        setQueuePanelWidth(QUEUE_DEFAULT_WIDTH)
+        saveQueuePanelClosed(false)
+        saveQueuePanelWidth(QUEUE_DEFAULT_WIDTH)
+      } else {
+        setQueuePanelClosed(true)
+        saveQueuePanelClosed(true)
+      }
+    }
+    window.addEventListener('spotifu:toggle-queue', handler)
+    return () => window.removeEventListener('spotifu:toggle-queue', handler)
+  }, [queuePanelClosed])
 
   const { data: sidebarPlaylists } = useQuery({
     queryKey: ['playlists'],
@@ -412,8 +472,33 @@ export default function MainLayout() {
           <Outlet />
         </main>
 
-        {/* Right queue strip (reactive, not user-toggleable) */}
-        <QueuePanel />
+        {/* Right queue strip (resizable) */}
+        <QueuePanel
+          width={queuePanelClosed ? 0 : queuePanelWidth}
+          onWidthChange={(w) => {
+            setQueuePanelWidth(w)
+            saveQueuePanelWidth(w)
+            if (w <= QUEUE_MIN_WIDTH) {
+              setQueuePanelClosed(true)
+              saveQueuePanelClosed(true)
+            } else {
+              setQueuePanelClosed(false)
+              saveQueuePanelClosed(false)
+            }
+          }}
+          onClose={() => {
+            setQueuePanelClosed(true)
+            saveQueuePanelClosed(true)
+          }}
+          onOpen={() => {
+            setQueuePanelClosed(false)
+            setQueuePanelWidth(QUEUE_DEFAULT_WIDTH)
+            saveQueuePanelClosed(false)
+            saveQueuePanelWidth(QUEUE_DEFAULT_WIDTH)
+          }}
+          maxWidth={QUEUE_MAX_WIDTH}
+          minWidth={QUEUE_MIN_WIDTH}
+        />
       </div>
 
       <NotificationCenter />

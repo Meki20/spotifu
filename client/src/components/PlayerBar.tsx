@@ -7,6 +7,7 @@ import { useNavigate } from 'react-router-dom'
 import {
   Play, Pause, SkipBack, SkipForward, Volume2, VolumeX,
   MoreHorizontal, Shuffle, Repeat, Repeat1, Heart, Computer,
+  ListMusic,
 } from 'lucide-react'
 import type { RepeatMode } from '../stores/playerStore'
 import AddToPlaylistModal, { type AddToPlaylistTrack } from './AddToPlaylistModal'
@@ -96,6 +97,10 @@ export default function PlayerBar() {
       controller.resume()
     }
     setIsPlaying(!isPlaying)
+  }
+
+  const handleToggleQueue = () => {
+    window.dispatchEvent(new CustomEvent('spotifu:toggle-queue'))
   }
 
   const cycleRepeat = () => {
@@ -357,6 +362,14 @@ export default function PlayerBar() {
 
         {/* Right: volume + download badge */}
         <div className="flex items-center gap-2 w-52 shrink-0 justify-end">
+          <button
+            onClick={handleToggleQueue}
+            className="px-1.5 transition-colors"
+            style={{ color: '#9A8E84' }}
+            title="Toggle queue"
+          >
+            <ListMusic size={14} />
+          </button>
           <button
             onClick={(e) => setContextMenu({ x: e.clientX, y: e.clientY, track: currentTrack as any })}
             className="px-1.5 transition-colors"

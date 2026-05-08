@@ -4,8 +4,7 @@ import { useVirtualizer } from '@tanstack/react-virtual'
 import { type Track, usePlayerStore } from '../stores/playerStore'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { subscribeSpotifuWebSocket } from '../spotifuWebSocket'
-import { API, authFetch } from '../api'
-import { requestMbDownload } from '../stores/downloadBusyStore'
+import { authFetch } from '../api'
 import * as controller from '../playback/controller'
 import { useDownloadStates } from '../hooks/useDownloadStates'
 import { useArtistPrefetch } from '../hooks/useArtistPrefetch'
@@ -13,8 +12,6 @@ import { useArtistTransitionStore } from '../stores/artistTransitionStore'
 import TrackRowFull from '../components/TrackRowFull'
 import AlbumCard from '../components/AlbumCard'
 import ArtistCard from '../components/ArtistCard'
-import ContextMenu from '../components/ContextMenu'
-import AddToPlaylistModal, { type AddToPlaylistTrack } from '../components/AddToPlaylistModal'
 import { useContextMenuActions } from '../contexts/ContextMenuProvider'
 import { useAuthStore } from '../stores/authStore'
 import { PollyLoading } from '../components/PollyLoading'
@@ -106,13 +103,6 @@ function parseNdjsonLine(line: string): SimilarStreamEvent | null {
   }
 }
 
-interface ContextMenu {
-  x: number
-  y: number
-  track: Track
-}
-
-
 export default function Search() {
   const [query, setQuery] = useState('')
   const [debouncedQuery, setDebouncedQuery] = useState('')
@@ -126,9 +116,6 @@ export default function Search() {
   const [similarStreamPending, setSimilarStreamPending] = useState(false)
   const [similarNotice, setSimilarNotice] = useState<string | null>(null)
   const similarStreamGenRef = useRef(0)
-  const [contextMenu, setContextMenu] = useState<ContextMenu | null>(null)
-  const [addPlOpen, setAddPlOpen] = useState(false)
-  const [addPlTrack, setAddPlTrack] = useState<AddToPlaylistTrack | null>(null)
   const [focused, setFocused] = useState(false)
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const scrollRef = useRef<HTMLDivElement | null>(null)
@@ -364,26 +351,11 @@ export default function Search() {
     controller.play(track)
   }
 
-  function downloadTrack(track: Track) {
-    requestMbDownload(authFetch, track.mb_id)
-      .then((r) => (r && r.ok ? r.json() : null))
-      .then((data) => {
-        if (data && data.status === 'already_downloaded' && data.local_stream_url) {
-          const updated: Track = {
-            ...track,
-            local_stream_url: `${API}${data.local_stream_url}`,
-            track_id: data.track_id,
-            is_cached: true,
-          }
-          controller.play(updated)
-        }
-      })
-      .catch(console.error)
-  }
-
   function handleContextMenu(e: React.MouseEvent, track: Track) {
     e.preventDefault()
-    setContextMenu({ x: e.clientX, y: e.clientY, track })
+    openContextMenu(e.clientX, e.clientY, track, {
+      onPlay: () => playTrack(track),
+    })
   }
 
   function handleAlbumContextMenu(e: React.MouseEvent, album: any) {
@@ -404,7 +376,6 @@ export default function Search() {
     <div
       ref={scrollRef}
       className="p-6 flex-1 overflow-y-auto"
-      onClick={() => setContextMenu(null)}
       style={{
         opacity: transitionActive ? 0 : 1,
         transition: 'opacity 120ms ease',
@@ -730,56 +701,6 @@ export default function Search() {
         </div>
       )}
 
-      {/* Context Menu */}
-      {contextMenu && (
-        <ContextMenu
-          x={contextMenu.x}
-          y={contextMenu.y}
-          track={contextMenu.track}
-          onPlay={() => { playTrack(contextMenu.track); setContextMenu(null) }}
-          onDownload={() => { downloadTrack(contextMenu.track); setContextMenu(null) }}
-          onAddToQueue={() => { controller.addToQueue(contextMenu.track); setContextMenu(null) }}
-          onGoToArtist={() => {
-            const t = contextMenu.track
-            const artistId = t.mb_artist_id
-            if (artistId) navigate(`/artist/${artistId}`)
-            setContextMenu(null)
-          }}
-          onGoToAlbum={() => {
-            const t = contextMenu.track as any
-            const albumId = t.mb_release_id || t.mb_release_group_id
-            if (albumId) navigate(`/album/${albumId}`)
-            setContextMenu(null)
-          }}
-          onAddToPlaylist={
-            contextMenu.track.mb_id
-              ? () => {
-                  const t = contextMenu.track as any
-                  setAddPlTrack({
-                    title: String(t.title ?? ''),
-                    artist: String(t.artist ?? ''),
-                    album: t.album != null ? String(t.album) : undefined,
-                    album_cover: t.album_cover ?? null,
-                    mb_id: t.mb_id,
-                    mb_artist_id: t.mb_artist_id ?? null,
-                    mb_release_id: t.mb_release_id ?? null,
-                    mb_release_group_id: t.mb_release_group_id ?? null,
-                  })
-                  setAddPlOpen(true)
-                }
-              : undefined
-          }
-          onClose={() => setContextMenu(null)}
-        />
-      )}
-      <AddToPlaylistModal
-        open={addPlOpen}
-        track={addPlTrack}
-        onClose={() => {
-          setAddPlOpen(false)
-          setAddPlTrack(null)
-        }}
-      />
     </div>
   )
 }

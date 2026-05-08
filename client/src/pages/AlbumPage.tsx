@@ -5,21 +5,14 @@ import { usePlayerStore } from '../stores/playerStore'
 import { useAuthStore } from '../stores/authStore'
 import { Play, ArrowLeft } from 'lucide-react'
 import * as controller from '../playback/controller'
-import { API, authFetch } from '../api'
-import { requestMbDownload } from '../stores/downloadBusyStore'
+import { API } from '../api'
 import { useDownloadStates } from '../hooks/useDownloadStates'
 import { useArtistPrefetch } from '../hooks/useArtistPrefetch'
-import ContextMenu from '../components/ContextMenu'
+import { useContextMenuActions } from '../contexts/ContextMenuProvider'
 import TrackRowFull from '../components/TrackRowFull'
 import { toTrack } from '../utils/trackHelpers'
 import { PollyLoading } from '../components/PollyLoading'
 import { fetchReleaseGroupCover } from '../api/covers'
-
-interface ContextMenuState {
-  x: number
-  y: number
-  track: any
-}
 
 function albumTrackToControllerTrack(track: any, album: any, cover: string | null) {
   return toTrack(track, {
@@ -37,7 +30,7 @@ export default function AlbumPage() {
   const navigate = useNavigate()
   const token = useAuthStore((s) => s.token)
   const { currentTrack } = usePlayerStore()
-  const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null)
+  const { openContextMenu } = useContextMenuActions()
 
   const { downloadStates, cachedMbIds } = useDownloadStates()
 
@@ -77,17 +70,15 @@ export default function AlbumPage() {
     return () => { cancelled = true }
   }, [album?.cover, albumId])
 
-  function downloadTrack(track: any) {
-    if (!track?.mb_id) return
-    requestMbDownload(authFetch, track.mb_id).catch(console.error)
-  }
+  const displayCover = cover ?? album?.cover ?? null
 
   function handleContextMenu(e: React.MouseEvent, track: any) {
     e.preventDefault()
-    setContextMenu({ x: e.clientX, y: e.clientY, track })
+    const normalized = albumTrackToControllerTrack(track, album, displayCover)
+    openContextMenu(e.clientX, e.clientY, normalized, {
+      onPlay: () => playTrack(track),
+    })
   }
-
-  const displayCover = cover ?? album?.cover ?? null
 
   function playTrack(track: any) {
     if (!album) return
@@ -124,7 +115,7 @@ export default function AlbumPage() {
   const hasCur = Boolean(curMb)
 
   return (
-    <div className="min-h-full" onClick={() => setContextMenu(null)}>
+    <div className="min-h-full">
       <div
         className="flex items-end gap-4 md:gap-6 p-6"
         style={{
@@ -250,27 +241,6 @@ export default function AlbumPage() {
         })}
       </div>
 
-      {contextMenu && (
-        <ContextMenu
-          x={contextMenu.x}
-          y={contextMenu.y}
-          track={albumTrackToControllerTrack(contextMenu.track, album, displayCover)}
-          onPlay={() => { playTrack(contextMenu.track); setContextMenu(null) }}
-          onDownload={() => { downloadTrack(contextMenu.track); setContextMenu(null) }}
-          onAddToQueue={() => { controller.addToQueue(albumTrackToControllerTrack(contextMenu.track, album, displayCover)); setContextMenu(null) }}
-          onGoToArtist={() => {
-            const aid = contextMenu.track?.mb_artist_id ?? album?.artist_mb_id
-            if (aid) navigate(`/artist/${aid}`)
-            setContextMenu(null)
-          }}
-          onGoToAlbum={() => {
-            const albumIdNav = album?.mb_release_group_id || album?.mbid || albumId
-            if (albumIdNav) navigate(`/album/${albumIdNav}`)
-            setContextMenu(null)
-          }}
-          onClose={() => setContextMenu(null)}
-        />
-      )}
     </div>
   )
 }

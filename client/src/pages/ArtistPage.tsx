@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react'
+import { useState, useRef, useEffect, useCallback } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useAuthStore } from '../stores/authStore'
@@ -9,6 +9,12 @@ import { useArtistTransitionStore } from '../stores/artistTransitionStore'
 import ImagePickerModal from '../components/ImagePickerModal'
 import { PollyLoading } from '../components/PollyLoading'
 import { fetchReleaseGroupCover } from '../api/covers'
+import * as controller from '../playback/controller'
+import { toTrack } from '../utils/trackHelpers'
+import TrackRowFull from '../components/TrackRowFull'
+import { useDownloadStates } from '../hooks/useDownloadStates'
+import { usePlayerStore, type Track } from '../stores/playerStore'
+import { useContextMenuActions } from '../contexts/ContextMenuProvider'
 
 function AlbumSkeleton() {
   return (
@@ -206,6 +212,17 @@ export default function ArtistPage() {
   const imageContainerRef = useRef<HTMLDivElement>(null)
   const transition = useArtistTransitionStore()
 
+  const { data: topTracksData, isLoading: topTracksLoading } = useQuery({
+    queryKey: ['artist-top-tracks', artistId],
+    queryFn: async () => {
+      const res = await authFetch(`/artist/${artistId}/top-tracks`)
+      if (!res.ok) return { tracks: [] }
+      return res.json()
+    },
+    enabled: !!artistId,
+    staleTime: 1000 * 60 * 60,
+  })
+
   const { data: artistImages, refetch: refetchImages } = useQuery({
     queryKey: ['artist-images', artistId],
     queryFn: async () => {
@@ -275,6 +292,26 @@ export default function ArtistPage() {
     enabled: !!artistId,
     retry: 3,
   })
+
+  const { downloadStates, cachedMbIds } = useDownloadStates()
+  const currentTrackMb = usePlayerStore((s) => s.currentTrack?.mb_id)
+  const { openContextMenu } = useContextMenuActions()
+  const [showAllPopular, setShowAllPopular] = useState(false)
+  const [popularCovers, setPopularCovers] = useState<Record<string, string>>({})
+
+  const onPopularCoverResolved = useCallback((mbid: string, url: string) => {
+    if (!mbid || !url) return
+    setPopularCovers((prev) => (prev[mbid] === url ? prev : { ...prev, [mbid]: url }))
+    usePlayerStore.setState((s) => {
+      const patch = (t: Track) =>
+        t.mb_id === mbid && t.album_cover !== url ? { ...t, album_cover: url } : t
+      return {
+        userQueue: (s.userQueue || []).map(patch),
+        systemList: (s.systemList || []).map(patch),
+        currentTrack: s.currentTrack ? patch(s.currentTrack) : s.currentTrack,
+      }
+    })
+  }, [])
 
   const [covers, setCovers] = useState<Record<string, string>>({})
 
@@ -416,27 +453,76 @@ export default function ArtistPage() {
         </div>
       </div>
 
-      {/* Popular — top tracks will be a dedicated endpoint later */}
-      <div className="px-6 py-4">
-        <h2 className="text-xl font-bold text-white mb-4">Popular</h2>
-        <div className="text-[#b3b3b3] text-xs grid grid-cols-[auto_1fr_1fr_auto] gap-4 py-2 border-b border-[#282828] mb-1">
-          <span className="w-8 text-center">#</span>
-          <span>Title</span>
-          <span>Album</span>
-          <span className="text-right">Duration</span>
-        </div>
-        {Array.from({ length: 5 }).map((_, i) => (
-          <div
-            key={i}
-            className="grid grid-cols-[auto_1fr_1fr_auto] gap-4 py-2.5 items-center"
-          >
-            <div className="w-8 h-4 bg-[#282828] rounded animate-pulse" />
-            <div className="h-4 bg-[#282828] rounded animate-pulse max-w-[60%]" />
-            <div className="h-4 bg-[#282828] rounded animate-pulse max-w-[50%]" />
-            <div className="h-4 bg-[#282828] rounded animate-pulse w-8 justify-self-end" />
+      {/* Popular — Last.fm top tracks resolved through the playlist-import batch resolver */}
+      {(() => {
+        const popularTracks = (topTracksData?.tracks || []) as any[]
+        const visiblePopular = popularTracks.slice(0, showAllPopular ? 10 : 5)
+        if (!topTracksLoading && popularTracks.length === 0) return null
+
+        const playPopular = (track: any) => {
+          const list = visiblePopular.map((x: any) =>
+            toTrack(x, { album_cover: popularCovers[x.mb_id] || x.album_cover || null }),
+          )
+          const idx = Math.max(0, list.findIndex((x) => x.mb_id === track.mb_id))
+          controller.setSystemAndPlay(list, idx, { kind: 'unknown', title: `${artist?.name ?? ''} — Popular` })
+        }
+
+        return (
+          <div className="px-6 py-4">
+            <h2 className="text-xl font-bold text-white mb-4">Popular</h2>
+            <div className="text-[#b3b3b3] text-xs grid grid-cols-[auto_1fr_1fr_auto] gap-4 py-2 border-b border-[#282828] mb-1">
+              <span className="w-8 text-center">#</span>
+              <span>Title</span>
+              <span>Album</span>
+              <span></span>
+            </div>
+            {topTracksLoading ? (
+              Array.from({ length: 5 }).map((_, i) => (
+                <div
+                  key={i}
+                  className="grid grid-cols-[auto_1fr_1fr_auto] gap-4 py-2.5 items-center"
+                >
+                  <div className="w-8 h-4 bg-[#282828] rounded animate-pulse" />
+                  <div className="h-4 bg-[#282828] rounded animate-pulse max-w-[60%]" />
+                  <div className="h-4 bg-[#282828] rounded animate-pulse max-w-[50%]" />
+                  <div className="h-4 bg-[#282828] rounded animate-pulse w-8 justify-self-end" />
+                </div>
+              ))
+            ) : (
+              visiblePopular.map((t: any, i: number) => (
+                <TrackRowFull
+                  key={t.mb_id}
+                  track={t}
+                  index={i}
+                  isCached={Boolean(t.is_cached) || cachedMbIds.has(t.mb_id)}
+                  isPlaying={Boolean(currentTrackMb) && currentTrackMb === t.mb_id}
+                  downloadState={downloadStates[t.mb_id]}
+                  playlistStyleCover
+                  showDuration={false}
+                  onCoverResolved={onPopularCoverResolved}
+                  onPlay={playPopular}
+                  onContextMenu={(e, track) => {
+                    e.preventDefault()
+                    e.stopPropagation()
+                    const cover = popularCovers[track.mb_id] || track.album_cover || null
+                    openContextMenu(e.clientX, e.clientY, { ...track, album_cover: cover })
+                  }}
+                />
+              ))
+            )}
+            {!topTracksLoading && popularTracks.length > 5 && (
+              <button
+                type="button"
+                onClick={() => setShowAllPopular((v) => !v)}
+                className="mt-2 text-xs text-[#b3b3b3] hover:text-white transition-colors"
+                style={{ fontFamily: "'Barlow Semi Condensed', sans-serif", letterSpacing: '0.04em' }}
+              >
+                {showAllPopular ? 'Show less' : 'Show more'}
+              </button>
+            )}
           </div>
-        ))}
-      </div>
+        )
+      })()}
 
       {/* Discography */}
       <div className="px-6 py-4">

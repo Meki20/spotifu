@@ -974,6 +974,83 @@ async def _resolve_batch_verbatim(
                 )
 
 
+async def resolve_tracks_batch(
+    session: Session,
+    queries: list[tuple[str, str, str | None]],
+) -> list[dict[str, Any] | None]:
+    """Resolve (artist, title, album?) rows to canonical MB recording metadata.
+
+    Returns a list aligned with ``queries`` order; ``None`` for blank or unmatched
+    rows. Uses the same multi-pass MB Lucene OR-search the playlist import uses,
+    in batches of 5. Matches are upserted into ``MBLookupCache`` so subsequent
+    imports / hybrid searches hit cache on the same (artist, title, album) key.
+    """
+    if not queries:
+        return []
+
+    rows_with_idx: list[tuple[int, ImportInputRow]] = []
+    for idx, (artist, title, album) in enumerate(queries):
+        a = (artist or "").strip()
+        t = (title or "").strip()
+        if not a or not t:
+            continue
+        rows_with_idx.append((
+            idx,
+            ImportInputRow(
+                row_index=idx,
+                title=t,
+                artist=a,
+                album=(album or "").strip(),
+                duration_ms=0,
+                query_normalized=_query_normalized(a, t, album or ""),
+            ),
+        ))
+
+    memo: dict[str, ResolveOutcome] = {}
+    stats: dict[str, int] = {
+        "memo_hit": 0, "db_cache_hit": 0, "live_lookup": 0,
+        "matched": 0, "unmatched": 0,
+    }
+    valid_rows = [r for _, r in rows_with_idx]
+    for i in range(0, len(valid_rows), 5):
+        await _resolve_batch_verbatim(session, valid_rows[i : i + 5], memo=memo, stats=stats)
+
+    now = datetime.utcnow()
+    wrote = 0
+    for r in valid_rows:
+        outcome = memo.get(r.query_normalized)
+        if not outcome or outcome.state != PlaylistImportRowState.MATCHED or not outcome.meta:
+            continue
+        existing = session.exec(
+            select(MBLookupCache).where(MBLookupCache.query_normalized == r.query_normalized)
+        ).first()
+        if existing is not None:
+            continue
+        m = outcome.meta
+        session.add(MBLookupCache(
+            query_normalized=r.query_normalized,
+            artist=m.get("artist") or r.artist,
+            artist_credit=m.get("artist_credit"),
+            title=m.get("title") or r.title,
+            album=m.get("album") or r.album,
+            mb_id=str(m["mbid"]),
+            mb_artist_id=m.get("mb_artist_id"),
+            mb_release_id=m.get("mb_release_id"),
+            mb_release_group_id=m.get("mb_release_group_id"),
+            fetched_at=now,
+        ))
+        wrote += 1
+    if wrote:
+        session.commit()
+
+    out: list[dict[str, Any] | None] = [None] * len(queries)
+    for orig_idx, r in rows_with_idx:
+        outcome = memo.get(r.query_normalized)
+        if outcome and outcome.state == PlaylistImportRowState.MATCHED and outcome.meta:
+            out[orig_idx] = dict(outcome.meta)
+    return out
+
+
 async def _resolve_one(
     session: Session,
     row: ImportInputRow,

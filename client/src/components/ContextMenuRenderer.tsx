@@ -38,6 +38,7 @@ export default function ContextMenuRenderer() {
   const [addPlOpen, setAddPlOpen] = useState(false)
   const [addPlTrack, setAddPlTrack] = useState<AddToPlaylistTrack | null>(null)
   const track = state?.track
+  const overrides = state?.overrides
   const canAddToPlaylist = Boolean(track && toAddPayload(track))
 
   function playTrack() {
@@ -75,7 +76,7 @@ export default function ContextMenuRenderer() {
           x={state.x}
           y={state.y}
           track={track}
-          onPlay={playTrack}
+          onPlay={overrides?.onPlay ?? playTrack}
           onDownload={downloadTrack}
           onAddToQueue={addToQueue}
           onGoToArtist={goToArtist}
@@ -91,6 +92,7 @@ export default function ContextMenuRenderer() {
                 }
               : undefined
           }
+          onRemoveFromPlaylist={overrides?.onRemoveFromPlaylist}
           onClose={closeContextMenu}
         />
       )}

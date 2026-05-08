@@ -13,7 +13,26 @@ from services.providers import MetadataService, _get_artist_images_dir
 from services.providers import musicbrainz
 from services.providers import _ARTIST_IMAGES_DIR
 from services.providers.musicbrainz import _caa_release_group_front_url, CAA_SIZE_LIST
+from services.providers import lastfm
+from services.playlist_import import resolve_tracks_batch
+from models import Track, TrackStatus
 router = APIRouter(prefix="/artist", tags=["artist"])
+
+
+def _annotate_top_tracks_is_cached(session: Session, tracks: list[dict]) -> None:
+    """Set ``is_cached`` per track based on local Track rows in READY status."""
+    mb_ids = [str(t.get("mb_id")) for t in tracks if t.get("mb_id")]
+    if not mb_ids:
+        for t in tracks:
+            t["is_cached"] = False
+        return
+    rows = session.exec(
+        select(Track.mb_id).where(Track.mb_id.in_(mb_ids), Track.status == TrackStatus.READY)
+    ).all()
+    cached_set: set[str] = {row for row in rows if row}
+    for t in tracks:
+        mb_id = str(t.get("mb_id") or "")
+        t["is_cached"] = bool(mb_id and mb_id in cached_set)
 
 
 class ImageIndexUpdate(BaseModel):
@@ -394,6 +413,96 @@ async def get_album_cover(
 ):
     cover = await _caa_release_group_front_url(rg_id, CAA_SIZE_LIST)
     return {"cover": cover}
+
+
+@router.get("/{artist_id}/top-tracks")
+async def get_artist_top_tracks(
+    artist_id: str,
+    session: Session = Depends(get_session),
+    user: User = Depends(get_current_user),
+):
+    """Last.fm top tracks resolved through the playlist-import batch resolver.
+
+    Runs on the PASSIVE MB lane so resolver fan-out can't push out interactive
+    nav. Cached per artist in MBEntityCache (kind=``artist_top_tracks``) for
+    7 days; stale entries are refreshed in-band.
+    """
+    from services.providers import _db_get, _db_set, _db_is_fresh
+
+    if _db_is_fresh("artist_top_tracks", artist_id):
+        cached = _db_get("artist_top_tracks", artist_id)
+        if isinstance(cached, dict) and isinstance(cached.get("tracks"), list):
+            _annotate_top_tracks_is_cached(session, cached["tracks"])
+            return cached
+
+    artist_name: str | None = None
+    try:
+        row = session.exec(
+            select(MbArtist).where(MbArtist.artist_mbid == artist_id)
+        ).first()
+        if row and (row.canonical_name or "").strip():
+            artist_name = row.canonical_name.strip()
+    except Exception:
+        pass
+
+    if not artist_name:
+        head = _get_cache("artist_head", artist_id)
+        if isinstance(head, dict) and (head.get("name") or "").strip():
+            artist_name = (head.get("name") or "").strip()
+
+    if not artist_name:
+        svc = MetadataService(session)
+        async with musicbrainz.mb_passive_calls():
+            mb = await svc.get_artist_head(artist_id)
+        if mb and (mb.get("name") or "").strip():
+            artist_name = (mb.get("name") or "").strip()
+
+    if not artist_name:
+        return {"tracks": []}
+
+    async with musicbrainz.mb_passive_calls():
+        try:
+            lf_tracks = await lastfm.artist_top_tracks(
+                artist_mbid=artist_id, artist=artist_name, limit=10
+            )
+        except Exception:
+            lf_tracks = []
+
+        if not lf_tracks:
+            payload = {"tracks": []}
+            _db_set("artist_top_tracks", artist_id, payload)
+            return payload
+
+        queries = [
+            ((t.get("artist") or artist_name).strip(), (t.get("name") or "").strip(), (t.get("album") or None))
+            for t in lf_tracks
+        ]
+        resolved = await resolve_tracks_batch(session, queries)
+
+    tracks: list[dict] = []
+    seen_mbids: set[str] = set()
+    for r in resolved:
+        if not r or not r.get("mbid"):
+            continue
+        mbid = str(r["mbid"])
+        if mbid in seen_mbids:
+            continue
+        seen_mbids.add(mbid)
+        tracks.append({
+            "mb_id": mbid,
+            "title": r.get("title") or "",
+            "artist": r.get("artist") or artist_name,
+            "artist_credit": r.get("artist_credit"),
+            "album": r.get("album") or "",
+            "mb_artist_id": r.get("mb_artist_id"),
+            "mb_release_id": r.get("mb_release_id"),
+            "mb_release_group_id": r.get("mb_release_group_id"),
+        })
+
+    payload = {"tracks": tracks}
+    _db_set("artist_top_tracks", artist_id, payload)
+    _annotate_top_tracks_is_cached(session, payload["tracks"])
+    return payload
 
 
 @router.get("/{artist_id}")

@@ -1,13 +1,21 @@
 import { createContext, useContext, useState, useCallback, type ReactNode } from 'react'
 
+export interface ContextMenuOverrides {
+  /** Page-specific play (e.g. play in album/search/playlist queue context). */
+  onPlay?: () => void
+  /** Only used by PlaylistPage; absence hides the menu item. */
+  onRemoveFromPlaylist?: () => void
+}
+
 interface ContextMenuState {
   x: number
   y: number
   track: any
+  overrides?: ContextMenuOverrides
 }
 
 interface ContextMenuActions {
-  openContextMenu: (x: number, y: number, track: any) => void
+  openContextMenu: (x: number, y: number, track: any, overrides?: ContextMenuOverrides) => void
   closeContextMenu: () => void
 }
 
@@ -17,9 +25,12 @@ const ContextMenuActionsContext = createContext<ContextMenuActions | null>(null)
 export function ContextMenuProvider({ children }: { children: ReactNode }) {
   const [state, setState] = useState<ContextMenuState | null>(null)
 
-  const openContextMenu = useCallback((x: number, y: number, track: any) => {
-    setState({ x, y, track })
-  }, [])
+  const openContextMenu = useCallback(
+    (x: number, y: number, track: any, overrides?: ContextMenuOverrides) => {
+      setState({ x, y, track, overrides })
+    },
+    [],
+  )
 
   const closeContextMenu = useCallback(() => {
     setState(null)

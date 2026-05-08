@@ -3,8 +3,6 @@ import { useParams, useNavigate, useLocation } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Play, ArrowLeft, X, FileSpreadsheet, Pencil, Trash2 } from 'lucide-react'
 import * as controller from '../playback/controller'
-import { authFetch } from '../api'
-import { requestMbDownload } from '../stores/downloadBusyStore'
 import {
   fetchPlaylistDetail,
   fetchAutoPlaylistDetail,
@@ -19,9 +17,8 @@ import PlaylistTrackCover from '../components/PlaylistTrackCover'
 import { usePlayerStore } from '../stores/playerStore'
 import { useDownloadStates } from '../hooks/useDownloadStates'
 import { useArtistPrefetch } from '../hooks/useArtistPrefetch'
-import ContextMenu from '../components/ContextMenu'
+import { useContextMenuActions } from '../contexts/ContextMenuProvider'
 import UploadPlaylistModal from '../components/UploadPlaylistModal'
-import AddToPlaylistModal, { type AddToPlaylistTrack } from '../components/AddToPlaylistModal'
 import { PollyLoading } from '../components/PollyLoading'
 
 function itemToPlayableTrack(
@@ -84,7 +81,7 @@ export default function PlaylistPage() {
   const { currentTrack } = usePlayerStore()
   const { downloadStates, cachedMbIds } = useDownloadStates()
   const { enqueue } = useArtistPrefetch()
-  const [contextMenu, setContextMenu] = useState<{ x: number; y: number; item: PlaylistItemDTO } | null>(null)
+  const { openContextMenu } = useContextMenuActions()
   const [uploadOpen, setUploadOpen] = useState(false)
   const [renameOpen, setRenameOpen] = useState(false)
   const [renameTitle, setRenameTitle] = useState('')
@@ -92,8 +89,6 @@ export default function PlaylistPage() {
   const [deleteOpen, setDeleteOpen] = useState(false)
   const [coverOpen, setCoverOpen] = useState(false)
   const [coverUrlInput, setCoverUrlInput] = useState('')
-  const [addPlOpen, setAddPlOpen] = useState(false)
-  const [addPlTrack, setAddPlTrack] = useState<AddToPlaylistTrack | null>(null)
 
   const queryKey = isAutoPlaylist ? ['auto-playlist', id] : ['playlist', id]
   const { data: playlist, isLoading, error, refetch } = useQuery({
@@ -192,8 +187,13 @@ export default function PlaylistPage() {
     controller.setSystemAndPlay(tracks, 0, { kind: 'playlist', id, title: playlist?.title })
   }
 
-  function downloadItem(item: PlaylistItemDTO) {
-    requestMbDownload(authFetch, item.mb_recording_id).catch(console.error)
+  function handleContextMenu(e: React.MouseEvent, item: PlaylistItemDTO) {
+    e.preventDefault()
+    const normalized = itemToPlayableTrack(item, playlist?.cover_image_url ?? null, cachedMbIds)
+    openContextMenu(e.clientX, e.clientY, normalized, {
+      onPlay: () => playItem(item),
+      onRemoveFromPlaylist: () => removeItemMutation.mutate(item.id),
+    })
   }
 
   if (isLoading) {
@@ -216,7 +216,7 @@ export default function PlaylistPage() {
   const cover = playlist.cover_image_url
 
   return (
-    <div key={playlistId} className="min-h-full relative" onClick={() => setContextMenu(null)}>
+    <div key={playlistId} className="min-h-full relative">
       {cover ? (
         <div
           className="absolute inset-x-0 top-0 h-64 md:h-80 pointer-events-none overflow-hidden"
@@ -404,10 +404,7 @@ export default function PlaylistPage() {
                     e.currentTarget.style.background = 'transparent'
                   }}
                   onClick={() => playItem(item)}
-                  onContextMenu={(e) => {
-                    e.preventDefault()
-                    setContextMenu({ x: e.clientX, y: e.clientY, item })
-                  }}
+                  onContextMenu={(e) => handleContextMenu(e, item)}
                 >
                   <div className="relative w-8 h-8 flex items-center justify-center shrink-0 justify-self-center">
                     <span
@@ -470,68 +467,6 @@ export default function PlaylistPage() {
           )}
         </div>
       </div>
-
-      {contextMenu && (
-        <ContextMenu
-          x={contextMenu.x}
-          y={contextMenu.y}
-          track={{
-            title: contextMenu.item.title,
-            artist: contextMenu.item.artist,
-            mb_id: contextMenu.item.mb_recording_id,
-            mb_artist_id: contextMenu.item.mb_artist_id,
-            mb_release_id: contextMenu.item.mb_release_id,
-            mb_release_group_id: contextMenu.item.mb_release_group_id,
-            album: contextMenu.item.album,
-            album_cover: contextMenu.item.album_cover,
-          }}
-          onPlay={() => {
-            playItem(contextMenu.item)
-            setContextMenu(null)
-          }}
-          onDownload={() => {
-            downloadItem(contextMenu.item)
-            setContextMenu(null)
-          }}
-          onAddToQueue={() => {
-            controller.addToQueue(
-              itemToPlayableTrack(contextMenu.item, playlist.cover_image_url ?? null, cachedMbIds),
-            )
-            setContextMenu(null)
-          }}
-          onGoToArtist={() => {
-            const aid = contextMenu.item.mb_artist_id
-            if (aid) navigate(`/artist/${aid}`)
-            setContextMenu(null)
-          }}
-          onGoToAlbum={() => {
-            const albumId = contextMenu.item.mb_release_id || contextMenu.item.mb_release_group_id
-            if (albumId) navigate(`/album/${albumId}`)
-            setContextMenu(null)
-          }}
-          onAddToPlaylist={() => {
-            const it = contextMenu.item
-            setAddPlTrack({
-              title: it.title,
-              artist: it.artist,
-              album: it.album,
-              album_cover: it.album_cover,
-              mb_id: it.mb_recording_id,
-              mb_artist_id: it.mb_artist_id,
-              mb_release_id: it.mb_release_id,
-              mb_release_group_id: it.mb_release_group_id,
-            })
-            setContextMenu(null)
-            setAddPlOpen(true)
-          }}
-          onRemoveFromPlaylist={() => {
-            const itemId = contextMenu.item.id
-            setContextMenu(null)
-            removeItemMutation.mutate(itemId)
-          }}
-          onClose={() => setContextMenu(null)}
-        />
-      )}
 
       {coverOpen && (
         <div
@@ -655,16 +590,6 @@ export default function PlaylistPage() {
           </div>
         </div>
       )}
-
-      <AddToPlaylistModal
-        open={addPlOpen}
-        track={addPlTrack}
-        excludePlaylistId={id}
-        onClose={() => {
-          setAddPlOpen(false)
-          setAddPlTrack(null)
-        }}
-      />
 
       <UploadPlaylistModal
         key={uploadOpen ? `csv-${playlist.id}` : 'csv-closed'}

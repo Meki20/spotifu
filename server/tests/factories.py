@@ -14,7 +14,7 @@ def make_user(
     username: str = "u1",
     password: str = "secret1",
 ) -> User:
-    u = User(username=username, hashed_password=hash_password(password))
+    u = User(username=username, hashed_password=hash_password(password), is_admin=True)
     session.add(u)
     session.commit()
     session.refresh(u)

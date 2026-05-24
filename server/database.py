@@ -60,6 +60,8 @@ def _migrate():
         CREATE UNIQUE INDEX IF NOT EXISTS ix_search_history_user_query_unique
         ON search_history (user_id, query)
         """,
+        "ALTER TABLE users ADD COLUMN IF NOT EXISTS is_admin BOOLEAN NOT NULL DEFAULT FALSE",
+        "ALTER TABLE users ADD COLUMN IF NOT EXISTS preferences_json VARCHAR",
     ]
     with engine.connect() as conn:
         for sql in migrations:

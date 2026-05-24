@@ -8,6 +8,7 @@ import { authFetch, getUsers, updateUserPermissions, grantAllPermissions, revoke
 import { PollyLoading } from '../components/PollyLoading'
 import ReconciliationModal from '../components/ReconciliationModal'
 import DetectNewFilesModal from '../components/DetectNewFilesModal'
+import ServerConnectionPanel from '../components/ServerConnectionPanel'
 
 interface Settings {
   soulseek_username: string | null
@@ -105,26 +106,37 @@ export default function Settings() {
     if (!token) return
 
     authFetch('/settings')
-      .then((r) => r.json())
-      .then(setSettings)
+      .then(async (r) => {
+        if (!r.ok) return
+        setSettings(await r.json())
+      })
       .catch(console.error)
 
     authFetch('/settings/preferences')
-      .then((r) => r.json())
-      .then((data: { prefetch?: Record<string, unknown> }) => applyServerPrefetch(data.prefetch))
+      .then(async (r) => {
+        if (!r.ok) return
+        const data: { prefetch?: Record<string, unknown> } = await r.json()
+        applyServerPrefetch(data.prefetch)
+      })
       .catch(console.error)
 
     setTracksLoading(true)
     authFetch('/settings/tracks')
-      .then((r) => r.json())
-      .then((data) => setTracks(data.tracks || []))
+      .then(async (r) => {
+        if (!r.ok) return
+        const data = await r.json()
+        setTracks(Array.isArray(data?.tracks) ? data.tracks : [])
+      })
       .catch(console.error)
       .finally(() => setTracksLoading(false))
 
     setAutoPlaylistsLoading(true)
     authFetch('/auto-playlists')
-      .then((r) => r.json())
-      .then(setAutoPlaylists)
+      .then(async (r) => {
+        if (!r.ok) return
+        const data = await r.json()
+        setAutoPlaylists(Array.isArray(data) ? data : [])
+      })
       .catch(console.error)
       .finally(() => setAutoPlaylistsLoading(false))
 
@@ -134,8 +146,10 @@ export default function Settings() {
       const t = tokenRef.current
       if (!t) return
       authFetch('/settings')
-        .then((r) => r.json())
-        .then(setSettings)
+        .then(async (r) => {
+          if (!r.ok) return
+          setSettings(await r.json())
+        })
         .catch(console.error)
     })
   }, [token])
@@ -566,6 +580,12 @@ export default function Settings() {
       >
         Settings
       </h1>
+
+      {/* Server connection */}
+      <section className="mb-6">
+        <div style={sectionLabelStyle}>Server connection</div>
+        <ServerConnectionPanel compact />
+      </section>
 
       {/* Soulseek section */}
       <section className="mb-6">

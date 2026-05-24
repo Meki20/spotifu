@@ -52,8 +52,13 @@ async function searchLocal(q: string): Promise<Track[]> {
   return data.tracks
 }
 
+const SEARCH_TIMEOUT_MS = 60_000
+
 async function searchHybrid(q: string, signal?: AbortSignal): Promise<HybridSearchResponse> {
-  const res = await authFetch(`/search/hybrid?q=${encodeURIComponent(q)}`, { signal })
+  const res = await authFetch(`/search/hybrid?q=${encodeURIComponent(q)}`, {
+    signal,
+    timeoutMs: SEARCH_TIMEOUT_MS,
+  })
   if (!res.ok) throw new Error('Search failed')
   return res.json()
 }
@@ -84,7 +89,7 @@ interface ArtistSearchResponse {
 }
 
 async function searchArtist(q: string): Promise<ArtistSearchResponse> {
-  const res = await authFetch(`/artist?q=${encodeURIComponent(q)}`)
+  const res = await authFetch(`/artist?q=${encodeURIComponent(q)}`, { timeoutMs: SEARCH_TIMEOUT_MS })
   if (!res.ok) throw new Error('Artist search failed')
   return res.json()
 }

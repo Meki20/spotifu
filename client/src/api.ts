@@ -1,17 +1,28 @@
 import { useAuthStore } from './stores/authStore'
 import { isTokenExpired } from './authToken'
+import { getApiBase } from './config/resolveApi'
 
-export const API = import.meta.env.VITE_API_URL ?? 'http://localhost:1985'
+/** Resolved at call time from connection store (runtime) or env/default fallback. */
+export function getApi(): string {
+  return getApiBase()
+}
 
 /** Prepend API origin to server-relative URLs (e.g. /covers/artist-local/...). */
 export function mediaUrl(url: string | null | undefined): string | undefined {
   if (!url) return undefined
-  if (url.startsWith('/')) return `${API}${url}`
+  if (url.startsWith('/')) return `${getApiBase()}${url}`
   return url
 }
 
-function mergeFetchSignal(userSignal: AbortSignal | null | undefined): AbortSignal {
-  const timeoutSignal = AbortSignal.timeout(15_000)
+export type AuthFetchOptions = RequestInit & {
+  /** Default 15s. Hybrid search and other MusicBrainz-backed calls need longer. */
+  timeoutMs?: number
+}
+
+const DEFAULT_FETCH_TIMEOUT_MS = 15_000
+
+function mergeFetchSignal(userSignal: AbortSignal | null | undefined, timeoutMs: number): AbortSignal {
+  const timeoutSignal = AbortSignal.timeout(timeoutMs)
   if (userSignal) {
     return AbortSignal.any([timeoutSignal, userSignal])
   }
@@ -19,7 +30,7 @@ function mergeFetchSignal(userSignal: AbortSignal | null | undefined): AbortSign
 }
 
 async function _doFetch(path: string, options: RequestInit, signal: AbortSignal): Promise<Response> {
-  const res = await fetch(`${API}${path}`, { ...options, signal })
+  const res = await fetch(`${getApiBase()}${path}`, { ...options, signal })
   return res
 }
 
@@ -37,8 +48,7 @@ export async function authFetchStream(path: string, options: RequestInit = {}): 
   }
   headers['Authorization'] = `Bearer ${token}`
 
-  // Important: no 15s timeout for streaming responses.
-  const res = await fetch(`${API}${path}`, { ...options, headers, signal: options.signal })
+  const res = await fetch(`${getApiBase()}${path}`, { ...options, headers, signal: options.signal })
   if (res.status === 401) {
     clearAuth()
     window.location.href = '/login'
@@ -47,7 +57,8 @@ export async function authFetchStream(path: string, options: RequestInit = {}): 
   return res
 }
 
-export async function authFetch(path: string, options: RequestInit = {}): Promise<Response> {
+export async function authFetch(path: string, options: AuthFetchOptions = {}): Promise<Response> {
+  const { timeoutMs = DEFAULT_FETCH_TIMEOUT_MS, ...fetchOptions } = options
   const { token, clearAuth } = useAuthStore.getState()
 
   if (!token || isTokenExpired(token)) {
@@ -57,20 +68,21 @@ export async function authFetch(path: string, options: RequestInit = {}): Promis
   }
 
   const headers: Record<string, string> = {
-    ...(options.headers as Record<string, string> || {}),
+    ...(fetchOptions.headers as Record<string, string> || {}),
   }
   headers['Authorization'] = `Bearer ${token}`
-  if (options.body && !headers['Content-Type']) {
-    if (!(options.body instanceof FormData)) {
+  if (fetchOptions.body && !headers['Content-Type']) {
+    if (!(fetchOptions.body instanceof FormData)) {
       headers['Content-Type'] = 'application/json'
     }
   }
 
-  const isMutation = options.method && ['POST', 'PUT', 'PATCH', 'DELETE'].includes(options.method.toUpperCase())
-  const combined = mergeFetchSignal(options.signal as AbortSignal | undefined)
+  const isMutation = fetchOptions.method && ['POST', 'PUT', 'PATCH', 'DELETE'].includes(fetchOptions.method.toUpperCase())
+  const userSignal = fetchOptions.signal as AbortSignal | undefined
+  const combined = mergeFetchSignal(userSignal, timeoutMs)
 
   try {
-    const res = await _doFetch(path, { ...options, headers }, combined)
+    const res = await _doFetch(path, { ...fetchOptions, headers }, combined)
     if (res.status === 401) {
       clearAuth()
       window.location.href = '/login'
@@ -79,15 +91,13 @@ export async function authFetch(path: string, options: RequestInit = {}): Promis
     return res
   } catch (err) {
     if (err instanceof DOMException && err.name === 'TimeoutError') {
-      throw new Error(`Request timed out after 15s: ${path}`)
+      throw new Error(`Request timed out after ${Math.round(timeoutMs / 1000)}s: ${path}`)
     }
-    // Retry GETs once on network error, but not intentional aborts
     if (!isMutation && (err instanceof TypeError || (err instanceof DOMException && err.name === 'AbortError'))) {
-      const userSignal = options.signal as AbortSignal | undefined
       if (userSignal?.aborted) throw err
-      const retrySignal = mergeFetchSignal(userSignal)
+      const retrySignal = mergeFetchSignal(userSignal, timeoutMs)
       try {
-        const res = await _doFetch(path, { ...options, headers }, retrySignal)
+        const res = await _doFetch(path, { ...fetchOptions, headers }, retrySignal)
         if (res.status === 401) {
           clearAuth()
           window.location.href = '/login'

@@ -2,7 +2,7 @@ import asyncio
 import csv
 import io
 import json
-from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, Query
+from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, Query, BackgroundTasks
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 from sqlmodel import Session, select, func, delete, or_, and_
@@ -257,6 +257,7 @@ class LibraryAlbumResponse(BaseModel):
     title: str
     artist: str
     cover: str | None
+    mb_release_group_id: str | None = None
     track_count: int
     cached_count: int
     tracks: list[LibraryTrackResponse]
@@ -292,9 +293,10 @@ async def list_library_albums(
     # Batch-fetch one mb_id per (album, artist) to eliminate N queries
     album_artist_pairs = [(album, artist) for album, artist, _ in ready]
     mb_id_by_pair: dict[tuple[str, str], str] = {}
+    rg_id_by_pair: dict[tuple[str, str], str] = {}
     if album_artist_pairs:
         mb_id_rows = session.exec(
-            select(Track.album, Track.artist, Track.mb_id)
+            select(Track.album, Track.artist, Track.mb_id, Track.mb_release_group_id)
             .where(
                 Track.status == TrackStatus.READY,
                 Track.mb_id != None,  # noqa: E711
@@ -308,13 +310,17 @@ async def list_library_albums(
                 )
             )
         ).all()
-        for row_album, row_artist, row_mb_id in mb_id_rows:
+        for row_album, row_artist, row_mb_id, row_rg_id in mb_id_rows:
             key = (row_album, row_artist)
             if row_mb_id and "-" in row_mb_id and key not in mb_id_by_pair:
                 mb_id_by_pair[key] = row_mb_id
+            if row_rg_id and "-" in str(row_rg_id) and key not in rg_id_by_pair:
+                rg_id_by_pair[key] = str(row_rg_id)
 
     svc = MetadataService(session)
     sem = asyncio.Semaphore(6)
+
+    from services.covers import attach_cached_covers_only, lookup_cached_cover_best_effort
 
     async def _build_one(
         album_name: str, artist_name: str, _tc: int, mb_id: str, sort_idx: int
@@ -322,13 +328,20 @@ async def list_library_albums(
         async with sem:
             try:
                 async with musicbrainz.mb_interactive_calls():
-                    data = await svc.get_album(mb_id)
+                    data = await svc.get_album(mb_id, light=True)
             except Exception:
                 return None
         if not data:
             return None
 
+        rg_id = data.get("mb_release_group_id") or rg_id_by_pair.get((album_name, artist_name))
         cover = data.get("cover") or data.get("album_cover")
+        if not cover:
+            cover = lookup_cached_cover_best_effort(
+                session,
+                release_id=str(data.get("mbid") or mb_id).strip() or None,
+                release_group_id=str(rg_id).strip() if rg_id else None,
+            )
         tracks_raw = data.get("tracks", [])
         if isinstance(tracks_raw, list):
             annotate_tracks_is_cached(session, tracks_raw, artist_fallback=artist_name)
@@ -342,6 +355,7 @@ async def list_library_albums(
             title=data.get("title", album_name),
             artist=data.get("artist", artist_name),
             cover=cover,
+            mb_release_group_id=str(rg_id).strip() if rg_id else None,
             track_count=len(tracks_raw),
             cached_count=cached_count,
             tracks=[
@@ -400,6 +414,7 @@ def update_album_order(
 
 @router.get("/recently-downloaded", response_model=list[TrackOut])
 async def list_recently_downloaded(
+    background_tasks: BackgroundTasks,
     user: CurrentUser = Depends(require_permission("can_view_recently_downloaded")),
     session: Session = Depends(get_session),
 ):
@@ -409,32 +424,12 @@ async def list_recently_downloaded(
         .order_by(Track.id.desc())
         .limit(20)
     ).all()
-    # Backfill covers from normalized cover cache (recording→release→rg), then fetch+write on miss.
-    from services.covers import lookup_cached_cover_best_effort, get_cover_url
-    dirty = False
-    for t in tracks:
-        if t.album_cover:
-            continue
-        rec = (t.mb_id or "").strip() or None
-        rel = (t.mb_release_id or "").strip() or None
-        rg = (t.mb_release_group_id or "").strip() or None
-        url = lookup_cached_cover_best_effort(session, recording_id=rec, release_id=rel, release_group_id=rg)
-        if not url and (rec or rel or rg):
-            if rec:
-                r = await get_cover_url("recording", rec)
-                url = r.url
-            elif rel:
-                r = await get_cover_url("release", rel)
-                url = r.url
-            elif rg:
-                r = await get_cover_url("release_group", rg)
-                url = r.url
-        if url:
-            t.album_cover = url
-            session.add(t)
-            dirty = True
-    if dirty:
-        session.commit()
+    from services.covers import attach_cached_covers_only, backfill_track_covers_task
+
+    attach_cached_covers_only(session, list(tracks))
+    missing_ids = [t.id for t in tracks if not t.album_cover and (t.mb_id or t.mb_release_id or t.mb_release_group_id)]
+    if missing_ids:
+        background_tasks.add_task(backfill_track_covers_task, missing_ids)
     return [
         TrackOut(
             mb_id=t.mb_id or "",
@@ -459,6 +454,7 @@ async def list_recently_downloaded(
 
 @router.get("/recently-played", response_model=list[TrackOut])
 async def list_recently_played(
+    background_tasks: BackgroundTasks,
     user: CurrentUser = Depends(require_permission("can_play")),
     session: Session = Depends(get_session),
 ):
@@ -483,31 +479,15 @@ async def list_recently_played(
     track_map = {t.id: t for t in tracks}
     ordered_tracks = [track_map[tid] for tid in track_ids if tid in track_map]
 
-    from services.covers import lookup_cached_cover_best_effort, get_cover_url
-    dirty = False
-    for t in ordered_tracks:
-        if t.album_cover:
-            continue
-        rec = (t.mb_id or "").strip() or None
-        rel = (t.mb_release_id or "").strip() or None
-        rg = (t.mb_release_group_id or "").strip() or None
-        url = lookup_cached_cover_best_effort(session, recording_id=rec, release_id=rel, release_group_id=rg)
-        if not url and (rec or rel or rg):
-            if rec:
-                r = await get_cover_url("recording", rec)
-                url = r.url
-            elif rel:
-                r = await get_cover_url("release", rel)
-                url = r.url
-            elif rg:
-                r = await get_cover_url("release_group", rg)
-                url = r.url
-        if url:
-            t.album_cover = url
-            session.add(t)
-            dirty = True
-    if dirty:
-        session.commit()
+    from services.covers import attach_cached_covers_only, backfill_track_covers_task
+
+    attach_cached_covers_only(session, ordered_tracks)
+    missing_ids = [
+        t.id for t in ordered_tracks
+        if not t.album_cover and (t.mb_id or t.mb_release_id or t.mb_release_group_id)
+    ]
+    if missing_ids:
+        background_tasks.add_task(backfill_track_covers_task, missing_ids)
     return [
         TrackOut(
             mb_id=t.mb_id or "",
@@ -596,9 +576,9 @@ def get_playlist(
         for i in items
     ]
     annotate_tracks_is_cached(session, shadow)
-    from services.covers import attach_playlist_style_covers_mbentity_cache
+    from services.covers import attach_cached_covers_only
 
-    attach_playlist_style_covers_mbentity_cache(session, list(items))
+    attach_cached_covers_only(session, list(items))
     item_outs = [
         _playlist_item_to_out(
             row,

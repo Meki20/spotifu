@@ -1,7 +1,7 @@
 import { usePlayerStore, type Track, type RepeatMode, type SystemSource } from '../stores/playerStore'
 import { useAuthStore } from '../stores/authStore'
 import { subscribeSpotifuWebSocket } from '../spotifuWebSocket'
-import { API, authFetch } from '../api'
+import { getApi, authFetch } from '../api'
 import { queryClient } from '../queryClient'
 import { coverManager } from '../lib/coverManager'
 
@@ -108,7 +108,7 @@ class PlaybackController {
     if (data.type === 'download_started') {
       if (data.track_id != null) this._currentTrackId = Number(data.track_id)
       const rawUrl = String(data.local_stream_url)
-      const fullUrl = rawUrl.startsWith('http') ? rawUrl : `${API}${rawUrl}`
+      const fullUrl = rawUrl.startsWith('http') ? rawUrl : `${getApi()}${rawUrl}`
       const duration = data.duration as number | undefined
       const ct = usePlayerStore.getState().currentTrack
       usePlayerStore.setState({
@@ -139,7 +139,7 @@ class PlaybackController {
 
   private _loadAndPlay(url: string) {
     this._clearPlayTimeout()
-    const fullUrl = url.startsWith('http') ? url : `${API}${url}`
+    const fullUrl = url.startsWith('http') ? url : `${getApi()}${url}`
     const token = useAuthStore.getState().token
     const u = new URL(fullUrl, window.location.origin)
     if (token) u.searchParams.set('token', token)
@@ -235,7 +235,7 @@ class PlaybackController {
 
         if (data.local_stream_url) {
           const rawUrl = String(data.local_stream_url)
-          const url = rawUrl.startsWith('http') ? rawUrl : `${API}${rawUrl}`
+          const url = rawUrl.startsWith('http') ? rawUrl : `${getApi()}${rawUrl}`
           usePlayerStore.setState({
             currentTrack: { ...ct!, local_stream_url: url, track_id: this._currentTrackId ?? undefined, is_cached: true, quality: data.quality ?? ct?.quality },
             phase: 'ready',

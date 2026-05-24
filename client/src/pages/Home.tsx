@@ -7,7 +7,7 @@ import * as controller from '../playback/controller'
 import { useArtistPrefetch } from '../hooks/useArtistPrefetch'
 import TrackCard from '../components/TrackCard'
 import TrackRow from '../components/TrackRow'
-import { toTrack } from '../utils/trackHelpers'
+import { toTrack, indexOfTrackInList } from '../utils/trackHelpers'
 import { useContextMenuActions } from '../contexts/ContextMenuProvider'
 
 interface Playlist {
@@ -125,13 +125,13 @@ export default function Home() {
 
   function playFromRecentlyDownloaded(track: any) {
     const list = (recentlyDownloaded || []).map((t) => toTrack(t))
-    const idx = Math.max(0, (recentlyDownloaded || []).findIndex((t) => (t?.mb_id || t?.mbid) === (track?.mb_id || track?.mbid)))
+    const idx = Math.max(0, indexOfTrackInList(recentlyDownloaded || [], track))
     controller.setSystemAndPlay(list, idx, { kind: 'recently-added' })
   }
 
   function playFromRecentlyPlayed(track: any) {
     const list = (recentlyPlayed || []).map((t) => toTrack(t))
-    const idx = Math.max(0, (recentlyPlayed || []).findIndex((t) => (t?.mb_id || t?.mbid) === (track?.mb_id || track?.mbid)))
+    const idx = Math.max(0, indexOfTrackInList(recentlyPlayed || [], track))
     controller.setSystemAndPlay(list, idx, { kind: 'recently-played' })
   }
 
@@ -342,6 +342,7 @@ export default function Home() {
                 <TrackRow
                   track={track}
                   isCached={track.is_cached}
+                  playlistStyleCover
                   onPlay={playFromRecentlyPlayed}
                   onHoverArtist={(aid, albs) => enqueue(aid, albs)}
                   onContextMenu={handleRecentlyPlayedContextMenu}

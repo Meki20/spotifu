@@ -1,6 +1,7 @@
-import { memo } from 'react'
+import { memo, useRef } from 'react'
 import { Computer } from 'lucide-react'
 import { displayArtist } from '../utils/trackHelpers'
+import { useCoverWhenVisible } from '../hooks/useCoverWhenVisible'
 
 function isLocalTrack(track: any): boolean {
   return !track.mb_id && !track.mb_artist_id && !track.mb_release_id && !track.mb_release_group_id
@@ -17,9 +18,17 @@ interface TrackCardProps {
 }
 
 const TrackCardImpl = ({ track, size = 96, onPlay, onHoverArtist, onContextMenu }: TrackCardProps) => {
-  const cover = track.album_cover as string | null | undefined
+  const rootRef = useRef<HTMLDivElement>(null)
+  const staticCover = track.album_cover as string | null | undefined
+  const { url: lazyCover } = useCoverWhenVisible(
+    rootRef,
+    staticCover ? null : (track.mb_id as string | undefined),
+    'viewport',
+  )
+  const cover = staticCover || lazyCover
   return (
     <div
+      ref={rootRef}
       className="flex flex-col items-center gap-2 px-3 py-3 rounded cursor-pointer border shrink-0 transition-colors hover:border-[#b4003e] group relative overflow-hidden"
       style={{
         background: '#1A1210',
@@ -95,6 +104,7 @@ export default memo(TrackCardImpl, (prev, next) => {
   return (
     prev.track?.mb_id === next.track?.mb_id &&
     prev.track?.track_id === next.track?.track_id &&
+    prev.track?.album_cover === next.track?.album_cover &&
     prev.onPlay === next.onPlay
   )
 })

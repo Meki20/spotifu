@@ -5,11 +5,14 @@ import { Environment } from '@react-three/drei'
 import * as THREE from 'three'
 import { useTexture, RoundedBox } from '@react-three/drei'
 
+import { useRgCover } from '../hooks/useRgCover'
+
 interface LibraryAlbum {
   id: string
   title: string
   artist: string
   cover: string | null
+  mb_release_group_id?: string | null
   track_count: number
   cached_count: number
   tracks: unknown[]
@@ -112,7 +115,9 @@ interface DiscProps {
 
 function Disc({ album, position, onClick }: DiscProps) {
   const meshRef = useRef<THREE.Group>(null!)
-  const sticker = useNormalizedTexture(album.cover)
+  const { url: lazyCover } = useRgCover(album.mb_release_group_id, 'viewport')
+  const coverUrl = album.cover || lazyCover
+  const sticker = useNormalizedTexture(coverUrl)
   const grunge = useTexture('/textures/grunge.jpg', (tex) => {
     tex.colorSpace = THREE.SRGBColorSpace
     tex.wrapS = tex.wrapT = THREE.RepeatWrapping

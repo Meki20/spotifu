@@ -12,7 +12,7 @@ from deps import get_current_user, require_permission, CurrentUser
 from models import SearchHistory
 from models import Track, TrackStatus, User
 from schemas import TrackOut
-from services.covers import attach_playlist_style_covers_mbentity_cache
+from services.covers import attach_cached_covers_only
 from services.providers.musicbrainz import official_releases_latest_first
 
 router = APIRouter(prefix="/search", tags=["search"])
@@ -110,7 +110,7 @@ async def hybrid_search(
 
     all_tracks = [t for sec in raw["sections"] for t in sec["tracks"]]
     annotate_tracks_is_cached(session, all_tracks)
-    attach_playlist_style_covers_mbentity_cache(session, all_tracks)
+    attach_cached_covers_only(session, all_tracks)
 
     sections = [
         TrackSection(type=sec["type"], label=sec["label"], tracks=[_track_to_out(t, t.get("is_cached", False)) for t in sec["tracks"]])
@@ -177,6 +177,8 @@ async def search(
     async with musicbrainz.mb_interactive_calls():
         results = await svc.search(q)
 
+    attach_cached_covers_only(session, results)
+
     mb_ids = [r["mbid"] for r in results if r.get("mbid")]
     cached_mb: set[str] = set()
     if mb_ids:
@@ -203,6 +205,7 @@ async def search(
             preview_url=r.get("preview_url"),
             is_cached=is_cached,
             mb_release_id=mb_release_id,
+            mb_release_group_id=r.get("mb_release_group_id"),
             mb_artist_id=r.get("mb_artist_id"),
         ))
     return SearchResponse(tracks=tracks)
@@ -240,7 +243,7 @@ async def stream_similar_tracks(
             cached_related = []
         if cached_related:
             logger.debug("[similar] cache hit mbid=%s tracks=%d", mbid, len(cached_related))
-            attach_playlist_style_covers_mbentity_cache(session, cached_related)
+            attach_cached_covers_only(session, cached_related)
             for t in cached_related:
                 try:
                     annotate_tracks_is_cached(session, [t])
@@ -343,7 +346,7 @@ async def stream_similar_tracks(
                 picked.append(best_row)
 
             if picked:
-                attach_playlist_style_covers_mbentity_cache(session, picked)
+                attach_cached_covers_only(session, picked)
 
             # Now yield picked rows.
             for row in picked:

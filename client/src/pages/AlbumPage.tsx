@@ -1,18 +1,17 @@
-import { useState, useEffect } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { useParams, useNavigate } from 'react-router-dom'
 import { usePlayerStore } from '../stores/playerStore'
 import { useAuthStore } from '../stores/authStore'
 import { Play, ArrowLeft } from 'lucide-react'
 import * as controller from '../playback/controller'
-import { API } from '../api'
+import { getApi } from '../api'
 import { useDownloadStates } from '../hooks/useDownloadStates'
 import { useArtistPrefetch } from '../hooks/useArtistPrefetch'
 import { useContextMenuActions } from '../contexts/ContextMenuProvider'
 import TrackRowFull from '../components/TrackRowFull'
 import { toTrack } from '../utils/trackHelpers'
 import { PollyLoading } from '../components/PollyLoading'
-import { fetchReleaseGroupCover } from '../api/covers'
+import { useRgCover } from '../hooks/useRgCover'
 
 function albumTrackToControllerTrack(track: any, album: any, cover: string | null) {
   return toTrack(track, {
@@ -39,7 +38,7 @@ export default function AlbumPage() {
   const { data: album, isLoading, error } = useQuery({
     queryKey: ['album', albumId],
     queryFn: async () => {
-      const res = await fetch(`${API}/album/${albumId}`, {
+      const res = await fetch(`${getApi()}/album/${albumId}`, {
         headers: token ? { Authorization: `Bearer ${token}` } : {},
       })
       if (!res.ok) throw new Error('Failed to load album')
@@ -50,27 +49,9 @@ export default function AlbumPage() {
     gcTime: 1000 * 60 * 30,
   })
 
-  const [cover, setCover] = useState<string | null>(null)
-
-  useEffect(() => {
-    if (album?.cover) {
-      setCover(album.cover)
-      return
-    }
-    if (!albumId) return
-
-    let cancelled = false
-    fetchReleaseGroupCover(albumId)
-      .then((u) => {
-        if (cancelled) return
-        if (u) setCover(u)
-      })
-      .catch(() => {})
-
-    return () => { cancelled = true }
-  }, [album?.cover, albumId])
-
-  const displayCover = cover ?? album?.cover ?? null
+  const rgId = album?.mb_release_group_id || albumId || null
+  const { url: lazyCover } = useRgCover(rgId, 'viewport')
+  const displayCover = album?.cover ?? lazyCover ?? null
 
   function handleContextMenu(e: React.MouseEvent, track: any) {
     e.preventDefault()

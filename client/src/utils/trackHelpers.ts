@@ -34,7 +34,9 @@ export function toTrack(raw: any, extras?: Partial<Track>): Track {
 
 export function displayArtist(track: { artist: string; artist_credit?: string | null }): string {
   const ac = (track.artist_credit || '').trim()
-  return ac || (track.artist || '')
+  const ar = (track.artist || '').trim()
+  if (ac && ac.toLowerCase() !== 'unknown artist') return ac
+  return ar || ac
 }
 
 export function formatDuration(secs: number): string {
@@ -42,4 +44,19 @@ export function formatDuration(secs: number): string {
   const m = Math.floor(secs / 60)
   const s = Math.floor(secs % 60)
   return `${m}:${String(s).padStart(2, '0')}`
+}
+
+/** Match a track row from a list (local imports use ``track_id``; MB tracks use ``mb_id``). */
+export function indexOfTrackInList(list: any[], track: any): number {
+  const tid = track?.track_id ?? track?.id
+  if (tid != null) {
+    const byId = list.findIndex((t) => (t?.track_id ?? t?.id) === tid)
+    if (byId >= 0) return byId
+  }
+  const mb = (track?.mb_id || track?.mbid || '').trim()
+  if (mb) {
+    const byMb = list.findIndex((t) => (t?.mb_id || t?.mbid || '').trim() === mb)
+    if (byMb >= 0) return byMb
+  }
+  return -1
 }

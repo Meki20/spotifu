@@ -1147,8 +1147,7 @@ def import_local_files(
                 track.title = extracted_title
             if extracted_artist:
                 track.artist = extracted_artist
-                if not track.artist_credit:
-                    track.artist_credit = extracted_artist
+                track.artist_credit = extracted_artist
             if extracted_album:
                 track.album = extracted_album
 
@@ -1196,8 +1195,7 @@ def apply_local_file_decisions(
                     track.title = item.title
                 if item.artist:
                     track.artist = item.artist
-                    if not track.artist_credit:
-                        track.artist_credit = item.artist
+                    track.artist_credit = item.artist
                 if item.album:
                     track.album = item.album
                 session.add(track)

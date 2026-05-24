@@ -21,16 +21,44 @@ services:
     container_name: spotifu-server
     environment:
       DATABASE_URL: postgresql://spotifu:spotifu@postgres:5432/spotifu
+      CACHE_DIR: /data/spotifu/cache
+      API_BASE_URL: ${API_BASE_URL:-http://localhost:1985}
+      JWT_SECRET: ${JWT_SECRET:-}
       SOULSEEK_USERNAME: ${SOULSEEK_USERNAME:-}
       SOULSEEK_PASSWORD: ${SOULSEEK_PASSWORD:-}
       SECRETS_FILE: /app/.secrets
+      MDNS_ENABLED: ${MDNS_ENABLED:-false}
+      MDNS_HOSTNAME: ${MDNS_HOSTNAME:-spotifu}
+      MDNS_PORT: ${MDNS_PORT:-1985}
+      ALLOWED_ORIGINS: ${ALLOWED_ORIGINS:-*}
+      ALLOW_REGISTRATION: ${ALLOW_REGISTRATION:-true}
     volumes:
-      - ./.secrets:/app/.secrets:ro
+      - ./.secrets:/app/.secrets
+      - spotifu-cache:/data/spotifu/cache
     ports:
       - "1985:1985"
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://127.0.0.1:1985/health/ready')\""]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
     depends_on:
       postgres:
         condition: service_healthy
 
+  client:
+    profiles: [full]
+    build:
+      context: ./client
+      dockerfile: Dockerfile
+    container_name: spotifu-client
+    ports:
+      - "1984:80"
+    depends_on:
+      server:
+        condition: service_healthy
+
 volumes:
   spotifu-db:
+  spotifu-cache:

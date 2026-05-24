@@ -1,0 +1,16 @@
+# Optional override for LAN deployment. Copy to docker-compose.override.yml and adjust.
+#
+# Replace 192.168.1.100 with your server's LAN IP so cover/stream URLs work for
+# remote clients on the network.
+#
+# For reliable mDNS from Docker, use network_mode: host on the server service
+# (see docs/DEPLOYMENT.md).
+
+services:
+  server:
+    environment:
+      API_BASE_URL: http://192.168.1.100:1985
+      MDNS_ENABLED: "true"
+    # Uncomment for mDNS on Linux (disables port mapping — server listens on host :1985):
+    # network_mode: host
+    # ports: []

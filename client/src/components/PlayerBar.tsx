@@ -14,6 +14,7 @@ import AddToPlaylistModal, { type AddToPlaylistTrack } from './AddToPlaylistModa
 import { displayArtist } from '../utils/trackHelpers'
 import { useDownloadStates } from '../hooks/useDownloadStates'
 import { PollyLoading } from './PollyLoading'
+import { useCover } from '../hooks/useCover'
 
 interface ContextMenu {
   x: number
@@ -61,6 +62,9 @@ export default function PlayerBar() {
   const [liked, setLiked] = useState(false)
   const progressRef = useRef<HTMLDivElement>(null)
   const { downloadStates } = useDownloadStates()
+  const trackMbId = currentTrack?.mb_id
+  const { url: lazyCover } = useCover(trackMbId, 'viewport')
+  const playerCover = currentTrack?.album_cover || lazyCover
 
   useEffect(() => {
     if (!contextMenu) return
@@ -155,10 +159,10 @@ export default function PlayerBar() {
               overflow: 'hidden',
             }}
           >
-            {currentTrack.album_cover ? (
+            {playerCover ? (
               <div className="relative w-full h-full overflow-hidden">
                 <img
-                  src={currentTrack.album_cover}
+                  src={playerCover}
                   alt={currentTrack.album || ''}
                   className="w-full h-full object-cover"
                   loading="lazy"

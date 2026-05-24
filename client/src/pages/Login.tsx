@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useAuthStore } from '../stores/authStore'
 import { getIsAdminFromToken } from '../authToken'
-import { API } from '../api'
+import { getApi } from '../api'
 
 export default function Login() {
   const [username, setUsername] = useState('')
@@ -16,7 +16,7 @@ export default function Login() {
     e.preventDefault()
     setError('')
     try {
-      const res = await fetch(`${API}/auth/login`, {
+      const res = await fetch(`${getApi()}/auth/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ username, password, remember }),

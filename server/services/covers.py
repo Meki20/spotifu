@@ -968,6 +968,86 @@ def lookup_cached_covers_batch(
     return out
 
 
+def attach_cached_covers_only(session: Session, rows: list[Any]) -> None:
+    """Fill ``album_cover`` from DB caches only (legacy MBEntityCache + normalized cover_links). No network."""
+    if not rows:
+        return
+
+    attach_playlist_style_covers_mbentity_cache(session, rows)
+
+    def _cover(r: Any) -> Any:
+        if isinstance(r, dict):
+            return r.get("album_cover") or r.get("cover")
+        return getattr(r, "album_cover", None) or getattr(r, "cover", None)
+
+    def _rec(r: Any) -> str | None:
+        if isinstance(r, dict):
+            v = r.get("mb_id") or r.get("mbid") or r.get("mb_recording_id")
+        else:
+            v = getattr(r, "mb_id", None) or getattr(r, "mb_recording_id", None)
+        return str(v).strip() if v else None
+
+    def _rel(r: Any) -> str | None:
+        v = r.get("mb_release_id") if isinstance(r, dict) else getattr(r, "mb_release_id", None)
+        return str(v).strip() if v else None
+
+    def _rg(r: Any) -> str | None:
+        v = r.get("mb_release_group_id") if isinstance(r, dict) else getattr(r, "mb_release_group_id", None)
+        return str(v).strip() if v else None
+
+    def _set_cover(r: Any, url: str) -> None:
+        if isinstance(r, dict):
+            if "album_cover" in r or r.get("album_cover") is None:
+                r["album_cover"] = url
+            if "cover" in r or r.get("cover") is None:
+                r["cover"] = url
+        else:
+            if hasattr(r, "album_cover"):
+                r.album_cover = url
+            if hasattr(r, "cover"):
+                r.cover = url
+
+    want_rec: dict[str, list[Any]] = {}
+    want_rel: dict[str, list[Any]] = {}
+    want_rg: dict[str, list[Any]] = {}
+    for r in rows:
+        if not r or _cover(r):
+            continue
+        rec, rel, rg = _rec(r), _rel(r), _rg(r)
+        if rec:
+            want_rec.setdefault(rec, []).append(r)
+        elif rel:
+            want_rel.setdefault(rel, []).append(r)
+        elif rg:
+            want_rg.setdefault(rg, []).append(r)
+
+    try:
+        if want_rec:
+            rec_urls = lookup_cached_covers_batch(session, entity_kind="recording", ids=list(want_rec.keys()))
+            for eid, url in rec_urls.items():
+                if url:
+                    for it in want_rec.get(eid, []):
+                        _set_cover(it, url)
+
+        if want_rel:
+            rel_urls = lookup_cached_covers_batch(session, entity_kind="release", ids=list(want_rel.keys()))
+            for eid, url in rel_urls.items():
+                if url:
+                    for it in want_rel.get(eid, []):
+                        if not _cover(it):
+                            _set_cover(it, url)
+
+        if want_rg:
+            rg_urls = lookup_cached_covers_batch(session, entity_kind="release_group", ids=list(want_rg.keys()))
+            for eid, url in rg_urls.items():
+                if url:
+                    for it in want_rg.get(eid, []):
+                        if not _cover(it):
+                            _set_cover(it, url)
+    except Exception:
+        pass
+
+
 def attach_playlist_style_covers_mbentity_cache(session: Session, rows: list[Any]) -> None:
     """Fill ``album_cover`` in-memory like playlist GET: MBEntityCache ``cover_release`` / ``cover_rg`` only (no network).
 
@@ -1033,3 +1113,39 @@ def attach_playlist_style_covers_mbentity_cache(session: Session, rows: list[Any
                     _set_cover(it, u)
     except Exception:
         pass
+
+
+async def backfill_track_covers_task(track_ids: list[int]) -> None:
+    """Background task: resolve and persist missing track covers (does not block API responses)."""
+    if not track_ids:
+        return
+    from models import Track
+
+    with Session(engine) as session:
+        tracks = session.exec(select(Track).where(Track.id.in_(track_ids))).all()
+        dirty = False
+        for t in tracks:
+            if t.album_cover:
+                continue
+            rec = (t.mb_id or "").strip() or None
+            rel = (t.mb_release_id or "").strip() or None
+            rg = (t.mb_release_group_id or "").strip() or None
+            url = lookup_cached_cover_best_effort(
+                session, recording_id=rec, release_id=rel, release_group_id=rg
+            )
+            if not url and (rec or rel or rg):
+                if rec:
+                    r = await get_cover_url("recording", rec)
+                    url = r.url
+                elif rel:
+                    r = await get_cover_url("release", rel)
+                    url = r.url
+                elif rg:
+                    r = await get_cover_url("release_group", rg)
+                    url = r.url
+            if url:
+                t.album_cover = url
+                session.add(t)
+                dirty = True
+        if dirty:
+            session.commit()

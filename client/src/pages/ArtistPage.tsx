@@ -3,12 +3,13 @@ import { useQuery } from '@tanstack/react-query'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useAuthStore } from '../stores/authStore'
 import { Play, ChevronLeft, ChevronRight, Pencil } from 'lucide-react'
-import { API, authFetch, mediaUrl } from '../api'
+import { getApi, authFetch, mediaUrl } from '../api'
 import { useArtistPrefetch } from '../hooks/useArtistPrefetch'
 import { useArtistTransitionStore } from '../stores/artistTransitionStore'
 import ImagePickerModal from '../components/ImagePickerModal'
 import { PollyLoading } from '../components/PollyLoading'
-import { fetchReleaseGroupCover } from '../api/covers'
+import { useRgCoverWhenVisible } from '../hooks/useRgCoverWhenVisible'
+import { rgCoverManager } from '../lib/rgCoverManager'
 import * as controller from '../playback/controller'
 import { toTrack } from '../utils/trackHelpers'
 import TrackRowFull from '../components/TrackRowFull'
@@ -28,20 +29,20 @@ function AlbumSkeleton() {
 
 const ALBUM_CARD_BACKDROP_OPACITY = 0.14
 
-function artistAlbumCoverUrl(album: any, covers?: Record<string, string>) {
-  return album.cover || (album.mb_release_group_id && covers?.[album.mb_release_group_id]) || null
+function artistAlbumCoverUrl(album: any) {
+  const rgId = album.mb_release_group_id
+  const fromManager = rgId ? rgCoverManager.peek(rgId).url : null
+  return album.cover || fromManager || null
 }
 
 /** Dim cover backdrop + foreground art, same idea as library playlist / AlbumCard. */
 function ArtistAlbumTile({
   album,
-  covers,
   onClick,
   onVisible,
   narrow,
 }: {
   album: any
-  covers: Record<string, string> | undefined
   onClick: () => void
   /** Fire once when the tile nears the viewport (avoids hover storms). */
   onVisible?: () => void
@@ -49,6 +50,11 @@ function ArtistAlbumTile({
 }) {
   const rootRef = useRef<HTMLDivElement>(null)
   const visibleFired = useRef(false)
+  const rgId = album.mb_release_group_id || null
+  const { url: lazyCover } = useRgCoverWhenVisible(rootRef, rgId, 'viewport', {
+    rootMargin: '140px',
+    threshold: 0.02,
+  })
 
   useEffect(() => {
     if (!onVisible) return
@@ -66,7 +72,7 @@ function ArtistAlbumTile({
     return () => obs.disconnect()
   }, [onVisible])
 
-  const u = artistAlbumCoverUrl(album, covers)
+  const u = artistAlbumCoverUrl(album) || lazyCover
   return (
     <div
       ref={rootRef}
@@ -101,14 +107,12 @@ function HorizontalAlbumStrip({
   albums,
   navigate,
   isLoading,
-  covers,
   artistId,
   onAlbumVisible,
 }: {
   albums: any[]
   navigate: any
   isLoading?: boolean
-  covers?: Record<string, string>
   artistId?: string
   onAlbumVisible?: (albumMbid: string) => void
 }) {
@@ -173,7 +177,6 @@ function HorizontalAlbumStrip({
           <ArtistAlbumTile
             key={album.mb_release_group_id || album.mb_id}
             album={album}
-            covers={covers}
             narrow
             onClick={() => {
               const id = album.mb_release_group_id || album.mb_id
@@ -196,6 +199,53 @@ function HorizontalAlbumStrip({
       >
         <ChevronRight size={20} />
       </button>
+    </div>
+  )
+}
+
+function SingleAlbumRow({
+  album,
+  index,
+  onNavigate,
+}: {
+  album: any
+  index: number
+  onNavigate: () => void
+}) {
+  const coverRef = useRef<HTMLDivElement>(null)
+  const rgId = album.mb_release_group_id || null
+  const { url: lazyCover } = useRgCoverWhenVisible(coverRef, rgId, 'viewport')
+  const coverUrl = artistAlbumCoverUrl(album) || lazyCover
+
+  return (
+    <div
+      className="grid grid-cols-[auto_1fr_1fr] gap-4 px-4 py-3 hover:bg-[#282828] rounded cursor-pointer group"
+      onClick={onNavigate}
+    >
+      <div className="relative w-8 h-8 shrink-0 flex items-center justify-center">
+        <span className="text-[#b3b3b3] text-sm tabular-nums group-hover:hidden">{index + 1}</span>
+        <span className="absolute inset-0 hidden group-hover:flex items-center justify-center text-[#b4003e]">
+          <Play size={14} fill="currentColor" className="shrink-0" />
+        </span>
+      </div>
+      <div className="min-w-0 flex items-center gap-3">
+        <div ref={coverRef} className="shrink-0">
+          {coverUrl ? (
+            <img
+              src={coverUrl}
+              alt={album.title}
+              className="w-10 h-10 aspect-square object-cover rounded"
+              loading="lazy"
+            />
+          ) : (
+            <div className="w-10 h-10 bg-[#282828] rounded flex items-center justify-center">
+              <span className="text-[#6a6a6a] text-xs">—</span>
+            </div>
+          )}
+        </div>
+        <span className="text-sm text-white truncate">{album.title}</span>
+      </div>
+      <span className="text-xs text-[#b3b3b3] flex items-center">{album.release_date?.split('-')[0] ?? ''}</span>
     </div>
   )
 }
@@ -236,7 +286,7 @@ export default function ArtistPage() {
   const { data: artist, isLoading, error } = useQuery({
     queryKey: ['artist', artistId],
     queryFn: async () => {
-      const res = await fetch(`${API}/artist/${artistId}`, {
+      const res = await fetch(`${getApi()}/artist/${artistId}`, {
         headers: token ? { Authorization: `Bearer ${token}` } : {},
       })
       if (!res.ok) throw new Error('Failed to load artist')
@@ -283,7 +333,7 @@ export default function ArtistPage() {
   const { data: albumsData, isLoading: albumsLoading } = useQuery({
     queryKey: ['artist-albums', artistId],
     queryFn: async () => {
-      const res = await fetch(`${API}/artist/${artistId}/albums`, {
+      const res = await fetch(`${getApi()}/artist/${artistId}/albums`, {
         headers: token ? { Authorization: `Bearer ${token}` } : {},
       })
       if (!res.ok) throw new Error(`Failed to load albums (${res.status})`)
@@ -312,39 +362,6 @@ export default function ArtistPage() {
       }
     })
   }, [])
-
-  const [covers, setCovers] = useState<Record<string, string>>({})
-
-  useEffect(() => {
-    if (!albumsData?.albums?.length) return
-    const missing = albumsData.albums.filter((a: any) => !a.cover && a.mb_release_group_id)
-    if (!missing.length) return
-
-    let cancelled = false
-
-    async function fetchWithConcurrency(mbids: string[], concurrency = 6): Promise<void> {
-      for (let i = 0; i < mbids.length; i += concurrency) {
-        if (cancelled) break
-        const batch = mbids.slice(i, i + concurrency)
-        const res = await Promise.allSettled(batch.map((id) => fetchReleaseGroupCover(id)))
-        if (cancelled) return
-        res.forEach((r, idx) => {
-          if (r.status !== 'fulfilled') return
-          const url = r.value
-          const id = batch[idx]
-          if (url && id && !cancelled) setCovers((prev) => ({ ...prev, [id]: url }))
-        })
-      }
-    }
-
-    const ids = missing
-      .map((a: any) => a.mb_release_group_id)
-      .filter((x: any): x is string => typeof x === 'string' && x.length > 0)
-
-    fetchWithConcurrency(ids)
-
-    return () => { cancelled = true }
-  }, [albumsData, artistId])
 
   const { enqueue, enqueueAlbumsIdle } = useArtistPrefetch()
 
@@ -559,7 +576,6 @@ export default function ArtistPage() {
                     <ArtistAlbumTile
                       key={album.mb_release_group_id || album.mb_id}
                       album={album}
-                      covers={covers}
                       onClick={() => {
                         const id = album.mb_release_group_id || album.mb_id
                         if (id) navigate(`/album/${id}`)
@@ -583,7 +599,6 @@ export default function ArtistPage() {
               albums={sortedEps}
               navigate={navigate}
               isLoading={albumsLoading}
-              covers={covers}
               artistId={artistId ?? undefined}
               onAlbumVisible={(id) => {
                 if (artistId) enqueue(artistId, [id])
@@ -602,37 +617,15 @@ export default function ArtistPage() {
               <span>Year</span>
             </div>
             {sortedSingles.map((album: any, i: number) => (
-              <div
+              <SingleAlbumRow
                 key={album.mb_release_group_id || album.mb_id}
-                className="grid grid-cols-[auto_1fr_1fr] gap-4 px-4 py-3 hover:bg-[#282828] rounded cursor-pointer group"
-                onClick={() => {
+                album={album}
+                index={i}
+                onNavigate={() => {
                   const id = album.mb_release_group_id || album.mb_id
                   if (id) navigate(`/album/${id}`)
                 }}
-              >
-                <div className="relative w-8 h-8 shrink-0 flex items-center justify-center">
-                  <span className="text-[#b3b3b3] text-sm tabular-nums group-hover:hidden">{i + 1}</span>
-                  <span className="absolute inset-0 hidden group-hover:flex items-center justify-center text-[#b4003e]">
-                    <Play size={14} fill="currentColor" className="shrink-0" />
-                  </span>
-                </div>
-                <div className="min-w-0 flex items-center gap-3">
-                  {album.cover || (album.mb_release_group_id && covers[album.mb_release_group_id]) ? (
-                    <img
-                      src={album.cover || covers[album.mb_release_group_id]}
-                      alt={album.title}
-                      className="w-10 h-10 aspect-square object-cover rounded shrink-0"
-                      loading="lazy"
-                    />
-                  ) : (
-                    <div className="w-10 h-10 bg-[#282828] rounded flex items-center justify-center shrink-0">
-                      <span className="text-[#6a6a6a] text-xs">—</span>
-                    </div>
-                  )}
-                  <span className="text-sm text-white truncate">{album.title}</span>
-                </div>
-                <span className="text-xs text-[#b3b3b3] flex items-center">{album.release_date?.split('-')[0] ?? ''}</span>
-              </div>
+              />
             ))}
           </div>
         )}

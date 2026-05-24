@@ -24,6 +24,8 @@ _fdb, _dbpath = tempfile.mkstemp(suffix=".db")
 os.close(_fdb)
 os.environ["DATABASE_URL"] = f"sqlite:///{_dbpath.replace(os.sep, '/')}"
 os.environ["SECRETS_FILE"] = _secrets
+os.environ["MDNS_ENABLED"] = "false"
+os.environ["SPOTIFU_TESTING"] = "1"
 
 import database  # noqa: E402
 from sqlalchemy import event

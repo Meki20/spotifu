@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { X, ChevronLeft, ChevronRight, Check, XCircle, Loader2, Pencil, Search, ChevronDown, ChevronUp } from 'lucide-react'
-import { authFetch } from '../api'
+import { authFetch, authFetchStream } from '../api'
 import { fetchReleaseGroupCover } from '../api/covers'
 
 interface ReconciliationTrack {
@@ -100,6 +100,10 @@ export default function ReconciliationModal({ open, onClose }: Props) {
   const [editedTags, setEditedTags] = useState<Record<number, string[]>>({})
   const [addingTagId, setAddingTagId] = useState<number | null>(null)
   const [newTagInput, setNewTagInput] = useState('')
+  const [exiting, setExiting] = useState<Record<number, 'accept' | 'reject'>>({})
+  const [selectAllBusy, setSelectAllBusy] = useState(false)
+
+  const EXIT_MS = 260
 
   const [additionalExpanded, setAdditionalExpanded] = useState(false)
   const [additionalTracks, setAdditionalTracks] = useState<DownloadedTrack[]>([])
@@ -118,6 +122,7 @@ export default function ReconciliationModal({ open, onClose }: Props) {
       setDecisions({})
       setApplyResults([])
       setSelected(new Set())
+      setExiting({})
       setAdditionalExpanded(false)
       setAdditionalTracks([])
       setAdditionalSearch('')
@@ -163,7 +168,29 @@ export default function ReconciliationModal({ open, onClose }: Props) {
   }
 
   function selectAll() {
-    setSelected(new Set(tracks.map((t) => t.id)))
+    void selectAllTracks()
+  }
+
+  async function selectAllTracks() {
+    if (totalPages <= 1) {
+      setSelected(new Set(tracks.map((t) => t.id)))
+      return
+    }
+    setSelectAllBusy(true)
+    try {
+      const allIds = new Set(selected)
+      for (let p = 1; p <= totalPages; p++) {
+        const res = await authFetch(`/settings/reconciliation/tracks?page=${p}&page_size=20`)
+        if (!res.ok) break
+        const data = (await res.json()) as ReconciliationResponse
+        for (const t of data.tracks) allIds.add(t.id)
+      }
+      setSelected(allIds)
+    } catch (err) {
+      console.error(err)
+    } finally {
+      setSelectAllBusy(false)
+    }
   }
 
   function deselectAll() {
@@ -232,7 +259,7 @@ export default function ReconciliationModal({ open, onClose }: Props) {
     setCoverArt({})
 
     try {
-      const response = await authFetch('/settings/reconciliation/resolve/stream', {
+      const response = await authFetchStream('/settings/reconciliation/resolve/stream', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ track_ids: Array.from(selected) }),
@@ -278,20 +305,24 @@ export default function ReconciliationModal({ open, onClose }: Props) {
               })
               setProcessedCount(prev => prev + 1)
 
-              // Fetch cover art for this result
-              if (result.original_mb_release_group_id && !coverArt[result.track_id]?.old) {
-                const oldUrl = await fetchReleaseGroupCover(result.original_mb_release_group_id)
-                setCoverArt(prev => ({
-                  ...prev,
-                  [result.track_id]: { ...prev[result.track_id], old: oldUrl }
-                }))
+              // Fetch cover art in background — do not block the SSE reader
+              if (result.original_mb_release_group_id) {
+                void fetchReleaseGroupCover(result.original_mb_release_group_id).then((oldUrl) => {
+                  if (!oldUrl) return
+                  setCoverArt(prev => ({
+                    ...prev,
+                    [result.track_id]: { ...prev[result.track_id], old: oldUrl },
+                  }))
+                })
               }
-              if (result.matched && result.mb_release_group_id && !coverArt[result.track_id]?.new) {
-                const newUrl = await fetchReleaseGroupCover(result.mb_release_group_id)
-                setCoverArt(prev => ({
-                  ...prev,
-                  [result.track_id]: { ...prev[result.track_id], new: newUrl }
-                }))
+              if (result.matched && result.mb_release_group_id) {
+                void fetchReleaseGroupCover(result.mb_release_group_id).then((newUrl) => {
+                  if (!newUrl) return
+                  setCoverArt(prev => ({
+                    ...prev,
+                    [result.track_id]: { ...prev[result.track_id], new: newUrl },
+                  }))
+                })
               }
             } else if (data.type === 'done') {
               break
@@ -303,7 +334,7 @@ export default function ReconciliationModal({ open, onClose }: Props) {
       }
     } catch (err) {
       if (err instanceof Error && err.name === 'AbortError') {
-        console.log('Resolution cancelled')
+        // User closed modal or navigated away — not an error
       } else {
         console.error('Resolve error:', err)
         alert(`Resolve error: ${err}`)
@@ -314,18 +345,29 @@ export default function ReconciliationModal({ open, onClose }: Props) {
   }
 
   useEffect(() => {
-    return () => {
-      if (resolutionControllerRef.current) {
-        resolutionControllerRef.current.abort()
-      }
+    if (!open && resolutionControllerRef.current) {
+      resolutionControllerRef.current.abort()
+      resolutionControllerRef.current = null
       setResolving(false)
     }
-  }, [])
+  }, [open])
+
+  function dismissResult(trackId: number, action: 'accept' | 'reject') {
+    if (decisions[trackId] || exiting[trackId]) return
+    setExiting((e) => ({ ...e, [trackId]: action }))
+    window.setTimeout(() => {
+      setDecisions((d) => ({ ...d, [trackId]: action }))
+      setExiting((e) => {
+        const next = { ...e }
+        delete next[trackId]
+        return next
+      })
+    }, EXIT_MS)
+  }
 
   async function acceptMatch(result: MatchResult) {
     if (!result.matched || !result.mb_id) return
-
-    setDecisions((d) => ({ ...d, [result.track_id]: 'accept' }))
+    if (decisions[result.track_id] || exiting[result.track_id]) return
 
     setApplying(true)
     try {
@@ -350,6 +392,7 @@ export default function ReconciliationModal({ open, onClose }: Props) {
       if (!res.ok) {
         const errText = await res.text()
         console.error('Apply failed:', res.status, errText)
+        return
       }
 
       const newCoverArt = result.mb_release_group_id
@@ -377,6 +420,7 @@ export default function ReconciliationModal({ open, onClose }: Props) {
           new_cover_art: newCoverArt,
         },
       ])
+      dismissResult(result.track_id, 'accept')
     } catch (err) {
       console.error(err)
     } finally {
@@ -385,7 +429,7 @@ export default function ReconciliationModal({ open, onClose }: Props) {
   }
 
   function rejectMatch(result: MatchResult) {
-    setDecisions((d) => ({ ...d, [result.track_id]: 'reject' }))
+    dismissResult(result.track_id, 'reject')
   }
 
   function getResultTags(result: MatchResult): string[] {
@@ -464,7 +508,10 @@ setResolveResults(prev => prev.map(r => r.track_id === result.track_id ? updated
 
   const acceptedCount = Object.values(decisions).filter((d) => d === 'accept').length
   const rejectedCount = Object.values(decisions).filter((d) => d === 'reject').length
-  const pendingCount = resolveResults.length - acceptedCount - rejectedCount
+  const pendingCount = resolveResults.filter(
+    (r) => !decisions[r.track_id] && !exiting[r.track_id],
+  ).length
+  const visibleResults = resolveResults.filter((r) => !decisions[r.track_id])
 
   if (!open) return null
 
@@ -714,10 +761,11 @@ setResolveResults(prev => prev.map(r => r.track_id === result.track_id ? updated
                       </button>
                       <button
                         onClick={selectAll}
-                        className="px-3 py-1.5 text-xs border rounded"
+                        disabled={selectAllBusy}
+                        className="px-3 py-1.5 text-xs border rounded disabled:opacity-50"
                         style={{ fontFamily: "'Barlow Condensed', sans-serif", color: '#9A8E84', borderColor: '#3D2820' }}
                       >
-                        Select All
+                        {selectAllBusy ? 'Selecting…' : totalPages > 1 ? `Select All (${totalTracks})` : 'Select All'}
                       </button>
                     </div>
                     <button
@@ -775,17 +823,29 @@ setResolveResults(prev => prev.map(r => r.track_id === result.track_id ? updated
                 </div>
               </div>
 
-              <div className="space-y-2 mb-4">
-                {resolveResults.map((result) => {
-                  const decision = decisions[result.track_id]
+              <div className="space-y-2 mb-4 overflow-x-hidden">
+                {visibleResults.length === 0 && !resolving && resolveResults.length > 0 && (
+                  <p className="text-sm py-4 text-center" style={{ fontFamily: "'Barlow Semi Condensed', sans-serif", color: '#9A8E84' }}>
+                    All tracks reviewed.
+                  </p>
+                )}
+                {visibleResults.map((result) => {
+                  const exitAction = exiting[result.track_id]
                   return (
                     <div
                       key={result.track_id}
                       className="p-3 rounded"
                       style={{
-                        background: decision === 'accept' ? 'rgba(180, 0, 62, 0.1)' : decision === 'reject' ? 'rgba(61, 40, 32, 0.5)' : '#231815',
-                        border: `1px solid ${decision === 'accept' ? 'rgba(180, 0, 62, 0.3)' : decision === 'reject' ? '#3D2820' : '#3D2820'}`,
-                        opacity: decision === 'reject' ? 0.5 : 1,
+                        background: '#231815',
+                        border: '1px solid #3D2820',
+                        transform: exitAction ? 'translateX(110%)' : 'translateX(0)',
+                        opacity: exitAction ? 0 : 1,
+                        maxHeight: exitAction ? 0 : 2000,
+                        marginBottom: exitAction ? 0 : undefined,
+                        paddingTop: exitAction ? 0 : undefined,
+                        paddingBottom: exitAction ? 0 : undefined,
+                        overflow: 'hidden',
+                        transition: `transform ${EXIT_MS}ms ease-in, opacity ${EXIT_MS}ms ease-in, max-height ${EXIT_MS}ms ease-in, margin ${EXIT_MS}ms ease-in, padding ${EXIT_MS}ms ease-in`,
                       }}
                     >
                       <div className="flex items-start justify-between gap-4">
@@ -939,7 +999,7 @@ setResolveResults(prev => prev.map(r => r.track_id === result.track_id ? updated
                                 <p className="text-xs" style={{ fontFamily: "'Barlow Semi Condensed', sans-serif", color: '#9A8E84' }}>
                                   No match
                                 </p>
-                                {!decision && (
+                                {!exitAction && (
                                   <button
                                     onClick={() => { setEditingId(result.track_id); setManualMbId('') }}
                                     className="flex items-center gap-1 mt-2 text-xs"
@@ -955,7 +1015,7 @@ setResolveResults(prev => prev.map(r => r.track_id === result.track_id ? updated
                         </div>
                       </div>
 
-                      {!decision && result.matched && (
+                      {!exitAction && result.matched && (
                         <div className="flex items-center gap-1.5 mt-2">
                           <button
                             onClick={() => acceptMatch(result)}
@@ -1028,18 +1088,6 @@ setResolveResults(prev => prev.map(r => r.track_id === result.track_id ? updated
                         </div>
                       )}
 
-                      {decision === 'accept' && (
-                        <div className="flex items-center gap-1 mt-3" style={{ color: '#b4003e' }}>
-                          <Check size={14} />
-                          <span className="text-xs" style={{ fontFamily: "'Barlow Semi Condensed', sans-serif", color: '#b4003e' }}>Accepted</span>
-                        </div>
-                      )}
-                      {decision === 'reject' && (
-                        <div className="flex items-center gap-1 mt-3" style={{ color: '#6B5E56' }}>
-                          <XCircle size={14} />
-                          <span className="text-xs" style={{ fontFamily: "'Barlow Semi Condensed', sans-serif", color: '#6B5E56' }}>Rejected</span>
-                        </div>
-                      )}
                     </div>
                   )
                 })}

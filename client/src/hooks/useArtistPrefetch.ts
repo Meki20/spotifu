@@ -2,7 +2,7 @@ import { useCallback, useRef } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { useAuthStore } from '../stores/authStore'
 import { effectivePrefetch, usePrefetchSettingsStore } from '../stores/prefetchSettingsStore'
-import { API } from '../api'
+import { getApi } from '../api'
 
 const DEFAULT_DRAIN_MS = 280
 const PREFETCH_ALBUM_BATCH = 4
@@ -60,7 +60,7 @@ export function useArtistPrefetch(options?: ArtistPrefetchOptions) {
           const chunk = rest.slice(0, PREFETCH_ALBUM_BATCH)
           rest = rest.slice(PREFETCH_ALBUM_BATCH)
           try {
-            const r = await fetch(`${API}/prefetch/artist`, {
+            const r = await fetch(`${getApi()}/prefetch/artist`, {
               method: 'POST',
               headers: {
                 'Content-Type': 'application/json',
@@ -105,7 +105,7 @@ export function useArtistPrefetch(options?: ArtistPrefetchOptions) {
         void queryClient.prefetchQuery({
           queryKey: ['artist', artistId],
           queryFn: () =>
-            fetch(`${API}/artist/${artistId}`, {
+            fetch(`${getApi()}/artist/${artistId}`, {
               headers: token ? { Authorization: `Bearer ${token}` } : {},
             }).then((r) => {
               if (!r.ok) throw new Error('Failed')
@@ -117,7 +117,7 @@ export function useArtistPrefetch(options?: ArtistPrefetchOptions) {
         void queryClient.prefetchQuery({
           queryKey: ['artist-albums', artistId],
           queryFn: (): Promise<{ albums: unknown[] }> =>
-            fetch(`${API}/artist/${artistId}/albums`, {
+            fetch(`${getApi()}/artist/${artistId}/albums`, {
               headers: token ? { Authorization: `Bearer ${token}` } : {},
             }).then((r) => (r.ok ? r.json() : { albums: [] })),
           staleTime: Infinity,

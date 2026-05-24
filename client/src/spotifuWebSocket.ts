@@ -1,21 +1,14 @@
 /** Single shared WebSocket to the API; components subscribe with callbacks. */
-import { API } from './api'
-
-function resolveWsUrl(): string {
-  const override = import.meta.env.VITE_WS_URL
-  if (override) return override
-  return API.replace(/^http/, 'ws') + '/ws'
-}
-
-const WS_URL = resolveWsUrl()
+import { getWsUrl } from './config/resolveApi'
+import { useConnectionStore } from './config/connectionStore'
+import { useAuthStore } from './stores/authStore'
 
 export type SpotifuWsMessage = {
   type?: string
   [key: string]: unknown
 }
 
-// Internal reconnect event — emitted after ws reconnection so subscribers can refetch state
-export const WS_RECONNECT = "spotifu:reconnect"
+export const WS_RECONNECT = 'spotifu:reconnect'
 
 type Listener = (msg: SpotifuWsMessage) => void
 
@@ -30,7 +23,14 @@ const listeners = new Set<Listener>()
 const PING_MS = 30_000
 const PONG_TIMEOUT_MS = 60_000
 
-// Exponential backoff: 1, 2, 4, 8, 16, 30s cap + jitter; nextBackoffAttempt reset on open
+function buildWsUrl(): string {
+  const base = getWsUrl()
+  const token = useAuthStore.getState().token
+  if (!token) return base
+  const sep = base.includes('?') ? '&' : '?'
+  return `${base}${sep}token=${encodeURIComponent(token)}`
+}
+
 function getBackoffDelay(attempt: number): number {
   const base = Math.min(30, 2 ** attempt) * 1000
   return base + Math.random() * 1000
@@ -91,7 +91,11 @@ function connect() {
   ) {
     return
   }
-  socket = new WebSocket(WS_URL)
+
+  const token = useAuthStore.getState().token
+  if (!token) return
+
+  socket = new WebSocket(buildWsUrl())
 
   socket.onmessage = (event) => {
     const raw = event.data as string
@@ -106,7 +110,6 @@ function connect() {
     } catch {
       return
     }
-    // Any well-formed server JSON counts as liveness after a ping
     pingOutstanding = false
     clearPongWatchdog()
     if (data.type === 'pong') {
@@ -146,10 +149,31 @@ function connect() {
   }
 }
 
-/**
- * Register a handler for all WS JSON messages. Returns unsubscribe.
- * First subscriber opens the socket; reconnects automatically if the server drops.
- */
+export function reconnectWebSocket() {
+  if (socket) {
+    socket.close()
+    socket = null
+  }
+  if (reconnectTimer != null) {
+    clearTimeout(reconnectTimer)
+    reconnectTimer = null
+  }
+  nextBackoffAttempt = 0
+  connect()
+}
+
+useConnectionStore.subscribe((state, prev) => {
+  if (state.apiBaseUrl !== prev.apiBaseUrl) {
+    reconnectWebSocket()
+  }
+})
+
+useAuthStore.subscribe((state, prev) => {
+  if (state.token !== prev.token) {
+    reconnectWebSocket()
+  }
+})
+
 export function subscribeSpotifuWebSocket(listener: Listener): () => void {
   listeners.add(listener)
   connect()

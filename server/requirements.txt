@@ -18,3 +18,4 @@ slowapi>=0.1.9
 apscheduler>=3.10.0
 Pillow>=10.0.0
 numpy>=1.26.0
+zeroconf>=0.132.0

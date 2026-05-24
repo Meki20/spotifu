@@ -3,15 +3,17 @@ from contextlib import asynccontextmanager
 import asyncio
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.cron import CronTrigger
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect, HTTPException, Request
+from fastapi import FastAPI, WebSocket, WebSocketDisconnect, HTTPException, Request, Query
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
+from jose import JWTError
 import os
 import logging
 from database import create_db, engine
 from limiter import limiter
+from auth import decode_access_token
 
 default_level = os.environ.get("LOG_LEVEL", "INFO").upper()
 logging.basicConfig(
@@ -37,7 +39,15 @@ from routers import (auth_router, search_router, play_router, stream_router,
 
 logger = logging.getLogger(__name__)
 
-ALLOWED_ORIGINS = ["*"]
+
+def _parse_allowed_origins() -> list[str]:
+    raw = os.environ.get("ALLOWED_ORIGINS", "*").strip()
+    if not raw or raw == "*":
+        return ["*"]
+    return [o.strip() for o in raw.split(",") if o.strip()]
+
+
+ALLOWED_ORIGINS = _parse_allowed_origins()
 
 
 class ConnectionManager:
@@ -134,31 +144,43 @@ def run_weekly_autoplaylist_generation():
 async def lifespan(app: FastAPI):
     await asyncio.to_thread(create_db)
 
-    def _loop_exception_handler(loop, context):
-        exc = context.get("exception")
-        if exc is not None:
-            try:
-                from aioslsk.exceptions import ConnectionFailedError, PeerConnectionError
-                if isinstance(exc, (ConnectionFailedError, PeerConnectionError)):
-                    logger.debug("slsk peer connection failed (expected): %s", exc)
-                    return
-            except ImportError:
-                pass
-        loop.default_exception_handler(context)
+    _testing = os.environ.get("SPOTIFU_TESTING", "").strip().lower() in ("1", "true", "yes")
 
-    asyncio.get_event_loop().set_exception_handler(_loop_exception_handler)
+    if not _testing:
+        def _loop_exception_handler(loop, context):
+            exc = context.get("exception")
+            if exc is not None:
+                try:
+                    from aioslsk.exceptions import ConnectionFailedError, PeerConnectionError
+                    if isinstance(exc, (ConnectionFailedError, PeerConnectionError)):
+                        logger.debug("slsk peer connection failed (expected): %s", exc)
+                        return
+                except ImportError:
+                    pass
+            loop.default_exception_handler(context)
 
-    scheduler.add_job(
-        run_weekly_autoplaylist_generation,
-        CronTrigger(day_of_week="mon", hour=0, minute=1),
-        id="weekly_hottest_tracks"
-    )
-    scheduler.start()
-    logger.info("Scheduler started for weekly auto-playlist generation")
+        asyncio.get_event_loop().set_exception_handler(_loop_exception_handler)
+
+        scheduler.add_job(
+            run_weekly_autoplaylist_generation,
+            CronTrigger(day_of_week="mon", hour=0, minute=1),
+            id="weekly_hottest_tracks",
+            replace_existing=True,
+        )
+        if not scheduler.running:
+            scheduler.start()
+        logger.info("Scheduler started for weekly auto-playlist generation")
+
+        from services import mdns
+        await asyncio.to_thread(mdns.start_mdns)
 
     try:
         yield
     finally:
+        if _testing:
+            return
+        from services import mdns
+        await asyncio.to_thread(mdns.stop_mdns)
         from services import soulseek
         from services.providers._http import aclose_all as _http_aclose_all
         await soulseek.stop_client()
@@ -235,7 +257,19 @@ app.include_router(auto_playlists_router)
 
 
 @app.websocket("/ws")
-async def websocket_endpoint(ws: WebSocket):
+async def websocket_endpoint(ws: WebSocket, token: str | None = Query(None)):
+    if not token:
+        await ws.close(code=1008, reason="Authentication required")
+        return
+    try:
+        payload = decode_access_token(token)
+    except JWTError:
+        await ws.close(code=1008, reason="Invalid token")
+        return
+    if not payload.get("sub"):
+        await ws.close(code=1008, reason="Invalid token")
+        return
+
     await ws_manager.connect(ws)
     try:
         while True:

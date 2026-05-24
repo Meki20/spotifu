@@ -1095,9 +1095,7 @@ async def release_search_tracks_loose(lucene_query: str, *, limit: int = 10) -> 
 
 
 async def raw_search(lucene_query: str, limit: int = 20) -> list[dict[str, Any]]:
-    results = await recording_search(lucene_query, limit)
-    await _hydrate_release_covers(results, size=CAA_SIZE_LIST)
-    return results
+    return await recording_search(lucene_query, limit)
 
 
 async def search(query: str, artist: str | None = None) -> list[dict[str, Any]]:
@@ -1109,9 +1107,7 @@ async def search(query: str, artist: str | None = None) -> list[dict[str, Any]]:
         lucene_query = f'recording:"{clean_title}" AND artist:"{artist}"'
     else:
         lucene_query = f'recording:{clean_title}'
-    results = await _search_releases_for_track(lucene_query)
-    await _hydrate_release_covers(results, size=CAA_SIZE_LIST)
-    return results
+    return await _search_releases_for_track(lucene_query)
 
 
 def _lucene_escape_phrase(s: str) -> str:

@@ -1,9 +1,10 @@
 from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel
 import logging
+import os
 
 logger = logging.getLogger(__name__)
-from sqlmodel import Session
+from sqlmodel import Session, func, select
 from database import get_session
 from limiter import limiter
 from models import User
@@ -12,6 +13,16 @@ from auth import hash_password, verify_password, create_access_token, ACCESS_TOK
 REMEMBER_ME_MINUTES = 30 * 24 * 60
 
 router = APIRouter(prefix="/auth", tags=["auth"])
+
+
+def _registration_allowed(session: Session) -> bool:
+    val = os.environ.get("ALLOW_REGISTRATION", "true").strip().lower()
+    if val not in ("0", "false", "no", "off"):
+        return True
+    user_count = session.exec(select(func.count()).select_from(User)).one()
+    if isinstance(user_count, tuple):
+        user_count = user_count[0]
+    return user_count == 0
 
 
 class RegisterRequest(BaseModel):
@@ -37,13 +48,16 @@ def register(
     body: RegisterRequest,
     session: Session = Depends(get_session),
 ):
-    from sqlmodel import func, select
+    if not _registration_allowed(session):
+        raise HTTPException(status_code=403, detail="Registration is disabled")
 
     existing = session.query(User).filter(User.username == body.username).first()
     if existing:
         raise HTTPException(status_code=400, detail="Username already taken")
 
     admin_count = session.exec(select(func.count()).select_from(User).where(User.is_admin == True)).one()
+    if isinstance(admin_count, tuple):
+        admin_count = admin_count[0]
     is_first_user = admin_count == 0
 
     user = User(

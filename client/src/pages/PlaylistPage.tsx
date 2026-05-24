@@ -97,6 +97,15 @@ export default function PlaylistPage() {
     enabled: Number.isFinite(id) && id > 0,
   })
 
+  useEffect(() => {
+    const items = playlist?.items
+    if (!items?.length) return
+    const mbids = items
+      .map((item) => (item.mb_recording_id || '').trim())
+      .filter(Boolean)
+    if (mbids.length) coverManager.prime(mbids, 'playlist')
+  }, [playlist?.items])
+
   const renameMutation = useMutation({
     mutationFn: () =>
       updatePlaylist(id, {

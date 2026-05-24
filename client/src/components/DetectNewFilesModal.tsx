@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { X, ChevronLeft, Check, XCircle, Loader2 } from 'lucide-react'
 import { authFetch } from '../api'
+import { queryClient } from '../queryClient'
 
 interface LocalFileInfo {
   path: string
@@ -34,6 +35,9 @@ export default function DetectNewFilesModal({ open, onClose }: Props) {
   const [editForm, setEditForm] = useState({ title: '', artist: '', album: '' })
   const [applyResults, setApplyResults] = useState<{ accepted: number; rejected: number; results: any[] } | null>(null)
   const [applying, setApplying] = useState(false)
+  const [exiting, setExiting] = useState<Record<number, 'accept' | 'reject'>>({})
+
+  const EXIT_MS = 260
 
   useEffect(() => {
     if (open) {
@@ -42,6 +46,7 @@ export default function DetectNewFilesModal({ open, onClose }: Props) {
       setSelected(new Set())
       setExtractedTracks([])
       setDecisions({})
+      setExiting({})
       setApplyResults(null)
       scanFiles()
     }
@@ -110,12 +115,33 @@ export default function DetectNewFilesModal({ open, onClose }: Props) {
     }
   }
 
+  function decideTrack(track: ExtractedTrack, action: 'accept' | 'reject') {
+    const id = track.track_id
+    if (decisions[id] || exiting[id]) return
+    setExiting((e) => ({ ...e, [id]: action }))
+    window.setTimeout(() => {
+      setDecisions((d) => ({ ...d, [id]: action }))
+      setExiting((e) => {
+        const next = { ...e }
+        delete next[id]
+        return next
+      })
+    }, EXIT_MS)
+  }
+
   function acceptTrack(track: ExtractedTrack) {
-    setDecisions((d) => ({ ...d, [track.track_id]: 'accept' }))
+    decideTrack(track, 'accept')
   }
 
   function rejectTrack(track: ExtractedTrack) {
-    setDecisions((d) => ({ ...d, [track.track_id]: 'reject' }))
+    decideTrack(track, 'reject')
+  }
+
+  function acceptAllPending() {
+    const pending = extractedTracks.filter((t) => !decisions[t.track_id] && !exiting[t.track_id])
+    pending.forEach((track, i) => {
+      window.setTimeout(() => decideTrack(track, 'accept'), i * 35)
+    })
   }
 
   function startEdit(track: ExtractedTrack) {
@@ -135,8 +161,8 @@ export default function DetectNewFilesModal({ open, onClose }: Props) {
           : t
       )
     )
-    setDecisions((d) => ({ ...d, [track.track_id]: 'accept' }))
     setEditingId(null)
+    decideTrack(track, 'accept')
   }
 
   async function applyDecisions() {
@@ -159,6 +185,7 @@ export default function DetectNewFilesModal({ open, onClose }: Props) {
 
       const data = await res.json()
       setApplyResults(data)
+      queryClient.invalidateQueries({ queryKey: ['recently-downloaded'] })
       setPage(3)
     } catch (err) {
       console.error(err)
@@ -170,7 +197,10 @@ export default function DetectNewFilesModal({ open, onClose }: Props) {
 
   const acceptedCount = Object.values(decisions).filter((d) => d === 'accept').length
   const rejectedCount = Object.values(decisions).filter((d) => d === 'reject').length
-  const pendingCount = extractedTracks.length - acceptedCount - rejectedCount
+  const pendingCount = extractedTracks.filter(
+    (t) => !decisions[t.track_id] && !exiting[t.track_id],
+  ).length
+  const visibleReviewTracks = extractedTracks.filter((t) => !decisions[t.track_id])
 
   function formatSize(bytes: number) {
     if (bytes < 1024) return bytes + ' B'
@@ -336,7 +366,7 @@ export default function DetectNewFilesModal({ open, onClose }: Props) {
 
           {page === 2 && (
             <>
-              <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center justify-between mb-4 gap-2 flex-wrap">
                 <button
                   onClick={() => setPage(1)}
                   className="flex items-center gap-1 px-3 py-1.5 text-sm border rounded"
@@ -345,7 +375,24 @@ export default function DetectNewFilesModal({ open, onClose }: Props) {
                   <ChevronLeft size={16} />
                   Back
                 </button>
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 flex-wrap">
+                  {pendingCount > 0 && !importing && (
+                    <button
+                      type="button"
+                      onClick={acceptAllPending}
+                      className="px-3 py-1.5 text-xs font-semibold border rounded"
+                      style={{
+                        fontFamily: "'Barlow Condensed', sans-serif",
+                        textTransform: 'uppercase',
+                        letterSpacing: '0.05em',
+                        color: '#E8DDD0',
+                        background: '#b4003e',
+                        borderColor: '#b4003e',
+                      }}
+                    >
+                      Accept All ({pendingCount})
+                    </button>
+                  )}
                   {importing && (
                     <div className="flex items-center gap-2" style={{ color: '#b4003e' }}>
                       <Loader2 className="animate-spin" size={16} />
@@ -360,17 +407,29 @@ export default function DetectNewFilesModal({ open, onClose }: Props) {
                 </div>
               </div>
 
-              <div className="space-y-4 mb-6 max-h-96 overflow-y-auto">
-                {extractedTracks.map((track) => {
-                  const decision = decisions[track.track_id]
+              <div className="space-y-4 mb-6 max-h-96 overflow-x-hidden overflow-y-auto">
+                {visibleReviewTracks.length === 0 && !importing && pendingCount === 0 && extractedTracks.length > 0 && (
+                  <p className="text-sm py-6 text-center" style={{ fontFamily: "'Barlow Semi Condensed', sans-serif", color: '#9A8E84' }}>
+                    All tracks reviewed — apply when ready.
+                  </p>
+                )}
+                {visibleReviewTracks.map((track) => {
+                  const exitAction = exiting[track.track_id]
                   return (
                     <div
                       key={track.track_id}
                       className="p-4 rounded"
                       style={{
-                        background: decision === 'accept' ? 'rgba(180, 0, 62, 0.1)' : decision === 'reject' ? 'rgba(61, 40, 32, 0.5)' : '#231815',
-                        border: `1px solid ${decision === 'accept' ? 'rgba(180, 0, 62, 0.3)' : decision === 'reject' ? '#3D2820' : '#3D2820'}`,
-                        opacity: decision === 'reject' ? 0.5 : 1,
+                        background: '#231815',
+                        border: '1px solid #3D2820',
+                        transform: exitAction ? 'translateX(110%)' : 'translateX(0)',
+                        opacity: exitAction ? 0 : 1,
+                        maxHeight: exitAction ? 0 : 600,
+                        marginBottom: exitAction ? 0 : undefined,
+                        paddingTop: exitAction ? 0 : undefined,
+                        paddingBottom: exitAction ? 0 : undefined,
+                        overflow: 'hidden',
+                        transition: `transform ${EXIT_MS}ms ease-in, opacity ${EXIT_MS}ms ease-in, max-height ${EXIT_MS}ms ease-in, margin ${EXIT_MS}ms ease-in, padding ${EXIT_MS}ms ease-in`,
                       }}
                     >
                       <div className="flex items-start justify-between gap-4">
@@ -401,7 +460,7 @@ export default function DetectNewFilesModal({ open, onClose }: Props) {
                         </div>
                       </div>
 
-                      {!decision && (
+                      {!exitAction && (
                         <div className="flex items-center gap-2 mt-3">
                           <button
                             onClick={() => acceptTrack(track)}
@@ -492,18 +551,6 @@ export default function DetectNewFilesModal({ open, onClose }: Props) {
                         </div>
                       )}
 
-                      {decision === 'accept' && (
-                        <div className="flex items-center gap-1 mt-3" style={{ color: '#b4003e' }}>
-                          <Check size={14} />
-                          <span className="text-xs" style={{ fontFamily: "'Barlow Semi Condensed', sans-serif", color: '#b4003e' }}>Accepted</span>
-                        </div>
-                      )}
-                      {decision === 'reject' && (
-                        <div className="flex items-center gap-1 mt-3" style={{ color: '#6B5E56' }}>
-                          <XCircle size={14} />
-                          <span className="text-xs" style={{ fontFamily: "'Barlow Semi Condensed', sans-serif", color: '#6B5E56' }}>Rejected</span>
-                        </div>
-                      )}
                     </div>
                   )
                 })}
@@ -517,16 +564,16 @@ export default function DetectNewFilesModal({ open, onClose }: Props) {
                 </p>
                 <button
                   onClick={applyDecisions}
-                  disabled={pendingCount > 0 || applying}
+                  disabled={pendingCount > 0 || Object.keys(exiting).length > 0 || applying}
                   className="px-6 py-2 text-sm font-semibold rounded transition-colors"
                   style={{
                     fontFamily: "'Barlow Condensed', sans-serif",
                     fontWeight: 600,
                     textTransform: 'uppercase',
                     letterSpacing: '0.05em',
-                    background: pendingCount > 0 ? '#3D2820' : '#b4003e',
-                    color: pendingCount > 0 ? '#6B5E56' : '#E8DDD0',
-                    cursor: pendingCount > 0 ? 'not-allowed' : 'pointer',
+                    background: pendingCount > 0 || Object.keys(exiting).length > 0 ? '#3D2820' : '#b4003e',
+                    color: pendingCount > 0 || Object.keys(exiting).length > 0 ? '#6B5E56' : '#E8DDD0',
+                    cursor: pendingCount > 0 || Object.keys(exiting).length > 0 ? 'not-allowed' : 'pointer',
                   }}
                 >
                   {applying ? (
@@ -534,8 +581,8 @@ export default function DetectNewFilesModal({ open, onClose }: Props) {
                       <Loader2 className="animate-spin" size={16} />
                       Applying...
                     </span>
-                  ) : pendingCount > 0 ? (
-                    `Decide on all first (${pendingCount} pending)`
+                  ) : pendingCount > 0 || Object.keys(exiting).length > 0 ? (
+                    `Decide on all first (${pendingCount + Object.keys(exiting).length} pending)`
                   ) : (
                     'Apply & Close'
                   )}

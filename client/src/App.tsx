@@ -11,6 +11,7 @@ import { lazy, Suspense } from 'react'
 import RouteErrorBoundary from './components/RouteErrorBoundary'
 import { PollyLoading } from './components/PollyLoading'
 import ArtistTransitionOverlay from './components/ArtistTransitionOverlay'
+import RequireServerConnection from './components/RequireServerConnection'
 
 const Home = lazy(() => import('./pages/Home'))
 const Search = lazy(() => import('./pages/Search'))
@@ -66,9 +67,11 @@ function App() {
     <QueryClientProvider client={queryClient}>
       <ContextMenuProvider>
         <BrowserRouter>
-          <ContextMenuLayer />
-          <AppContent />
-          <ArtistTransitionOverlay />
+          <RequireServerConnection>
+            <ContextMenuLayer />
+            <AppContent />
+            <ArtistTransitionOverlay />
+          </RequireServerConnection>
         </BrowserRouter>
       </ContextMenuProvider>
     </QueryClientProvider>

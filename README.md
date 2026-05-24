@@ -20,15 +20,32 @@ Soulseek music player with Spotify-like UI. Search and stream music from the Sou
 
 ## Quick Start
 
-### One-command startup (everything in Docker)
+### Docker — server only
+
+Starts PostgreSQL and the API (port 1985). The web UI is not included in this profile.
 
 ```bash
-docker compose up -d
+cp .env.example .env
+cp .secrets.example .secrets   # add Soulseek credentials
+sudo docker compose up -d --build
 ```
 
-Access:
-- App: http://localhost:1984
+**Important:** run with `--build` after pulling code changes so the server image matches the client.
+
+API: http://localhost:1985
+
+### Docker — full stack (server + web UI)
+
+```bash
+sudo docker compose --profile full up -d --build
+```
+
+- Web UI: http://localhost:1984
 - API: http://localhost:1985
+
+Clients discover the server on the LAN via mDNS (`spotifu.local`) or a manual URL in Settings — no rebuild needed when pointing at a remote server.
+
+See [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) for LAN setup, env vars, and desktop builds.
 
 ### Stop
 
@@ -136,10 +153,16 @@ docker compose up -d
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `DATABASE_URL` | `postgresql://spotifu:spotifu@localhost:5432/spotifu` | PostgreSQL connection string |
+| `CACHE_DIR` | repo `cache/` | Download and cover storage |
+| `API_BASE_URL` | `http://localhost:1985` | Public URL for cover/stream links |
+| `JWT_SECRET` | — | JWT signing secret (≥32 chars) |
 | `SOULSEEK_USERNAME` | — | Soulseek username |
 | `SOULSEEK_PASSWORD` | — | Soulseek password |
 | `SECRETS_FILE` | `.secrets` | Path to secrets file (Docker: `/app/.secrets`) |
-| `VITE_API_URL` | `http://localhost:1985` | Client → server base URL |
+| `MDNS_ENABLED` | on bare metal / off in Docker | LAN service discovery |
+| `ALLOWED_ORIGINS` | `*` | Comma-separated CORS origins |
+| `ALLOW_REGISTRATION` | `true` | Set `false` to disable signup after first user |
+| `VITE_API_URL` | `http://localhost:1985` | Optional client build-time API seed |
 
 **Docker**: Create a `.env` file in the project root:
 ```bash

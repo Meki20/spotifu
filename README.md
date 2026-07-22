@@ -13,10 +13,10 @@ Requirements: **Docker** (with the `compose` plugin) and **Git**.
 ```bash
 git clone https://github.com/<org>/SpotiFU.git
 cd SpotiFU
-bash scripts/install.sh
+bash scripts/deploy.sh
 ```
 
-`scripts/install.sh` runs two steps:
+`scripts/deploy.sh` runs two steps:
 
 1. **Wizard** — prompts for Soulseek credentials (and optionally Last.fm / fanart.tv API keys) and writes `./.secrets`. Auto-generates a JWT signing secret.
 2. **Up** — starts PostgreSQL + the API container via `docker compose up -d --build`.
@@ -57,10 +57,10 @@ Soulseek connectivity: `docker compose logs server | grep -i soulseek`. The wiza
 ## Stop / restart
 
 ```bash
-bash scripts/install.sh down    # stop, keep volumes
-bash scripts/install.sh up      # restart
-bash scripts/install.sh reset   # stop AND delete volumes (DB + cache)
-bash scripts/install.sh logs    # tail server logs
+bash scripts/deploy.sh down    # stop, keep volumes
+bash scripts/deploy.sh up      # restart
+bash scripts/deploy.sh reset   # stop AND delete volumes (DB + cache)
+bash scripts/deploy.sh logs    # tail server logs
 ```
 
 ## Re-running the wizard
@@ -68,7 +68,7 @@ bash scripts/install.sh logs    # tail server logs
 The wizard pre-fills from any existing `.secrets`, so re-running only changes fields you edit:
 
 ```bash
-bash scripts/install.sh wizard
+bash scripts/deploy.sh wizard
 ```
 
 ## Architecture (high-level)
@@ -119,7 +119,7 @@ If you previously had SpotiFU running with a root-owned `spotifu_spotifu-cache` 
 
 ```bash
 docker run --rm -v spotifu_spotifu-cache:/cache alpine chown -R 1000:1000 /cache
-bash scripts/install.sh up
+bash scripts/deploy.sh up
 ```
 
 The wizard also detects pre-existing `.secrets` and pre-fills prompts from it.
@@ -145,7 +145,7 @@ The wizard also detects pre-existing `.secrets` and pre-fills prompts from it.
 
 ### "Wizard says .secrets is invalid"
 
-Re-run: `bash scripts/install.sh wizard`. It reads the current `.secrets` and only re-prompts fields that fail validation.
+Re-run: `bash scripts/deploy.sh wizard`. It reads the current `.secrets` and only re-prompts fields that fail validation.
 
 ### "Server keeps restarting / Soulseek won't connect"
 

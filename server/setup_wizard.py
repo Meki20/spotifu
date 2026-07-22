@@ -207,7 +207,7 @@ def _wizard() -> int:
     _atomic_write(data)
     print()
     print(f"[setup] wrote {SECRETS_PATH} (mode 0600).")
-    print("[setup] run `bash scripts/install.sh up` (or `docker compose up -d --build`) to start.")
+    print("[setup] run `bash scripts/deploy.sh up` (or `bash scripts/deploy.sh dev` for live-reload) to start.")
     return 0
 
 

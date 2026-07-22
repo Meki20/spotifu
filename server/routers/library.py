@@ -339,6 +339,7 @@ async def list_library_albums(
         if not cover:
             cover = lookup_cached_cover_best_effort(
                 session,
+                recording_id=None,
                 release_id=str(data.get("mbid") or mb_id).strip() or None,
                 release_group_id=str(rg_id).strip() if rg_id else None,
             )

@@ -30,6 +30,7 @@ async def get_album(
         rel_id = data.get("mbid")
         cached = lookup_cached_cover_best_effort(
             session,
+            recording_id=None,
             release_id=str(rel_id).strip() if rel_id else None,
             release_group_id=str(rg_id).strip() if rg_id else None,
         )

@@ -2,7 +2,7 @@ import { useShallow } from 'zustand/react/shallow'
 import { usePlayerStore, type PlayerState } from '../stores/playerStore'
 import { seekAudio } from '../hooks/useAudioPlayer'
 import * as controller from '../playback/controller'
-import { useState, useRef, useEffect } from 'react'
+import { useState, useRef, useEffect, useLayoutEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
   Play, Pause, SkipBack, SkipForward, Volume2, VolumeX,
@@ -57,20 +57,51 @@ export default function PlayerBar() {
     })),
   )
   const [contextMenu, setContextMenu] = useState<ContextMenu | null>(null)
+  const [contextMenuPos, setContextMenuPos] = useState<{ left: number; top: number } | null>(null)
+  const contextMenuRef = useRef<HTMLDivElement>(null)
   const [addPlOpen, setAddPlOpen] = useState(false)
   const [addPlTrack, setAddPlTrack] = useState<AddToPlaylistTrack | null>(null)
   const [liked, setLiked] = useState(false)
+  const [isDragging, setIsDragging] = useState(false)
+  const [dragProgress, setDragProgress] = useState(0)
   const progressRef = useRef<HTMLDivElement>(null)
+  const progressHitboxRef = useRef<HTMLDivElement>(null)
   const { downloadStates } = useDownloadStates()
   const trackMbId = currentTrack?.mb_id
   const { url: lazyCover } = useCover(trackMbId, 'viewport')
   const playerCover = currentTrack?.album_cover || lazyCover
 
   useEffect(() => {
-    if (!contextMenu) return
+    if (!contextMenu) {
+      setContextMenuPos(null)
+      return
+    }
     const handler = () => setContextMenu(null)
     document.addEventListener('mousedown', handler)
     return () => document.removeEventListener('mousedown', handler)
+  }, [contextMenu])
+
+  useLayoutEffect(() => {
+    if (!contextMenu || !contextMenuRef.current) {
+      setContextMenuPos(null)
+      return
+    }
+    const el = contextMenuRef.current
+    const rect = el.getBoundingClientRect()
+    const margin = 8
+    const vw = window.innerWidth
+    const vh = window.innerHeight
+
+    let left = contextMenu.x
+    let top = contextMenu.y
+
+    if (top + rect.height > vh - margin) top = contextMenu.y - rect.height
+    if (left + rect.width > vw - margin) left = vw - rect.width - margin
+    if (left < margin) left = margin
+    if (top + rect.height > vh - margin) top = vh - rect.height - margin
+    if (top < margin) top = margin
+
+    setContextMenuPos({ left, top })
   }, [contextMenu])
 
   const progress = duration > 0 ? (currentTime / duration) * 100 : 0
@@ -82,12 +113,36 @@ export default function PlayerBar() {
 
   const seekBlocked = phase === 'idle' || phase === 'resolving' || phase === 'waiting_for_bytes'
 
-  const handleProgressClick = (e: React.MouseEvent<HTMLDivElement>) => {
-    if (!progressRef.current || seekBlocked) return
+  const calcProgressFromEvent = (e: React.MouseEvent | MouseEvent) => {
+    if (!progressRef.current) return 0
     const rect = progressRef.current.getBoundingClientRect()
-    const pct = (e.clientX - rect.left) / rect.width
-    seekAudio(pct * duration)
+    return Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width))
   }
+
+  const handleBarMouseDown = (e: React.MouseEvent) => {
+    if (seekBlocked) return
+    setIsDragging(true)
+    setDragProgress(calcProgressFromEvent(e))
+  }
+
+  useEffect(() => {
+    if (!isDragging) return
+    const handleMouseMove = (e: MouseEvent) => {
+      setDragProgress(calcProgressFromEvent(e))
+    }
+    const handleMouseUp = (e: MouseEvent) => {
+      seekAudio(calcProgressFromEvent(e) * duration)
+      setIsDragging(false)
+    }
+    document.addEventListener('mousemove', handleMouseMove)
+    document.addEventListener('mouseup', handleMouseUp)
+    return () => {
+      document.removeEventListener('mousemove', handleMouseMove)
+      document.removeEventListener('mouseup', handleMouseUp)
+    }
+  }, [isDragging, duration])
+
+  const displayProgress = isDragging ? dragProgress * 100 : progress
 
   const handleContextMenu = (e: React.MouseEvent, track: typeof currentTrack) => {
     e.preventDefault()
@@ -317,43 +372,53 @@ export default function PlayerBar() {
             </span>
             <div
               ref={progressRef}
-              className="flex-1 h-0.5 relative cursor-pointer group"
-              style={{ background: 'var(--bg-surface)', borderRadius: 1 }}
-              onClick={handleProgressClick}
+              className="flex-1 relative cursor-pointer group"
+              style={{ height: '20px' }}
             >
-              {/* Fill */}
               <div
-                className="absolute left-0 top-0 h-full rounded"
-                style={{
-                  width: `${progress}%`,
-                  background: 'var(--bg-surface)',
-                  boxShadow: '0 0 6px rgba(139, 42, 26, 0.5)',
-                }}
+                ref={progressHitboxRef}
+                className="absolute inset-0 cursor-pointer"
+                onMouseDown={handleBarMouseDown}
               />
-              {/* Buffering */}
-              {isBuffering && (
-                <div className="absolute top-0 left-0 h-full overflow-hidden w-full">
-                  <div
-                    className="h-full"
-                    style={{
-                      animation: 'shimmerSlide 1.2s ease-in-out infinite',
-                      background: 'var(--bg-surface)',
-                      width: '33%',
-                    }}
-                  />
-                </div>
-              )}
-              {/* Handle */}
-              {!seekBlocked && (
+              <div
+                className="absolute inset-x-0 top-1/2 -translate-y-1/2 h-0.5 pointer-events-none rounded"
+                style={{ background: 'var(--bg-surface)' }}
+              >
+                {/* Fill */}
                 <div
-                  className="absolute top-1/2 -translate-y-1/2 w-2 h-2 rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
+                  className="absolute left-0 top-0 h-full rounded"
                   style={{
-                    background: 'var(--bg-surface)',
-                    left: `calc(${progress}% - 4px)`,
-                    boxShadow: '0 0 6px rgba(139, 42, 26, 0.7)',
+                    width: `${displayProgress}%`,
+                    background: 'var(--accent)',
+                    boxShadow: '0 0 6px rgba(139, 42, 26, 0.5)',
                   }}
                 />
-              )}
+                {/* Buffering */}
+                {isBuffering && (
+                  <div className="absolute top-0 left-0 h-full overflow-hidden w-full">
+                    <div
+                      className="h-full"
+                      style={{
+                        animation: 'shimmerSlide 1.2s ease-in-out infinite',
+                        background: 'var(--accent)',
+                        width: '33%',
+                        opacity: 0.5,
+                      }}
+                    />
+                  </div>
+                )}
+                {/* Handle */}
+                {!seekBlocked && (
+                  <div
+                    className="absolute top-1/2 -translate-y-1/2 w-2.5 h-2.5 rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
+                    style={{
+                      background: 'var(--accent)',
+                      left: `calc(${displayProgress}% - 5px)`,
+                      boxShadow: '0 0 6px rgba(139, 42, 26, 0.7)',
+                    }}
+                  />
+                )}
+              </div>
             </div>
             <span
               className="text-sm w-10"
@@ -405,10 +470,11 @@ export default function PlayerBar() {
       {/* Context Menu */}
       {contextMenu && (
         <div
+          ref={contextMenuRef}
           className="fixed z-[60] min-w-48 py-1 text-sm"
           style={{
-            left: contextMenu.x,
-            top: contextMenu.y,
+            left: contextMenuPos?.left ?? contextMenu.x,
+            top: contextMenuPos?.top ?? contextMenu.y,
             background: 'var(--bg-surface)',
             border: '1px solid var(--border)',
             borderRadius: 4,

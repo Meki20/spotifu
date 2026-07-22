@@ -15,7 +15,7 @@ LAN clients        →  Connect to http://<server-ip>:1985 or via mDNS
 ```bash
 git clone https://github.com/<org>/SpotiFU.git
 cd SpotiFU
-bash scripts/install.sh
+bash scripts/deploy.sh
 ```
 
 This runs the wizard (Soulseek + optional API keys) then `docker compose up -d --build`.
@@ -47,7 +47,7 @@ mDNS note: in default Docker bridge mode, mDNS multicast often doesn't propagate
 | `lastfm_api_key` | optional |
 | `fanarttv_api_key` | optional |
 
-Bind-mounted to `/app/.secrets` in the server container, mode `0600`. Re-run `bash scripts/install.sh wizard` to update.
+Bind-mounted to `/app/.secrets` in the server container, mode `0600`. Re-run `bash scripts/deploy.sh wizard` to update.
 
 ### `.env` (optional host overrides)
 
@@ -66,7 +66,7 @@ Copy `.env.example` to `.env` and uncomment anything you want to override. Commo
 - `spotifu-db` — PostgreSQL data.
 - `spotifu-cache` — downloaded audio, cover art, artist images. Stored under `/data/spotifu/cache` in the container.
 
-Both persist across `docker compose down`. `bash scripts/install.sh reset` removes them.
+Both persist across `docker compose down`. `bash scripts/deploy.sh reset` removes them.
 
 ## Upgrading from an older version
 
@@ -74,7 +74,7 @@ If you previously ran SpotiFU with a root-owned `spotifu-cache` volume (pre-UID-
 
 ```bash
 docker run --rm -v spotifu_spotifu-cache:/cache alpine chown -R 1000:1000 /cache
-bash scripts/install.sh up
+bash scripts/deploy.sh up
 ```
 
 ## Backup
@@ -90,8 +90,8 @@ Terminate TLS with Caddy or nginx in front of the API. Set the client server URL
 
 | Problem | Check |
 |---------|-------|
-| `docker compose ps` shows server unhealthy | `docker compose logs server --tail=200`. Most often: Soulseek login failed. Re-run `bash scripts/install.sh wizard`. |
-| Server won't start: `.secrets invalid` | Run `bash scripts/install.sh wizard` (it pre-fills valid fields and only re-prompts invalid ones). |
+| `docker compose ps` shows server unhealthy | `docker compose logs server --tail=200`. Most often: Soulseek login failed. Re-run `bash scripts/deploy.sh wizard`. |
+| Server won't start: `.secrets invalid` | Run `bash scripts/deploy.sh wizard` (it pre-fills valid fields and only re-prompts invalid ones). |
 | `curl localhost:1985/health/ready` returns 503 | DB unreachable. Check `docker compose ps` for `spotifu-postgres (healthy)`. |
 | Covers/streams use `localhost` URLs | Set `API_BASE_URL` to your LAN IP via override file. |
 | Remote client can't find server | Use manual URL in client Settings → Server connection. mDNS is unreliable in Docker bridge mode. |

@@ -1,6 +1,15 @@
 @import "tailwindcss";
 
-:root {
+/* ────────────────────────────────────────────────────────────────────────────
+   Theme tokens.
+
+   The default theme (no [data-theme]) matches the original Polly dark palette.
+   Other themes set [data-theme="<id>"] on <html> and override these vars.
+   Components should reference these via var(--token) instead of hardcoded hex.
+   ──────────────────────────────────────────────────────────────────────────── */
+
+:root,
+[data-theme="polly-dark"] {
   /* Backgrounds */
   --bg-base: #0C0906;
   --bg-surface: #1A1210;
@@ -9,27 +18,98 @@
 
   /* Borders */
   --border: #3D2820;
-  --border-active: #b4003e;
   --border-subtle: #261A14;
+  --border-active: #b4003e;
 
-  /* Primary accent */
-  --red: #b4003e;
-  --red-bright: #b4003e;
-  --red-muted: #b4003e;
-  --red-faint: #1c000f;
+  /* Primary accent (brand red — Polly) */
+  --accent: #b4003e;
+  --accent-hover: #b4003e;
+  --accent-muted: #b4003e;
+  --accent-faint: #1c000f;
 
   /* Text */
   --text-primary: #E8DDD0;
   --text-secondary: #9A8E84;
   --text-faint: #4A413C;
+  --text-muted: #6B5E56;
 
-  /* Semantic */
+  /* Status colors */
+  --color-success: #8FD4B0;
+  --color-success-strong: #8EC9A0;
+  --color-success-bg: #1A2820;
+  --color-success-border: rgba(80, 180, 120, 0.35);
+  --color-success-border-alt: rgba(101, 163, 13, 0.35);
+  --color-success-glow: rgba(101, 163, 13, 0.6);
+  --color-success-icon-bg: rgba(62, 180, 137, 0.18);
+  --color-success-icon-border: rgba(62, 180, 137, 0.55);
+
+  --color-danger: #b4003e;
+  --color-danger-bg: #281818;
+  --color-danger-border: rgba(196, 48, 48, 0.35);
+  --color-danger-glow: rgba(196, 48, 48, 0.5);
+  --color-danger-faint-bg: rgba(196, 48, 43, 0.15);
+
+  --text-muted-icon-bg: rgba(107, 83, 72, 0.18);
+  --text-muted-icon-border: rgba(107, 83, 72, 0.55);
+
+  /* Overlays */
+  --overlay-dim: rgba(0, 0, 0, 0.55);
+
+  /* Typography */
+  --font-display: 'Barlow Condensed', sans-serif;
+  --font-body: 'Barlow Semi Condensed', sans-serif;
+  --font-mono: 'Barlow Semi Condensed', monospace;
+
+  /* Spotifu helpers (pre-existing semantic aliases) */
   --color-bg: var(--bg-base);
   --color-panel: var(--bg-surface-2);
   --color-card: var(--bg-surface);
-  --color-primary: var(--red);
-  --color-primary-hover: var(--red-bright);
+  --color-primary: var(--accent);
+  --color-primary-hover: var(--accent-hover);
   --color-border: var(--border);
+}
+
+/* ── Light themes ─────────────────────────────────────────────────────────── */
+
+[data-theme="polly-light"] {
+  --bg-base: #F5F0E8;
+  --bg-surface: #FFFFFF;
+  --bg-surface-2: #F0E8DD;
+  --bg-surface-3: #E5DBCB;
+
+  --border: #C9B9A8;
+  --border-subtle: #D9CCBA;
+  --border-active: #8B0030;
+
+  --accent: #8B0030;
+  --accent-hover: #6E0026;
+  --accent-muted: #8B0030;
+  --accent-faint: #F5DCE3;
+
+  --text-primary: #2B1B12;
+  --text-secondary: #6B5E56;
+  --text-faint: #9A8E84;
+  --text-muted: #4A413C;
+
+  --color-success: #1E7A4F;
+  --color-success-strong: #1E7A4F;
+  --color-success-bg: #E1F2E8;
+  --color-success-border: rgba(30, 122, 79, 0.35);
+  --color-success-border-alt: rgba(30, 122, 79, 0.35);
+  --color-success-glow: rgba(30, 122, 79, 0.5);
+  --color-success-icon-bg: rgba(30, 122, 79, 0.15);
+  --color-success-icon-border: rgba(30, 122, 79, 0.5);
+
+  --color-danger: #8B0030;
+  --color-danger-bg: #FAE5E8;
+  --color-danger-border: rgba(139, 0, 48, 0.3);
+  --color-danger-glow: rgba(139, 0, 48, 0.4);
+  --color-danger-faint-bg: rgba(139, 0, 48, 0.1);
+
+  --text-muted-icon-bg: rgba(107, 83, 72, 0.12);
+  --text-muted-icon-border: rgba(107, 83, 72, 0.4);
+
+  --overlay-dim: rgba(43, 27, 18, 0.45);
 }
 
 * {
@@ -45,9 +125,10 @@ html, body, #root {
 body {
   background: var(--bg-base);
   color: var(--text-primary);
-  font-family: 'Barlow Semi Condensed', sans-serif;
+  font-family: var(--font-body);
   font-size: 18px;
   -webkit-font-smoothing: antialiased;
+  transition: background-color 200ms ease, color 200ms ease;
 }
 
 input, button {
@@ -62,7 +143,7 @@ button:focus {
 }
 a:focus-visible,
 button:focus-visible {
-  outline: 2px solid var(--red);
+  outline: 2px solid var(--accent);
   outline-offset: 2px;
 }
 
@@ -84,11 +165,11 @@ button {
   border-radius: 2px;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: var(--red);
+  background: var(--accent);
 }
 
 h1 {
-  font-family: 'Barlow Condensed', sans-serif;
+  font-family: var(--font-display);
   font-weight: 800;
   text-transform: uppercase;
   letter-spacing: 0.04em;
@@ -96,7 +177,7 @@ h1 {
 }
 
 h2, h3 {
-  font-family: 'Barlow Condensed', sans-serif;
+  font-family: var(--font-display);
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.03em;

@@ -12,13 +12,13 @@ function kindIcon(kind: NotificationKind) {
 function kindColors(kind: NotificationKind) {
   switch (kind) {
     case 'success':
-      return { icon: '#22c55e', title: '#E8DDD0' }
+      return { icon: '#22c55e', title: 'var(--text-primary)' }
     case 'warning':
-      return { icon: '#f59e0b', title: '#E8DDD0' }
+      return { icon: '#f59e0b', title: 'var(--text-primary)' }
     case 'error':
-      return { icon: '#ef4444', title: '#E8DDD0' }
+      return { icon: '#ef4444', title: 'var(--text-primary)' }
     default:
-      return { icon: '#b4003e', title: '#E8DDD0' }
+      return { icon: 'var(--text-primary)', title: 'var(--text-primary)' }
   }
 }
 
@@ -36,8 +36,8 @@ function actionStyles(a: NotificationAction) {
       } as const
     default:
       return {
-        background: 'rgba(232, 221, 208, 0.06)',
-        color: '#E8DDD0',
+        background: 'color-mix(in srgb, var(--text-primary) 0.06, transparent)',
+        color: 'var(--text-primary)',
       } as const
   }
 }
@@ -77,7 +77,7 @@ function NotificationToast({ item }: { item: NotificationItem }) {
     <div
       className="relative overflow-hidden rounded-xl"
       style={{
-        background: 'rgba(26,18,16,0.98)',
+        background: 'color-mix(in srgb, var(--bg-surface) 0.98, transparent)',
         border: 'none',
         boxShadow: '0 12px 36px rgba(0,0,0,0.55)',
         transform: leaving ? 'translateY(6px) scale(0.985)' : show ? 'translateY(0) scale(1)' : 'translateY(10px) scale(0.985)',
@@ -138,7 +138,7 @@ function NotificationToast({ item }: { item: NotificationItem }) {
                 className="text-xs mt-1 leading-snug"
                 style={{
                   fontFamily: "'Barlow Semi Condensed', sans-serif",
-                  color: 'rgba(232,221,208,0.72)',
+                  color: 'color-mix(in srgb, var(--text-primary) 0.72, transparent)',
                 }}
               >
                 {item.description}

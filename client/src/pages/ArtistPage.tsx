@@ -19,10 +19,10 @@ import { useContextMenuActions } from '../contexts/ContextMenuProvider'
 
 function AlbumSkeleton() {
   return (
-    <div className="bg-[#181818] p-4 rounded-md animate-pulse shrink-0 w-44">
-      <div className="w-full aspect-square bg-[#282828] rounded-md mb-3" />
-      <div className="h-3 bg-[#282828] rounded mb-2" />
-      <div className="h-2 bg-[#282828] rounded w-2/3" />
+    <div className="bg-[var(--bg-surface)] p-4 rounded-md animate-pulse shrink-0 w-44">
+      <div className="w-full aspect-square bg-[var(--bg-surface-2)] rounded-md mb-3" />
+      <div className="h-3 bg-[var(--bg-surface-2)] rounded mb-2" />
+      <div className="h-2 bg-[var(--bg-surface-2)] rounded w-2/3" />
     </div>
   )
 }
@@ -76,7 +76,7 @@ function ArtistAlbumTile({
   return (
     <div
       ref={rootRef}
-      className={`bg-[#181818] p-4 rounded-md cursor-pointer transition-colors group relative overflow-hidden hover:bg-[#202020] ${narrow ? 'shrink-0 w-44' : ''}`}
+      className={`bg-[var(--bg-surface)] p-4 rounded-md cursor-pointer transition-colors group relative overflow-hidden hover:bg-[var(--bg-surface-2)] ${narrow ? 'shrink-0 w-44' : ''}`}
       onClick={onClick}
     >
       {u && (
@@ -90,7 +90,7 @@ function ArtistAlbumTile({
           }}
         />
       )}
-      <div className="relative z-10 w-full aspect-square rounded-md mb-3 flex items-center justify-center overflow-hidden bg-[#282828]">
+      <div className="relative z-10 w-full aspect-square rounded-md mb-3 flex items-center justify-center overflow-hidden bg-[var(--bg-surface-2)]">
         {u ? (
           <img src={u} alt={album.title} className="w-full h-full object-cover" loading="lazy" />
         ) : (
@@ -98,7 +98,7 @@ function ArtistAlbumTile({
         )}
       </div>
       <p className="relative z-10 font-semibold text-sm truncate text-white">{album.title}</p>
-      <p className="relative z-10 text-xs text-[#b3b3b3] truncate">{album.release_date?.split('-')[0] ?? ''}</p>
+      <p className="relative z-10 text-xs text-[var(--text-secondary)] truncate">{album.release_date?.split('-')[0] ?? ''}</p>
     </div>
   )
 }
@@ -139,10 +139,10 @@ function HorizontalAlbumStrip({
         </button>
         <div className="flex gap-4 overflow-x-auto scrollbar-hide px-10">
           {Array.from({ length: 4 }).map((_, i) => (
-            <div key={i} className="bg-[#181818] p-4 rounded-md animate-pulse shrink-0 w-44">
-              <div className="w-full aspect-square bg-[#282828] rounded-md mb-3" />
-              <div className="h-3 bg-[#282828] rounded mb-2" />
-              <div className="h-2 bg-[#282828] rounded w-2/3" />
+            <div key={i} className="bg-[var(--bg-surface)] p-4 rounded-md animate-pulse shrink-0 w-44">
+              <div className="w-full aspect-square bg-[var(--bg-surface-2)] rounded-md mb-3" />
+              <div className="h-3 bg-[var(--bg-surface-2)] rounded mb-2" />
+              <div className="h-2 bg-[var(--bg-surface-2)] rounded w-2/3" />
             </div>
           ))}
         </div>
@@ -219,12 +219,12 @@ function SingleAlbumRow({
 
   return (
     <div
-      className="grid grid-cols-[auto_1fr_1fr] gap-4 px-4 py-3 hover:bg-[#282828] rounded cursor-pointer group"
+      className="grid grid-cols-[auto_1fr_1fr] gap-4 px-4 py-3 hover:bg-[var(--bg-surface-2)] rounded cursor-pointer group"
       onClick={onNavigate}
     >
       <div className="relative w-8 h-8 shrink-0 flex items-center justify-center">
-        <span className="text-[#b3b3b3] text-sm tabular-nums group-hover:hidden">{index + 1}</span>
-        <span className="absolute inset-0 hidden group-hover:flex items-center justify-center text-[#b4003e]">
+        <span className="text-[var(--text-secondary)] text-sm tabular-nums group-hover:hidden">{index + 1}</span>
+        <span className="absolute inset-0 hidden group-hover:flex items-center justify-center text-[var(--accent)]">
           <Play size={14} fill="currentColor" className="shrink-0" />
         </span>
       </div>
@@ -238,14 +238,14 @@ function SingleAlbumRow({
               loading="lazy"
             />
           ) : (
-            <div className="w-10 h-10 bg-[#282828] rounded flex items-center justify-center">
+            <div className="w-10 h-10 bg-[var(--bg-surface-2)] rounded flex items-center justify-center">
               <span className="text-[#6a6a6a] text-xs">—</span>
             </div>
           )}
         </div>
         <span className="text-sm text-white truncate">{album.title}</span>
       </div>
-      <span className="text-xs text-[#b3b3b3] flex items-center">{album.release_date?.split('-')[0] ?? ''}</span>
+      <span className="text-xs text-[var(--text-secondary)] flex items-center">{album.release_date?.split('-')[0] ?? ''}</span>
     </div>
   )
 }
@@ -376,7 +376,7 @@ export default function ArtistPage() {
 
   if (isLoading) {
     return (
-      <div className="p-6 flex flex-col items-center gap-3 text-[#b3b3b3]">
+      <div className="p-6 flex flex-col items-center gap-3 text-[var(--text-secondary)]">
         <PollyLoading size={48} />
         <span className="text-sm" style={{ fontFamily: "'Barlow Semi Condensed', sans-serif" }}>loading…</span>
       </div>
@@ -423,11 +423,11 @@ export default function ArtistPage() {
           backgroundImage: bannerUrl ? `url(${bannerUrl})` : undefined,
           backgroundSize: 'cover',
           backgroundPosition: 'center',
-          backgroundColor: '#121212',
+          backgroundColor: '--bg-base',
         }}
       >
         {/* Gradient overlay for readability */}
-        <div className="absolute inset-0 bg-gradient-to-t from-[#121212] via-[#12121280] to-transparent" />
+        <div className="absolute inset-0 bg-gradient-to-t from-[var(--bg-base)] via-[color-mix(in_srgb,var(--bg-base)_50%,transparent)] to-transparent" />
 
         {/* Edit button */}
         <button
@@ -452,11 +452,11 @@ export default function ArtistPage() {
               alt={artist.name}
               className="w-40 h-40 rounded-full shadow-xl object-cover shrink-0 relative z-10 border-2 border-[#383838]"
               loading="lazy"
-              style={{ borderColor: '#2A2A2A' }}
+              style={{ borderColor: '--bg-surface-2' }}
             />
           ) : (
             <div
-              className="w-40 h-40 rounded-full shrink-0 relative z-10 border-2 border-[#2A2A2A] bg-[#282828] animate-pulse"
+              className="w-40 h-40 rounded-full shrink-0 relative z-10 border-2 border-[var(--bg-surface-2)] bg-[var(--bg-surface-2)] animate-pulse"
               aria-hidden
             />
           )}
@@ -487,7 +487,7 @@ export default function ArtistPage() {
         return (
           <div className="px-6 py-4">
             <h2 className="text-xl font-bold text-white mb-4">Popular</h2>
-            <div className="text-[#b3b3b3] text-xs grid grid-cols-[auto_1fr_1fr_auto] gap-4 py-2 border-b border-[#282828] mb-1">
+            <div className="text-[var(--text-secondary)] text-xs grid grid-cols-[auto_1fr_1fr_auto] gap-4 py-2 border-b border-[var(--bg-surface-2)] mb-1">
               <span className="w-8 text-center">#</span>
               <span>Title</span>
               <span>Album</span>
@@ -499,10 +499,10 @@ export default function ArtistPage() {
                   key={i}
                   className="grid grid-cols-[auto_1fr_1fr_auto] gap-4 py-2.5 items-center"
                 >
-                  <div className="w-8 h-4 bg-[#282828] rounded animate-pulse" />
-                  <div className="h-4 bg-[#282828] rounded animate-pulse max-w-[60%]" />
-                  <div className="h-4 bg-[#282828] rounded animate-pulse max-w-[50%]" />
-                  <div className="h-4 bg-[#282828] rounded animate-pulse w-8 justify-self-end" />
+                  <div className="w-8 h-4 bg-[var(--bg-surface-2)] rounded animate-pulse" />
+                  <div className="h-4 bg-[var(--bg-surface-2)] rounded animate-pulse max-w-[60%]" />
+                  <div className="h-4 bg-[var(--bg-surface-2)] rounded animate-pulse max-w-[50%]" />
+                  <div className="h-4 bg-[var(--bg-surface-2)] rounded animate-pulse w-8 justify-self-end" />
                 </div>
               ))
             ) : (
@@ -531,7 +531,7 @@ export default function ArtistPage() {
               <button
                 type="button"
                 onClick={() => setShowAllPopular((v) => !v)}
-                className="mt-2 text-xs text-[#b3b3b3] hover:text-white transition-colors"
+                className="mt-2 text-xs text-[var(--text-secondary)] hover:text-white transition-colors"
                 style={{ fontFamily: "'Barlow Semi Condensed', sans-serif", letterSpacing: '0.04em' }}
               >
                 {showAllPopular ? 'Show less' : 'Show more'}
@@ -549,7 +549,7 @@ export default function ArtistPage() {
             <select
               value={sortField}
               onChange={(e) => setSortField(e.target.value as 'year' | 'alpha')}
-              className="bg-[#282828] text-white text-sm rounded px-2 py-1 cursor-pointer"
+              className="bg-[var(--bg-surface-2)] text-white text-sm rounded px-2 py-1 cursor-pointer"
             >
               <option value="year">Year</option>
               <option value="alpha">A-Z</option>
@@ -557,7 +557,7 @@ export default function ArtistPage() {
             <select
               value={sortDir}
               onChange={(e) => setSortDir(e.target.value as 'asc' | 'desc')}
-              className="bg-[#282828] text-white text-sm rounded px-2 py-1 cursor-pointer"
+              className="bg-[var(--bg-surface-2)] text-white text-sm rounded px-2 py-1 cursor-pointer"
             >
               <option value="desc">Descending</option>
               <option value="asc">Ascending</option>
@@ -568,7 +568,7 @@ export default function ArtistPage() {
         {/* Albums */}
         {sortedAlbums.length > 0 && (
           <div className="mb-8">
-            <h3 className="text-sm font-semibold text-[#b3b3b3] uppercase tracking-wider mb-3">Albums</h3>
+            <h3 className="text-sm font-semibold text-[var(--text-secondary)] uppercase tracking-wider mb-3">Albums</h3>
             <div className="grid grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4">
               {albumsLoading
                 ? Array.from({ length: 6 }).map((_, i) => <AlbumSkeleton key={i} />)
@@ -594,7 +594,7 @@ export default function ArtistPage() {
         {/* EPs */}
         {(sortedEps.length > 0 || albumsLoading) && (
           <div className="mb-8">
-            <h3 className="text-sm font-semibold text-[#b3b3b3] uppercase tracking-wider mb-3">EPs</h3>
+            <h3 className="text-sm font-semibold text-[var(--text-secondary)] uppercase tracking-wider mb-3">EPs</h3>
             <HorizontalAlbumStrip
               albums={sortedEps}
               navigate={navigate}
@@ -610,8 +610,8 @@ export default function ArtistPage() {
         {/* Singles */}
         {sortedSingles.length > 0 && (
           <div>
-            <h3 className="text-sm font-semibold text-[#b3b3b3] uppercase tracking-wider mb-3">Singles</h3>
-            <div className="text-[#b3b3b3] text-xs grid grid-cols-[auto_1fr_1fr] gap-4 px-4 py-2 border-b border-[#282828] mb-1">
+            <h3 className="text-sm font-semibold text-[var(--text-secondary)] uppercase tracking-wider mb-3">Singles</h3>
+            <div className="text-[var(--text-secondary)] text-xs grid grid-cols-[auto_1fr_1fr] gap-4 px-4 py-2 border-b border-[var(--bg-surface-2)] mb-1">
               <span className="w-8 text-center">#</span>
               <span>Title</span>
               <span>Year</span>

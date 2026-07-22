@@ -6,7 +6,7 @@ import { PollyLoading } from './PollyLoading'
 
 const modalShell = {
   overlay: { background: 'rgba(0,0,0,0.75)' } as const,
-  panel: { background: '#1A1210', border: '1px solid #3D2820' } as const,
+  panel: { background: 'var(--bg-surface)', border: '1px solid var(--border)' } as const,
 }
 
 export type AddToPlaylistTrack = {
@@ -134,7 +134,7 @@ export default function AddToPlaylistModal({
       >
         <div
           className="flex items-center justify-between px-4 py-3"
-          style={{ borderBottom: '1px solid #261A14' }}
+          style={{ borderBottom: '1px solid var(--border-subtle)' }}
         >
           <div className="min-w-0">
             <h2
@@ -144,20 +144,20 @@ export default function AddToPlaylistModal({
                 fontSize: 16,
                 textTransform: 'uppercase',
                 letterSpacing: '0.08em',
-                color: '#E8DDD0',
+                color: 'var(--text-primary)',
               }}
             >
               Add to playlist
             </h2>
-            <p className="text-xs truncate mt-0.5" style={{ color: '#9A8E84', fontFamily: "'Barlow Semi Condensed', sans-serif" }}>
+            <p className="text-xs truncate mt-0.5" style={{ color: 'var(--text-primary)', fontFamily: "'Barlow Semi Condensed', sans-serif" }}>
               {track.title} · {(track.artist_credit || track.artist)}
             </p>
           </div>
           <button
             type="button"
             onClick={onClose}
-            className="p-1 rounded hover:bg-[#2E1E19]"
-            style={{ color: '#9A8E84' }}
+            className="p-1 rounded hover:bg-[var(--bg-surface-3)]"
+            style={{ color: 'var(--text-primary)' }}
             aria-label="Close"
           >
             <X size={18} />
@@ -171,19 +171,19 @@ export default function AddToPlaylistModal({
             className="w-full px-3 py-2 rounded border text-sm outline-none"
             style={{
               fontFamily: "'Barlow Semi Condensed', sans-serif",
-              color: '#E8DDD0',
-              background: '#140E0C',
-              borderColor: '#3D2820',
+              color: 'var(--text-primary)',
+              background: '--bg-base',
+              borderColor: 'var(--border)',
             }}
           />
           <div className="flex items-center justify-between mt-2">
-            <span className="text-xs" style={{ color: '#9A8E84', fontFamily: "'Barlow Semi Condensed', sans-serif" }}>
+            <span className="text-xs" style={{ color: 'var(--text-primary)', fontFamily: "'Barlow Semi Condensed', sans-serif" }}>
               {selectedCount === 0 ? 'Select one or more playlists' : `${selectedCount} selected`}
             </span>
             <button
               type="button"
               className="text-xs underline-offset-2 hover:underline disabled:opacity-50"
-              style={{ color: '#9A8E84', fontFamily: "'Barlow Semi Condensed', sans-serif" }}
+              style={{ color: 'var(--text-primary)', fontFamily: "'Barlow Semi Condensed', sans-serif" }}
               disabled={selectedCount === 0 || saving}
               onClick={() => setSelected(new Set())}
             >
@@ -194,38 +194,38 @@ export default function AddToPlaylistModal({
         {err && (
           <p
             className="px-4 pb-2 text-xs whitespace-pre-line"
-            style={{ color: '#b4003e', fontFamily: "'Barlow Semi Condensed', sans-serif" }}
+            style={{ color: 'var(--text-primary)', fontFamily: "'Barlow Semi Condensed', sans-serif" }}
           >
             {err}
           </p>
         )}
         <ul className="max-h-72 overflow-y-auto py-1">
           {isLoading && (
-            <li className="px-4 py-3 flex items-center gap-2 text-sm" style={{ color: '#4A413C', fontFamily: "'Barlow Semi Condensed', sans-serif" }}>
+            <li className="px-4 py-3 flex items-center gap-2 text-sm" style={{ color: 'var(--text-primary)', fontFamily: "'Barlow Semi Condensed', sans-serif" }}>
               <PollyLoading size={24} />
               <span>loading…</span>
             </li>
           )}
           {!isLoading && (!playlists || playlists.length === 0) && (
-            <li className="px-4 py-3 text-sm" style={{ color: '#4A413C', fontFamily: "'Barlow Semi Condensed', sans-serif" }}>No playlists. Create one in the library.</li>
+            <li className="px-4 py-3 text-sm" style={{ color: 'var(--text-primary)', fontFamily: "'Barlow Semi Condensed', sans-serif" }}>No playlists. Create one in the library.</li>
           )}
           {!isLoading && playlists && playlists.length > 0 && list.length === 0 && (
-            <li className="px-4 py-3 text-sm" style={{ color: '#4A413C', fontFamily: "'Barlow Semi Condensed', sans-serif" }}>
+            <li className="px-4 py-3 text-sm" style={{ color: 'var(--text-primary)', fontFamily: "'Barlow Semi Condensed', sans-serif" }}>
               {q.trim() ? 'No playlists match your search.' : 'No other playlists to add to.'}
             </li>
           )}
           {list.map((pl) => (
             <li key={pl.id}>
               <label
-                className="flex items-center gap-3 px-4 py-2.5 transition-colors hover:bg-[#2E1E19] cursor-pointer"
-                style={{ fontFamily: "'Barlow Semi Condensed', sans-serif", color: '#E8DDD0' }}
+                className="flex items-center gap-3 px-4 py-2.5 transition-colors hover:bg-[var(--bg-surface-3)] cursor-pointer"
+                style={{ fontFamily: "'Barlow Semi Condensed', sans-serif", color: 'var(--text-primary)' }}
               >
                 <input
                   type="checkbox"
                   checked={selected.has(pl.id)}
                   onChange={() => toggle(pl)}
                   disabled={saving}
-                  className="accent-[#b4003e]"
+                  className="accent-[var(--accent)]"
                 />
                 <span className="truncate">{pl.title}</span>
               </label>
@@ -234,12 +234,12 @@ export default function AddToPlaylistModal({
         </ul>
         <div
           className="flex items-center justify-end gap-2 px-4 py-3"
-          style={{ borderTop: '1px solid #261A14' }}
+          style={{ borderTop: '1px solid var(--border-subtle)' }}
         >
           <button
             type="button"
-            className="px-3 py-2 rounded text-sm transition-colors hover:bg-[#2E1E19]"
-            style={{ fontFamily: "'Barlow Semi Condensed', sans-serif", color: '#E8DDD0' }}
+            className="px-3 py-2 rounded text-sm transition-colors hover:bg-[var(--bg-surface-3)]"
+            style={{ fontFamily: "'Barlow Semi Condensed', sans-serif", color: 'var(--text-primary)' }}
             onClick={onClose}
             disabled={saving}
           >
@@ -250,8 +250,8 @@ export default function AddToPlaylistModal({
             className="px-3 py-2 rounded text-sm transition-colors disabled:opacity-50"
             style={{
               fontFamily: "'Barlow Semi Condensed', sans-serif",
-              color: '#140E0C',
-              background: selectedCount === 0 ? '#4A413C' : '#b4003e',
+              color: '--bg-base',
+              background: selectedCount === 0 ? 'var(--bg-surface)' : 'var(--bg-surface)',
             }}
             disabled={selectedCount === 0 || saving}
             onClick={save}

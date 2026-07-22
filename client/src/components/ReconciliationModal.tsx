@@ -522,35 +522,35 @@ setResolveResults(prev => prev.map(r => r.track_id === result.track_id ? updated
       >
         <div
           className="w-full max-w-3xl max-h-[calc(100vh-140px)] flex flex-col rounded-lg overflow-hidden"
-          style={{ background: '#1A1210', border: '1px solid #3D2820' }}
+          style={{ background: 'var(--bg-surface)', border: '1px solid var(--border)' }}
         >
           {/* Header */}
           <div
             className="flex items-center justify-between px-4 py-2 shrink-0"
-            style={{ borderBottom: '1px solid #3D2820' }}
+            style={{ borderBottom: '1px solid var(--border)' }}
           >
             <h2
               className="text-lg font-bold"
-              style={{ fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 800, color: '#E8DDD0', letterSpacing: '0.02em' }}
+              style={{ fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 800, color: 'var(--text-primary)', letterSpacing: '0.02em' }}
             >
               RECONCILE
             </h2>
           <button
             onClick={onClose}
-            className="p-1 rounded hover:bg-[#3D2820]"
-            style={{ color: '#9A8E84' }}
+            className="p-1 rounded hover:bg-[var(--border)]"
+            style={{ color: 'var(--text-primary)' }}
           >
             <X size={20} />
           </button>
         </div>
 
         {/* Page indicator */}
-        <div className="flex items-center justify-center gap-3 py-2 shrink-0" style={{ borderBottom: '1px solid #3D2820' }}>
+        <div className="flex items-center justify-center gap-3 py-2 shrink-0" style={{ borderBottom: '1px solid var(--border)' }}>
           <div
             className="w-8 h-8 rounded flex items-center justify-center text-sm font-semibold"
             style={{
-              background: page >= 1 ? '#b4003e' : '#3D2820',
-              color: page >= 1 ? '#E8DDD0' : '#6B5E56',
+              background: page >= 1 ? 'var(--bg-surface)' : 'var(--bg-surface)',
+              color: page >= 1 ? 'var(--text-primary)' : 'var(--text-primary)',
               fontFamily: "'Barlow Condensed', sans-serif",
             }}
           >
@@ -559,8 +559,8 @@ setResolveResults(prev => prev.map(r => r.track_id === result.track_id ? updated
           <div
             className="w-8 h-8 rounded flex items-center justify-center text-sm font-semibold"
             style={{
-              background: page >= 2 ? '#b4003e' : '#3D2820',
-              color: page >= 2 ? '#E8DDD0' : '#6B5E56',
+              background: page >= 2 ? 'var(--bg-surface)' : 'var(--bg-surface)',
+              color: page >= 2 ? 'var(--text-primary)' : 'var(--text-primary)',
               fontFamily: "'Barlow Condensed', sans-serif",
             }}
           >
@@ -569,8 +569,8 @@ setResolveResults(prev => prev.map(r => r.track_id === result.track_id ? updated
           <div
             className="w-8 h-8 rounded flex items-center justify-center text-sm font-semibold"
             style={{
-              background: page >= 3 ? '#b4003e' : '#3D2820',
-              color: page >= 3 ? '#E8DDD0' : '#6B5E56',
+              background: page >= 3 ? 'var(--bg-surface)' : 'var(--bg-surface)',
+              color: page >= 3 ? 'var(--text-primary)' : 'var(--text-primary)',
               fontFamily: "'Barlow Condensed', sans-serif",
             }}
           >
@@ -582,14 +582,14 @@ setResolveResults(prev => prev.map(r => r.track_id === result.track_id ? updated
         <div className="flex-1 overflow-y-auto p-3">
           {page === 1 && (
             <>
-              <p className="text-sm mb-4" style={{ fontFamily: "'Barlow Semi Condensed', sans-serif", color: '#9A8E84' }}>
+              <p className="text-sm mb-4" style={{ fontFamily: "'Barlow Semi Condensed', sans-serif", color: 'var(--text-primary)' }}>
                 {totalTracks} tracks need reconciliation. Select the ones you want to resolve against MusicBrainz.
               </p>
 
               {loading ? (
                 <div className="flex items-center gap-2 py-8 justify-center">
-                  <Loader2 className="animate-spin" size={24} style={{ color: '#b4003e' }} />
-                  <span style={{ fontFamily: "'Barlow Semi Condensed', sans-serif", color: '#9A8E84' }}>Loading tracks...</span>
+                  <Loader2 className="animate-spin" size={24} style={{ color: 'var(--text-primary)' }} />
+                  <span style={{ fontFamily: "'Barlow Semi Condensed', sans-serif", color: 'var(--text-primary)' }}>Loading tracks...</span>
                 </div>
               ) : (
                 <>
@@ -598,23 +598,23 @@ setResolveResults(prev => prev.map(r => r.track_id === result.track_id ? updated
                       <label
                         key={track.id}
                         className="flex items-center gap-3 p-3 rounded cursor-pointer"
-                        style={{ background: '#231815', border: '1px solid #3D2820' }}
+                        style={{ background: 'var(--bg-surface)', border: '1px solid var(--border)' }}
                       >
                         <input
                           type="checkbox"
                           checked={selected.has(track.id)}
                           onChange={() => toggleTrack(track.id)}
                           className="w-4 h-4"
-                          style={{ accentColor: '#b4003e' }}
+                          style={{ accentColor: 'var(--text-primary)' }}
                         />
                         <div className="flex-1 min-w-0">
-                          <p className="text-sm truncate" style={{ fontFamily: "'Barlow Semi Condensed', sans-serif", color: '#E8DDD0' }}>
+                          <p className="text-sm truncate" style={{ fontFamily: "'Barlow Semi Condensed', sans-serif", color: 'var(--text-primary)' }}>
                             {track.title}
                           </p>
-                          <p className="text-xs truncate" style={{ fontFamily: "'Barlow Semi Condensed', sans-serif", color: '#9A8E84' }}>
+                          <p className="text-xs truncate" style={{ fontFamily: "'Barlow Semi Condensed', sans-serif", color: 'var(--text-primary)' }}>
                             {track.artist} — {track.album}
                           </p>
-                          <p className="text-xs" style={{ fontFamily: "'Barlow Semi Condensed', sans-serif", color: '#b4003e' }}>
+                          <p className="text-xs" style={{ fontFamily: "'Barlow Semi Condensed', sans-serif", color: 'var(--text-primary)' }}>
                             Missing: {track.missing_fields.join(', ')}
                           </p>
                         </div>
@@ -628,48 +628,48 @@ setResolveResults(prev => prev.map(r => r.track_id === result.track_id ? updated
                       onClick={() => { const p = Math.max(1, trackPage - 1); setTrackPage(p); fetchTracksAndSelect(p); }}
                       disabled={trackPage <= 1}
                       className="p-2 rounded disabled:opacity-50"
-                      style={{ color: '#9A8E84' }}
+                      style={{ color: 'var(--text-primary)' }}
                     >
                       <ChevronLeft size={20} />
                     </button>
-                    <span style={{ fontFamily: "'Barlow Semi Condensed', sans-serif", color: '#9A8E84' }}>
+                    <span style={{ fontFamily: "'Barlow Semi Condensed', sans-serif", color: 'var(--text-primary)' }}>
                       Page {trackPage} of {totalPages}
                     </span>
                     <button
                       onClick={() => { const p = Math.min(totalPages, trackPage + 1); setTrackPage(p); fetchTracksAndSelect(p); }}
                       disabled={trackPage >= totalPages}
                       className="p-2 rounded disabled:opacity-50"
-                      style={{ color: '#9A8E84' }}
+                      style={{ color: 'var(--text-primary)' }}
                     >
                       <ChevronRight size={20} />
                     </button>
                   </div>
 
-                  <div className="mt-6 pt-4" style={{ borderTop: '1px solid #3D2820' }}>
+                  <div className="mt-6 pt-4" style={{ borderTop: '1px solid var(--border)' }}>
                     <button
                       onClick={() => setAdditionalExpanded(!additionalExpanded)}
                       className="flex items-center justify-between w-full p-3 rounded"
                       style={{
-                        background: '#1A1210',
-                        border: '1px solid #3D2820',
+                        background: 'var(--bg-surface)',
+                        border: '1px solid var(--border)',
                       }}
                     >
                       <div className="flex items-center gap-2">
-                        {additionalExpanded ? <ChevronUp size={16} style={{ color: '#b4003e' }} /> : <ChevronDown size={16} style={{ color: '#9A8E84' }} />}
-                        <span style={{ fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 600, color: '#E8DDD0', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                        {additionalExpanded ? <ChevronUp size={16} style={{ color: 'var(--text-primary)' }} /> : <ChevronDown size={16} style={{ color: 'var(--text-primary)' }} />}
+                        <span style={{ fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 600, color: 'var(--text-primary)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
                           Additional Tracks
                         </span>
                         {selected.size > 0 && (
                           <span
                             className="text-xs px-1.5 py-0.5 rounded"
-                            style={{ fontFamily: "'Barlow Semi Condensed', sans-serif", background: '#b4003e', color: '#E8DDD0' }}
+                            style={{ fontFamily: "'Barlow Semi Condensed', sans-serif", background: 'var(--bg-surface)', color: 'var(--text-primary)' }}
                           >
                             {selected.size} selected
                           </span>
                         )}
                       </div>
                       {!additionalExpanded && (
-                        <span style={{ fontFamily: "'Barlow Semi Condensed', sans-serif", color: '#6B5E56', fontSize: '0.75rem' }}>
+                        <span style={{ fontFamily: "'Barlow Semi Condensed', sans-serif", color: 'var(--text-primary)', fontSize: '0.75rem' }}>
                           {additionalTracks.length > 0 ? `${additionalTracks.length} loaded` : 'click to browse'}
                         </span>
                       )}
@@ -685,9 +685,9 @@ setResolveResults(prev => prev.map(r => r.track_id === result.track_id ? updated
                             placeholder="Search tracks..."
                             className="flex-1 px-3 py-2 text-sm rounded"
                             style={{
-                              background: '#1A1210',
-                              border: '1px solid #3D2820',
-                              color: '#E8DDD0',
+                              background: 'var(--bg-surface)',
+                              border: '1px solid var(--border)',
+                              color: 'var(--text-primary)',
                               fontFamily: "'Barlow Semi Condensed', sans-serif",
                             }}
                           />
@@ -695,11 +695,11 @@ setResolveResults(prev => prev.map(r => r.track_id === result.track_id ? updated
 
                         {additionalLoading && additionalTracks.length === 0 ? (
                           <div className="flex items-center gap-2 py-4 justify-center">
-                            <Loader2 className="animate-spin" size={20} style={{ color: '#b4003e' }} />
-                            <span style={{ fontFamily: "'Barlow Semi Condensed', sans-serif", color: '#9A8E84' }}>Loading...</span>
+                            <Loader2 className="animate-spin" size={20} style={{ color: 'var(--text-primary)' }} />
+                            <span style={{ fontFamily: "'Barlow Semi Condensed', sans-serif", color: 'var(--text-primary)' }}>Loading...</span>
                           </div>
                         ) : additionalTracks.length === 0 ? (
-                          <div className="py-4 text-center" style={{ fontFamily: "'Barlow Semi Condensed', sans-serif", color: '#6B5E56' }}>
+                          <div className="py-4 text-center" style={{ fontFamily: "'Barlow Semi Condensed', sans-serif", color: 'var(--text-primary)' }}>
                             No additional tracks found
                           </div>
                         ) : (
@@ -709,20 +709,20 @@ setResolveResults(prev => prev.map(r => r.track_id === result.track_id ? updated
                                 <label
                                   key={track.id}
                                   className="flex items-center gap-3 p-2 rounded cursor-pointer"
-                                  style={{ background: '#231815', border: '1px solid #3D2820' }}
+                                  style={{ background: 'var(--bg-surface)', border: '1px solid var(--border)' }}
                                 >
                                   <input
                                     type="checkbox"
                                     checked={selected.has(track.id)}
                                     onChange={() => toggleAdditionalTrack(track.id)}
                                     className="w-4 h-4"
-                                    style={{ accentColor: '#b4003e' }}
+                                    style={{ accentColor: 'var(--text-primary)' }}
                                   />
                                   <div className="flex-1 min-w-0">
-                                    <p className="text-sm truncate" style={{ fontFamily: "'Barlow Semi Condensed', sans-serif", color: '#E8DDD0' }}>
+                                    <p className="text-sm truncate" style={{ fontFamily: "'Barlow Semi Condensed', sans-serif", color: 'var(--text-primary)' }}>
                                       {track.title}
                                     </p>
-                                    <p className="text-xs truncate" style={{ fontFamily: "'Barlow Semi Condensed', sans-serif", color: '#9A8E84' }}>
+                                    <p className="text-xs truncate" style={{ fontFamily: "'Barlow Semi Condensed', sans-serif", color: 'var(--text-primary)' }}>
                                       {track.artist} — {track.album}
                                     </p>
                                   </div>
@@ -737,8 +737,8 @@ setResolveResults(prev => prev.map(r => r.track_id === result.track_id ? updated
                                 className="w-full py-2 text-xs border rounded"
                                 style={{
                                   fontFamily: "'Barlow Condensed', sans-serif",
-                                  color: '#9A8E84',
-                                  borderColor: '#3D2820',
+                                  color: 'var(--text-primary)',
+                                  borderColor: 'var(--border)',
                                 }}
                               >
                                 {additionalLoading ? 'Loading...' : 'Load more'}
@@ -755,7 +755,7 @@ setResolveResults(prev => prev.map(r => r.track_id === result.track_id ? updated
                       <button
                         onClick={deselectAll}
                         className="px-3 py-1.5 text-xs border rounded"
-                        style={{ fontFamily: "'Barlow Condensed', sans-serif", color: '#9A8E84', borderColor: '#3D2820' }}
+                        style={{ fontFamily: "'Barlow Condensed', sans-serif", color: 'var(--text-primary)', borderColor: 'var(--border)' }}
                       >
                         Deselect All
                       </button>
@@ -763,7 +763,7 @@ setResolveResults(prev => prev.map(r => r.track_id === result.track_id ? updated
                         onClick={selectAll}
                         disabled={selectAllBusy}
                         className="px-3 py-1.5 text-xs border rounded disabled:opacity-50"
-                        style={{ fontFamily: "'Barlow Condensed', sans-serif", color: '#9A8E84', borderColor: '#3D2820' }}
+                        style={{ fontFamily: "'Barlow Condensed', sans-serif", color: 'var(--text-primary)', borderColor: 'var(--border)' }}
                       >
                         {selectAllBusy ? 'Selecting…' : totalPages > 1 ? `Select All (${totalTracks})` : 'Select All'}
                       </button>
@@ -777,8 +777,8 @@ setResolveResults(prev => prev.map(r => r.track_id === result.track_id ? updated
                         fontWeight: 600,
                         textTransform: 'uppercase',
                         letterSpacing: '0.05em',
-                        background: selected.size === 0 ? '#3D2820' : '#b4003e',
-                        color: selected.size === 0 ? '#6B5E56' : '#E8DDD0',
+                        background: selected.size === 0 ? 'var(--bg-surface)' : 'var(--bg-surface)',
+                        color: selected.size === 0 ? 'var(--text-primary)' : 'var(--text-primary)',
                         cursor: selected.size === 0 ? 'not-allowed' : 'pointer',
                       }}
                     >
@@ -803,21 +803,21 @@ setResolveResults(prev => prev.map(r => r.track_id === result.track_id ? updated
                 <button
                   onClick={() => setPage(1)}
                   className="flex items-center gap-1 px-2 py-1 text-xs border rounded"
-                  style={{ fontFamily: "'Barlow Condensed', sans-serif", color: '#9A8E84', borderColor: '#3D2820' }}
+                  style={{ fontFamily: "'Barlow Condensed', sans-serif", color: 'var(--text-primary)', borderColor: 'var(--border)' }}
                 >
                   <ChevronLeft size={14} />
                   Back
                 </button>
                 <div className="flex items-center gap-2">
                   {resolving && (
-                    <div className="flex items-center gap-2" style={{ color: '#b4003e' }}>
+                    <div className="flex items-center gap-2" style={{ color: 'var(--text-primary)' }}>
                       <Loader2 className="animate-spin" size={14} />
                       <span style={{ fontFamily: "'Barlow Semi Condensed', sans-serif", fontSize: '0.75rem' }}>
                         {processedCount}/{selected.size}
                       </span>
                     </div>
                   )}
-                  <span className="text-xs" style={{ fontFamily: "'Barlow Semi Condensed', sans-serif", color: '#9A8E84' }}>
+                  <span className="text-xs" style={{ fontFamily: "'Barlow Semi Condensed', sans-serif", color: 'var(--text-primary)' }}>
                     {resolveResults.filter((r) => r.matched).length} found • {resolveResults.filter((r) => !r.matched).length} no match
                   </span>
                 </div>
@@ -825,7 +825,7 @@ setResolveResults(prev => prev.map(r => r.track_id === result.track_id ? updated
 
               <div className="space-y-2 mb-4 overflow-x-hidden">
                 {visibleResults.length === 0 && !resolving && resolveResults.length > 0 && (
-                  <p className="text-sm py-4 text-center" style={{ fontFamily: "'Barlow Semi Condensed', sans-serif", color: '#9A8E84' }}>
+                  <p className="text-sm py-4 text-center" style={{ fontFamily: "'Barlow Semi Condensed', sans-serif", color: 'var(--text-primary)' }}>
                     All tracks reviewed.
                   </p>
                 )}
@@ -836,8 +836,8 @@ setResolveResults(prev => prev.map(r => r.track_id === result.track_id ? updated
                       key={result.track_id}
                       className="p-3 rounded"
                       style={{
-                        background: '#231815',
-                        border: '1px solid #3D2820',
+                        background: 'var(--bg-surface)',
+                        border: '1px solid var(--border)',
                         transform: exitAction ? 'translateX(110%)' : 'translateX(0)',
                         opacity: exitAction ? 0 : 1,
                         maxHeight: exitAction ? 0 : 2000,
@@ -852,7 +852,7 @@ setResolveResults(prev => prev.map(r => r.track_id === result.track_id ? updated
                         <div className="flex items-start gap-3 flex-1 min-w-0">
                           <div
                             className="w-12 h-12 rounded shrink-0 overflow-hidden"
-                            style={{ background: '#1A1210', border: '1px solid #3D2820' }}
+                            style={{ background: 'var(--bg-surface)', border: '1px solid var(--border)' }}
                           >
                             {result.original_mb_release_group_id &&
                               coverArt[result.track_id]?.old ? (
@@ -862,22 +862,22 @@ setResolveResults(prev => prev.map(r => r.track_id === result.track_id ? updated
                                 className="w-full h-full object-cover"
                               />
                             ) : (
-                              <div className="w-full h-full flex items-center justify-center" style={{ color: '#3D2820' }}>
+                              <div className="w-full h-full flex items-center justify-center" style={{ color: 'var(--text-primary)' }}>
                                 <span className="text-xs" style={{ fontFamily: "'Barlow Condensed', sans-serif" }}>—</span>
                               </div>
                             )}
                           </div>
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center gap-1 mb-0.5">
-                              <p className="text-xs truncate" style={{ fontFamily: "'Barlow Semi Condensed', sans-serif", color: '#E8DDD0' }}>
+                              <p className="text-xs truncate" style={{ fontFamily: "'Barlow Semi Condensed', sans-serif", color: 'var(--text-primary)' }}>
                                 {result.original_title}
                               </p>
                             </div>
-                            <p className="text-xs truncate" style={{ fontFamily: "'Barlow Semi Condensed', sans-serif", color: '#9A8E84' }}>
+                            <p className="text-xs truncate" style={{ fontFamily: "'Barlow Semi Condensed', sans-serif", color: 'var(--text-primary)' }}>
                               {result.original_artist}
                             </p>
                             {result.original_artist_credit && (
-                              <p className="text-xs truncate" style={{ fontFamily: "'Barlow Semi Condensed', sans-serif", color: '#6B5E56' }}>
+                              <p className="text-xs truncate" style={{ fontFamily: "'Barlow Semi Condensed', sans-serif", color: 'var(--text-primary)' }}>
                                 {result.original_artist_credit}
                               </p>
                             )}
@@ -890,7 +890,7 @@ setResolveResults(prev => prev.map(r => r.track_id === result.track_id ? updated
                                       <span
                                         key={tag}
                                         className="text-xs px-1 py-0.5 rounded"
-                                        style={{ background: '#3D2820', color: '#9A8E84', fontFamily: "'Barlow Semi Condensed', sans-serif" }}
+                                        style={{ background: 'var(--bg-surface)', color: 'var(--text-primary)', fontFamily: "'Barlow Semi Condensed', sans-serif" }}
                                       >
                                         {tag}
                                       </span>
@@ -903,11 +903,11 @@ setResolveResults(prev => prev.map(r => r.track_id === result.track_id ? updated
                             })()}
                           </div>
                         </div>
-                        <div style={{ color: '#6B5E56', fontSize: 16 }}>→</div>
+                        <div style={{ color: 'var(--text-primary)', fontSize: 16 }}>→</div>
                         <div className="flex items-start gap-2 flex-1 min-w-0">
                           <div
                             className="w-12 h-12 rounded shrink-0 overflow-hidden"
-                            style={{ background: '#1A1210', border: '1px solid #3D2820' }}
+                            style={{ background: 'var(--bg-surface)', border: '1px solid var(--border)' }}
                           >
                             {result.matched && result.mb_release_group_id && coverArt[result.track_id]?.new ? (
                               <img
@@ -916,11 +916,11 @@ setResolveResults(prev => prev.map(r => r.track_id === result.track_id ? updated
                                 className="w-full h-full object-cover"
                               />
                             ) : !result.matched || !result.mb_release_group_id ? (
-                              <div className="w-full h-full flex items-center justify-center" style={{ color: '#3D2820' }}>
+                              <div className="w-full h-full flex items-center justify-center" style={{ color: 'var(--text-primary)' }}>
                                 <span className="text-xs" style={{ fontFamily: "'Barlow Condensed', sans-serif" }}>—</span>
                               </div>
                             ) : (
-                              <div className="w-full h-full flex items-center justify-center" style={{ color: '#3D2820' }}>
+                              <div className="w-full h-full flex items-center justify-center" style={{ color: 'var(--text-primary)' }}>
                                 <Loader2 className="animate-spin" size={16} />
                               </div>
                             )}
@@ -929,22 +929,22 @@ setResolveResults(prev => prev.map(r => r.track_id === result.track_id ? updated
                             {result.matched ? (
                               <>
                                 <div className="flex items-center gap-1 mb-0.5">
-                                  <p className="text-xs truncate" style={{ fontFamily: "'Barlow Semi Condensed', sans-serif", color: '#E8DDD0' }}>
+                                  <p className="text-xs truncate" style={{ fontFamily: "'Barlow Semi Condensed', sans-serif", color: 'var(--text-primary)' }}>
                                     {result.matched_title}
                                   </p>
                                 </div>
-                                <p className="text-xs truncate" style={{ fontFamily: "'Barlow Semi Condensed', sans-serif", color: '#9A8E84' }}>
+                                <p className="text-xs truncate" style={{ fontFamily: "'Barlow Semi Condensed', sans-serif", color: 'var(--text-primary)' }}>
                                   {result.matched_artist}
                                 </p>
                                 {result.matched_artist_credit && (
-                                  <p className="text-xs truncate" style={{ fontFamily: "'Barlow Semi Condensed', sans-serif", color: '#6B5E56' }}>
+                                  <p className="text-xs truncate" style={{ fontFamily: "'Barlow Semi Condensed', sans-serif", color: 'var(--text-primary)' }}>
                                     {result.matched_artist_credit}
                                   </p>
                                 )}
-                                <p className="text-xs truncate" style={{ fontFamily: "'Barlow Semi Condensed', sans-serif", color: '#6B5E56' }}>
+                                <p className="text-xs truncate" style={{ fontFamily: "'Barlow Semi Condensed', sans-serif", color: 'var(--text-primary)' }}>
                                   {result.matched_album}
                                 </p>
-                                <p className="text-xs" style={{ fontFamily: "'Barlow Semi Condensed', sans-serif", color: '#6B5E56' }}>
+                                <p className="text-xs" style={{ fontFamily: "'Barlow Semi Condensed', sans-serif", color: 'var(--text-primary)' }}>
                                   {result.phase === 'Set by user' ? 'Manual' : result.mb_score != null ? `Score: ${result.mb_score}%` : null}
                                 </p>
                                 <div className="flex flex-wrap gap-1 mt-0.5">
@@ -952,12 +952,12 @@ setResolveResults(prev => prev.map(r => r.track_id === result.track_id ? updated
                                     <span
                                       key={tag}
                                       className="group relative text-xs px-1 py-0.5 rounded flex items-center gap-0.5 cursor-pointer"
-                                      style={{ background: '#b4003e33', color: '#E8DDD0', fontFamily: "'Barlow Semi Condensed', sans-serif" }}
+                                      style={{ background: 'color-mix(in srgb, var(--accent) 20%, transparent)', color: 'var(--text-primary)', fontFamily: "'Barlow Semi Condensed', sans-serif" }}
                                       onClick={() => removeTag(result, tag)}
                                       title="Click to remove"
                                     >
                                       <span className="group-hover:brightness-150 transition-all">{tag}</span>
-                                      <span className="opacity-0 group-hover:opacity-100 transition-opacity ml-0.5" style={{ color: '#E8DDD0' }}>
+                                      <span className="opacity-0 group-hover:opacity-100 transition-opacity ml-0.5" style={{ color: 'var(--text-primary)' }}>
                                         <X size={10} />
                                       </span>
                                     </span>
@@ -971,13 +971,13 @@ setResolveResults(prev => prev.map(r => r.track_id === result.track_id ? updated
                                       onBlur={() => { addTag(result) }}
                                       autoFocus
                                       className="w-20 px-1 py-0.5 text-xs rounded"
-                                      style={{ background: '#1A1210', border: '1px solid #b4003e', color: '#E8DDD0', fontFamily: "'Barlow Semi Condensed', sans-serif" }}
+                                      style={{ background: 'var(--bg-surface)', border: '1px solid var(--accent)', color: 'var(--text-primary)', fontFamily: "'Barlow Semi Condensed', sans-serif" }}
                                     />
                                   ) : (
                                     <button
                                       onClick={() => setAddingTagId(result.track_id)}
                                       className="text-xs px-1 py-0.5 rounded"
-                                      style={{ background: '#3D2820', color: '#9A8E84', fontFamily: "'Barlow Semi Condensed', sans-serif" }}
+                                      style={{ background: 'var(--bg-surface)', color: 'var(--text-primary)', fontFamily: "'Barlow Semi Condensed', sans-serif" }}
                                     >
                                       +
                                     </button>
@@ -986,7 +986,7 @@ setResolveResults(prev => prev.map(r => r.track_id === result.track_id ? updated
                                     <button
                                       onClick={() => setEditedTags((prev) => ({ ...prev, [result.track_id]: [] }))}
                                       className="text-xs px-1 py-0.5 rounded"
-                                      style={{ background: '#3D2820', color: '#6B5E56', fontFamily: "'Barlow Semi Condensed', sans-serif" }}
+                                      style={{ background: 'var(--bg-surface)', color: 'var(--text-primary)', fontFamily: "'Barlow Semi Condensed', sans-serif" }}
                                       title="Clear all tags"
                                     >
                                       Clear
@@ -996,14 +996,14 @@ setResolveResults(prev => prev.map(r => r.track_id === result.track_id ? updated
                               </>
                             ) : (
                               <>
-                                <p className="text-xs" style={{ fontFamily: "'Barlow Semi Condensed', sans-serif", color: '#9A8E84' }}>
+                                <p className="text-xs" style={{ fontFamily: "'Barlow Semi Condensed', sans-serif", color: 'var(--text-primary)' }}>
                                   No match
                                 </p>
                                 {!exitAction && (
                                   <button
                                     onClick={() => { setEditingId(result.track_id); setManualMbId('') }}
                                     className="flex items-center gap-1 mt-2 text-xs"
-                                    style={{ fontFamily: "'Barlow Condensed', sans-serif", color: '#b4003e' }}
+                                    style={{ fontFamily: "'Barlow Condensed', sans-serif", color: 'var(--text-primary)' }}
                                   >
                                     <Pencil size={12} />
                                     Enter MBID manually
@@ -1021,7 +1021,7 @@ setResolveResults(prev => prev.map(r => r.track_id === result.track_id ? updated
                             onClick={() => acceptMatch(result)}
                             disabled={applying}
                             className="p-1 rounded"
-                            style={{ background: '#b4003e', color: '#E8DDD0' }}
+                            style={{ background: 'var(--bg-surface)', color: 'var(--text-primary)' }}
                             title="Accept"
                           >
                             <Check size={14} />
@@ -1029,7 +1029,7 @@ setResolveResults(prev => prev.map(r => r.track_id === result.track_id ? updated
                           <button
                             onClick={() => rejectMatch(result)}
                             className="p-1.5 rounded"
-                            style={{ background: '#3D2820', color: '#9A8E84' }}
+                            style={{ background: 'var(--bg-surface)', color: 'var(--text-primary)' }}
                             title="Reject"
                           >
                             <XCircle size={16} />
@@ -1038,7 +1038,7 @@ setResolveResults(prev => prev.map(r => r.track_id === result.track_id ? updated
                             <button
                               onClick={() => { setEditingId(result.track_id); setManualMbId(result.mb_id || '') }}
                               className="p-1.5 rounded"
-                              style={{ background: '#3D2820', color: '#9A8E84' }}
+                              style={{ background: 'var(--bg-surface)', color: 'var(--text-primary)' }}
                               title="Edit MBID"
                             >
                               <Pencil size={16} />
@@ -1048,7 +1048,7 @@ setResolveResults(prev => prev.map(r => r.track_id === result.track_id ? updated
                       )}
 
                       {editingId === result.track_id && result.mb_score != null && (
-                        <div className="mt-3 p-3 rounded" style={{ background: '#231815', border: '1px solid #3D2820' }}>
+                        <div className="mt-3 p-3 rounded" style={{ background: 'var(--bg-surface)', border: '1px solid var(--border)' }}>
                           <div className="flex items-center gap-2">
                             <input
                               type="text"
@@ -1057,9 +1057,9 @@ setResolveResults(prev => prev.map(r => r.track_id === result.track_id ? updated
                               placeholder="Enter MB recording ID"
                               className="flex-1 px-3 py-1.5 text-xs rounded"
                               style={{
-                                background: '#1A1210',
-                                border: '1px solid #3D2820',
-                                color: '#E8DDD0',
+                                background: 'var(--bg-surface)',
+                                border: '1px solid var(--border)',
+                                color: 'var(--text-primary)',
                                 fontFamily: "'Barlow Semi Condensed', sans-serif",
                               }}
                             />
@@ -1068,8 +1068,8 @@ setResolveResults(prev => prev.map(r => r.track_id === result.track_id ? updated
                               disabled={mbidLoading || !manualMbId.trim()}
                               className="p-1.5 rounded"
                               style={{
-                                background: mbidLoading ? '#3D2820' : '#b4003e',
-                                color: '#E8DDD0',
+                                background: mbidLoading ? 'var(--bg-surface)' : 'var(--bg-surface)',
+                                color: 'var(--text-primary)',
                                 cursor: mbidLoading ? 'not-allowed' : 'pointer',
                               }}
                               title="Search by MBID"
@@ -1079,7 +1079,7 @@ setResolveResults(prev => prev.map(r => r.track_id === result.track_id ? updated
                             <button
                               onClick={() => { setEditingId(null); setManualMbId('') }}
                               className="p-1.5 rounded"
-                              style={{ background: '#3D2820', color: '#9A8E84' }}
+                              style={{ background: 'var(--bg-surface)', color: 'var(--text-primary)' }}
                               title="Cancel"
                             >
                               <X size={16} />
@@ -1093,8 +1093,8 @@ setResolveResults(prev => prev.map(r => r.track_id === result.track_id ? updated
                 })}
               </div>
 
-              <div className="flex items-center justify-between pt-3" style={{ borderTop: '1px solid #3D2820' }}>
-                <p className="text-xs" style={{ fontFamily: "'Barlow Semi Condensed', sans-serif", color: '#9A8E84' }}>
+              <div className="flex items-center justify-between pt-3" style={{ borderTop: '1px solid var(--border)' }}>
+                <p className="text-xs" style={{ fontFamily: "'Barlow Semi Condensed', sans-serif", color: 'var(--text-primary)' }}>
                   {acceptedCount} ✓ • {rejectedCount} ✗ • {pendingCount} pending
                 </p>
                 <button
@@ -1106,8 +1106,8 @@ setResolveResults(prev => prev.map(r => r.track_id === result.track_id ? updated
                     fontWeight: 600,
                     textTransform: 'uppercase',
                     letterSpacing: '0.05em',
-                    background: pendingCount > 0 ? '#3D2820' : '#b4003e',
-                    color: pendingCount > 0 ? '#6B5E56' : '#E8DDD0',
+                    background: pendingCount > 0 ? 'var(--bg-surface)' : 'var(--bg-surface)',
+                    color: pendingCount > 0 ? 'var(--text-primary)' : 'var(--text-primary)',
                     cursor: pendingCount > 0 ? 'not-allowed' : 'pointer',
                   }}
                 >
@@ -1120,66 +1120,66 @@ setResolveResults(prev => prev.map(r => r.track_id === result.track_id ? updated
           {page === 3 && (
             <>
               <div className="text-center mb-6">
-                <div className="w-16 h-16 rounded-full mx-auto mb-4 flex items-center justify-center" style={{ background: 'rgba(180, 0, 62, 0.2)' }}>
-                  <Check size={32} style={{ color: '#b4003e' }} />
+                <div className="w-16 h-16 rounded-full mx-auto mb-4 flex items-center justify-center" style={{ background: 'color-mix(in srgb, var(--accent) 0.2, transparent)' }}>
+                  <Check size={32} style={{ color: 'var(--text-primary)' }} />
                 </div>
                 <h3
                   className="text-xl font-bold mb-2"
-                  style={{ fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 800, color: '#E8DDD0' }}
+                  style={{ fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 800, color: 'var(--text-primary)' }}
                 >
                   Reconciliation Complete
                 </h3>
-                <p className="text-sm" style={{ fontFamily: "'Barlow Semi Condensed', sans-serif", color: '#9A8E84' }}>
+                <p className="text-sm" style={{ fontFamily: "'Barlow Semi Condensed', sans-serif", color: 'var(--text-primary)' }}>
                   {acceptedCount} tracks updated, {rejectedCount} skipped
                 </p>
               </div>
 
               {applyResults.length > 0 && (
                 <div className="space-y-3">
-                  <p className="text-xs uppercase" style={{ fontFamily: "'Barlow Condensed', sans-serif", color: '#6B5E56' }}>
+                  <p className="text-xs uppercase" style={{ fontFamily: "'Barlow Condensed', sans-serif", color: 'var(--text-primary)' }}>
                     Changes Applied
                   </p>
                   {applyResults.map((result) => (
                     <div
                       key={result.track_id}
                       className="p-3 rounded"
-                      style={{ background: '#231815', border: '1px solid #3D2820' }}
+                      style={{ background: 'var(--bg-surface)', border: '1px solid var(--border)' }}
                     >
                       <div className="flex items-center gap-3 mb-2">
                         <div
                           className="w-12 h-12 rounded overflow-hidden shrink-0"
-                          style={{ background: '#1A1210', border: '1px solid #3D2820' }}
+                          style={{ background: 'var(--bg-surface)', border: '1px solid var(--border)' }}
                         >
                           {coverArt[result.track_id]?.old ? (
                             <img src={coverArt[result.track_id].old!} alt="Old cover" className="w-full h-full object-cover" />
                           ) : (
-                            <div className="w-full h-full flex items-center justify-center" style={{ color: '#3D2820', fontSize: '0.5rem', fontFamily: "'Barlow Condensed', sans-serif" }}>No Cover</div>
+                            <div className="w-full h-full flex items-center justify-center" style={{ color: 'var(--text-primary)', fontSize: '0.5rem', fontFamily: "'Barlow Condensed', sans-serif" }}>No Cover</div>
                           )}
                         </div>
-                        <span style={{ color: '#6B5E56', fontSize: 20 }}>→</span>
+                        <span style={{ color: 'var(--text-primary)', fontSize: 20 }}>→</span>
                         <div
                           className="w-12 h-12 rounded overflow-hidden shrink-0"
-                          style={{ background: '#1A1210', border: '1px solid #3D2820' }}
+                          style={{ background: 'var(--bg-surface)', border: '1px solid var(--border)' }}
                         >
                           {coverArt[result.track_id]?.new ? (
                             <img src={coverArt[result.track_id].new!} alt="New cover" className="w-full h-full object-cover" />
                           ) : (
-                            <div className="w-full h-full flex items-center justify-center" style={{ color: '#3D2820', fontSize: '0.5rem', fontFamily: "'Barlow Condensed', sans-serif" }}>No Cover</div>
+                            <div className="w-full h-full flex items-center justify-center" style={{ color: 'var(--text-primary)', fontSize: '0.5rem', fontFamily: "'Barlow Condensed', sans-serif" }}>No Cover</div>
                           )}
                         </div>
                       </div>
-                      <div className="text-xs" style={{ fontFamily: "'Barlow Semi Condensed', sans-serif", color: '#E8DDD0' }}>
-                        <span style={{ color: '#6B5E56' }}>{result.old_title}</span> → <span style={{ color: '#b4003e' }}>{result.new_title}</span>
+                      <div className="text-xs" style={{ fontFamily: "'Barlow Semi Condensed', sans-serif", color: 'var(--text-primary)' }}>
+                        <span style={{ color: 'var(--text-primary)' }}>{result.old_title}</span> → <span style={{ color: 'var(--text-primary)' }}>{result.new_title}</span>
                       </div>
-                      <div className="text-xs" style={{ fontFamily: "'Barlow Semi Condensed', sans-serif", color: '#9A8E84' }}>
+                      <div className="text-xs" style={{ fontFamily: "'Barlow Semi Condensed', sans-serif", color: 'var(--text-primary)' }}>
                         {result.old_artist} → {result.new_artist}
                       </div>
                       {(result.old_artist_credit || result.new_artist_credit) && (
-                        <div className="text-xs" style={{ fontFamily: "'Barlow Semi Condensed', sans-serif", color: '#6B5E56' }}>
+                        <div className="text-xs" style={{ fontFamily: "'Barlow Semi Condensed', sans-serif", color: 'var(--text-primary)' }}>
                           {(result.old_artist_credit || '—')} → {result.new_artist_credit || '—'}
                         </div>
                       )}
-                      <div className="text-xs" style={{ fontFamily: "'Barlow Semi Condensed', sans-serif", color: '#9A8E84' }}>
+                      <div className="text-xs" style={{ fontFamily: "'Barlow Semi Condensed', sans-serif", color: 'var(--text-primary)' }}>
                         {result.old_album} → {result.new_album}
                       </div>
                     </div>

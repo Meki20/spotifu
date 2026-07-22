@@ -77,8 +77,8 @@ export default function ContextMenu({
       style={{
         left: pos.left,
         top: pos.top,
-        background: '#1A1210',
-        border: '1px solid #3D2820',
+        background: 'var(--bg-surface)',
+        border: '1px solid var(--border)',
         borderRadius: 4,
       }}
       ref={ref}
@@ -88,17 +88,17 @@ export default function ContextMenu({
       {track != null && (
       <div
         className="px-4 py-2"
-        style={{ borderBottom: '1px solid #261A14' }}
+        style={{ borderBottom: '1px solid var(--border-subtle)' }}
       >
         <p
           className="truncate"
-          style={{ fontFamily: "'Barlow Semi Condensed', sans-serif", color: '#E8DDD0' }}
+          style={{ fontFamily: "'Barlow Semi Condensed', sans-serif", color: 'var(--text-primary)' }}
         >
           {getStr(track, 'title')}
         </p>
         <p
           className="text-xs truncate mt-0.5"
-          style={{ fontFamily: "'Barlow Semi Condensed', sans-serif", color: '#9A8E84' }}
+          style={{ fontFamily: "'Barlow Semi Condensed', sans-serif", color: 'var(--text-primary)' }}
         >
           {displayArtist({ artist: getStr(track, 'artist'), artist_credit: getStr(track, 'artist_credit') })}
         </p>
@@ -106,8 +106,8 @@ export default function ContextMenu({
       )}
 
       <button
-        className="w-full text-left px-4 py-2 hover:bg-[#2E1E19] transition-colors"
-        style={{ fontFamily: "'Barlow Semi Condensed', sans-serif", color: '#E8DDD0' }}
+        className="w-full text-left px-4 py-2 hover:bg-[var(--bg-surface-3)] transition-colors"
+        style={{ fontFamily: "'Barlow Semi Condensed', sans-serif", color: 'var(--text-primary)' }}
         onClick={() => { onPlay(); onClose() }}
       >
         Play
@@ -115,8 +115,8 @@ export default function ContextMenu({
 
       {onDownload && (
         <button
-          className="w-full text-left px-4 py-2 hover:bg-[#2E1E19] transition-colors"
-          style={{ fontFamily: "'Barlow Semi Condensed', sans-serif", color: '#E8DDD0' }}
+          className="w-full text-left px-4 py-2 hover:bg-[var(--bg-surface-3)] transition-colors"
+          style={{ fontFamily: "'Barlow Semi Condensed', sans-serif", color: 'var(--text-primary)' }}
           onClick={() => { onDownload(); onClose() }}
         >
           Download Full Track
@@ -125,8 +125,8 @@ export default function ContextMenu({
 
       {onAddToQueue && (
         <button
-          className="w-full text-left px-4 py-2 hover:bg-[#2E1E19] transition-colors"
-          style={{ fontFamily: "'Barlow Semi Condensed', sans-serif", color: '#E8DDD0' }}
+          className="w-full text-left px-4 py-2 hover:bg-[var(--bg-surface-3)] transition-colors"
+          style={{ fontFamily: "'Barlow Semi Condensed', sans-serif", color: 'var(--text-primary)' }}
           onClick={() => { onAddToQueue(); onClose() }}
         >
           Add to queue
@@ -135,8 +135,8 @@ export default function ContextMenu({
 
       {onGoToArtist && (
         <button
-          className="w-full text-left px-4 py-2 hover:bg-[#2E1E19] transition-colors"
-          style={{ fontFamily: "'Barlow Semi Condensed', sans-serif", color: '#E8DDD0' }}
+          className="w-full text-left px-4 py-2 hover:bg-[var(--bg-surface-3)] transition-colors"
+          style={{ fontFamily: "'Barlow Semi Condensed', sans-serif", color: 'var(--text-primary)' }}
           onClick={() => { onGoToArtist(); onClose() }}
         >
           Go to artist
@@ -145,8 +145,8 @@ export default function ContextMenu({
 
       {onGoToAlbum && (
         <button
-          className="w-full text-left px-4 py-2 hover:bg-[#2E1E19] transition-colors"
-          style={{ fontFamily: "'Barlow Semi Condensed', sans-serif", color: '#E8DDD0' }}
+          className="w-full text-left px-4 py-2 hover:bg-[var(--bg-surface-3)] transition-colors"
+          style={{ fontFamily: "'Barlow Semi Condensed', sans-serif", color: 'var(--text-primary)' }}
           onClick={() => { onGoToAlbum(); onClose() }}
         >
           Go to album
@@ -155,8 +155,8 @@ export default function ContextMenu({
 
       {onAddToPlaylist && (
         <button
-          className="w-full text-left px-4 py-2 hover:bg-[#2E1E19] transition-colors"
-          style={{ fontFamily: "'Barlow Semi Condensed', sans-serif", color: '#E8DDD0' }}
+          className="w-full text-left px-4 py-2 hover:bg-[var(--bg-surface-3)] transition-colors"
+          style={{ fontFamily: "'Barlow Semi Condensed', sans-serif", color: 'var(--text-primary)' }}
           onClick={() => { onAddToPlaylist(); onClose() }}
         >
           Add to playlist
@@ -164,10 +164,10 @@ export default function ContextMenu({
       )}
 
       {onRemoveFromPlaylist && (
-        <div className="mt-1 pt-1" style={{ borderTop: '1px solid #261A14' }}>
+        <div className="mt-1 pt-1" style={{ borderTop: '1px solid var(--border-subtle)' }}>
           <button
-            className="w-full text-left px-4 py-2 hover:bg-[#2E1E19] transition-colors"
-            style={{ fontFamily: "'Barlow Semi Condensed', sans-serif", color: '#b4003e' }}
+            className="w-full text-left px-4 py-2 hover:bg-[var(--bg-surface-3)] transition-colors"
+            style={{ fontFamily: "'Barlow Semi Condensed', sans-serif", color: 'var(--text-primary)' }}
             onClick={() => { onRemoveFromPlaylist(); onClose() }}
           >
             Remove from this playlist

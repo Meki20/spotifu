@@ -55,9 +55,9 @@ export default function PlaylistTrackCover({
 
   if (!src) {
     if (needFromManager && !isResolved) {
-      return <div ref={containerRef} className={`${className} animate-pulse bg-[#231815]`} aria-hidden />
+      return <div ref={containerRef} className={`${className} animate-pulse bg-[var(--bg-surface-2)]`} aria-hidden />
     }
-    return <div ref={containerRef} className={`${className} bg-[#231815]`} aria-hidden />
+    return <div ref={containerRef} className={`${className} bg-[var(--bg-surface-2)]`} aria-hidden />
   }
 
   return (
@@ -66,7 +66,7 @@ export default function PlaylistTrackCover({
         key={src}
         src={src}
         alt=""
-        className={`${className} object-cover bg-[#231815]`}
+        className={`${className} object-cover bg-[var(--bg-surface-2)]`}
         loading="lazy"
         onError={() => {
           if (primary && !primaryBroken) {

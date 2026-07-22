@@ -6,11 +6,76 @@
 
 Soulseek music player with Spotify-like UI. Search and stream music from the Soulseek network.
 
+## Quick Start
+
+Requirements: **Docker** (with the `compose` plugin) and **Git**.
+
+```bash
+git clone https://github.com/<org>/SpotiFU.git
+cd SpotiFU
+bash scripts/install.sh
+```
+
+`scripts/install.sh` runs two steps:
+
+1. **Wizard** — prompts for Soulseek credentials (and optionally Last.fm / fanart.tv API keys) and writes `./.secrets`. Auto-generates a JWT signing secret.
+2. **Up** — starts PostgreSQL + the API container via `docker compose up -d --build`.
+
+When it finishes, the API is on http://localhost:1985.
+
+If you want to build the in-browser UI (the desktop clients are distributed separately on the Releases page):
+
+```bash
+cd client
+npm install
+npm run dev
+```
+
+Open http://localhost:1984 — it talks to the dockerized API.
+
+## Verifying the install
+
+```bash
+docker compose ps
+# spotifu-postgres (healthy)   spotifu-server (healthy)
+
+curl -fsS http://localhost:1985/health
+# {"status":"ok"}
+
+curl -fsS http://localhost:1985/health/ready
+# {"ready":true,"soulseek_connected":true}
+
+PGPASSWORD=spotifu psql -h 127.0.0.1 -U spotifu -d spotifu -c '\dt'
+# list of tables
+
+ls -l .secrets
+# -rw-------  1 you  you  ...  .secrets
+```
+
+Soulseek connectivity: `docker compose logs server | grep -i soulseek`. The wizard saves credentials but does not connect until the API starts; the lifespan hook logs in automatically once the server is up.
+
+## Stop / restart
+
+```bash
+bash scripts/install.sh down    # stop, keep volumes
+bash scripts/install.sh up      # restart
+bash scripts/install.sh reset   # stop AND delete volumes (DB + cache)
+bash scripts/install.sh logs    # tail server logs
+```
+
+## Re-running the wizard
+
+The wizard pre-fills from any existing `.secrets`, so re-running only changes fields you edit:
+
+```bash
+bash scripts/install.sh wizard
+```
+
 ## Architecture (high-level)
 
-- **Client** — React + TypeScript + TailwindCSS + Vite, runs on port 1984
-- **Server** — FastAPI + SQLModel + aioslsk (Soulseek protocol), runs on port 1985
-- **Database** — PostgreSQL 16 (docker-managed)
+- **Client** — React + TypeScript + TailwindCSS + Vite. Distributed as separate binaries (desktop) or runnable in the browser for development.
+- **Server** — FastAPI + SQLModel + aioslsk (Soulseek protocol), runs on port 1985 inside Docker as non-root UID 1000.
+- **Database** — PostgreSQL 16, internal to the compose network; published on loopback only (`127.0.0.1:5432`) for `psql`/host-tool debugging.
 
 ### How data flows
 
@@ -18,160 +83,46 @@ Soulseek music player with Spotify-like UI. Search and stream music from the Sou
 - **Playback**: the server queues downloads/streams local files when available.
 - **Playlists**: playlist items store MusicBrainz IDs (`mb_recording_id`, plus optional `mb_release_id` / `mb_release_group_id`) so the UI can hydrate consistent metadata later.
 
-## Quick Start
+## Configuration
 
-### Docker — server only
+### Credentials (wizard-managed)
 
-Starts PostgreSQL and the API (port 1985). The web UI is not included in this profile.
+`.secrets` holds everything sensitive:
 
-```bash
-cp .env.example .env
-cp .secrets.example .secrets   # add Soulseek credentials
-sudo docker compose up -d --build
-```
+| Key | Purpose |
+|---|---|
+| `jwt_secret` | JWT signing key (auto-generated, ≥32 chars) |
+| `soulseek_username` / `soulseek_password` | Soulseek login |
+| `lastfm_api_key` | optional, for similar-artist enrichment |
+| `fanarttv_api_key` | optional, for high-quality artist images |
 
-**Important:** run with `--build` after pulling code changes so the server image matches the client.
+Permissions: `chmod 600` enforced by the wizard. File is bind-mounted to `/app/.secrets` in the server container.
 
-API: http://localhost:1985
+### Optional host overrides (`.env`)
 
-### Docker — full stack (server + web UI)
+`./.env` (copy from `.env.example`) overrides non-secret settings at the compose level:
 
-```bash
-sudo docker compose --profile full up -d --build
-```
+- `API_BASE_URL` — public URL for cover/stream links (set to LAN IP for remote clients)
+- `ALLOWED_ORIGINS` — CORS allow-list
+- `ALLOW_REGISTRATION` — set `false` after creating the first admin
+- `MDNS_ENABLED` / `MDNS_HOSTNAME` / `MDNS_PORT` — LAN service discovery (off in Docker)
+- `LOG_LEVEL` and per-module `LOG_LEVEL_*`
+- `SOULSEEK_USERNAME` / `SOULSEEK_PASSWORD` / `LASTFM_API_KEY` / `FANARTTV_API_KEY` — overrides for what the wizard wrote (rare)
 
-- Web UI: http://localhost:1984
-- API: http://localhost:1985
+### LAN deployment
 
-Clients discover the server on the LAN via mDNS (`spotifu.local`) or a manual URL in Settings — no rebuild needed when pointing at a remote server.
+Copy `docker-compose.override.example.yml` to `docker-compose.override.yml` and set `API_BASE_URL` to this host's LAN IP. See [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) for full LAN notes.
 
-See [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) for LAN setup, env vars, and desktop builds.
+## Upgrading from an older version
 
-### Stop
-
-```bash
-docker compose down        # keep data
-docker compose down -v     # delete data volume
-```
-
----
-
-## Development
-
-### Prerequisites
-
-- Python 3.12+
-- Node.js 20+
-- PostgreSQL 16 (or Docker)
-- Soulseek credentials (env vars or `.env`)
-
-### Manual setup
-
-**1. Clone and install server dependencies**
+If you previously had SpotiFU running with a root-owned `spotifu_spotifu-cache` volume (pre-UID-1000), fix ownership once:
 
 ```bash
-cd server
-python -m venv venv
-source venv/bin/activate
-pip install -r requirements.txt
+docker run --rm -v spotifu_spotifu-cache:/cache alpine chown -R 1000:1000 /cache
+bash scripts/install.sh up
 ```
 
-**2. Configure Soulseek credentials**
-
-```bash
-cp .env.example .env
-# Edit .env and add your Soulseek username/password
-```
-
-**3. Start PostgreSQL**
-
-```bash
-# Option A: Docker
-docker run -d \
-  --name spotifu-postgres \
-  -e POSTGRES_USER=spotifu \
-  -e POSTGRES_PASSWORD=spotifu \
-  -e POSTGRES_DB=spotifu \
-  -p 5432:5432 \
-  postgres:16-alpine
-
-# Option B: Docker Compose (from project root)
-docker compose up -d postgres
-```
-
-**4. Start server**
-
-```bash
-cd server
-source venv/bin/activate
-uvicorn main:app --reload --port 1985
-```
-
-**5. Install client dependencies**
-
-```bash
-cd client
-npm install
-```
-
-**6. Start client dev server**
-
-```bash
-npm run dev
-```
-
-App runs at http://localhost:1984. API at http://localhost:1985.
-
----
-
-## Docker
-
-### Build images
-
-```bash
-docker compose build
-```
-
-### View logs
-
-```bash
-docker compose logs -f        # all services
-docker compose logs -f server # server only
-```
-
-### Recreate from scratch
-
-```bash
-docker compose down -v
-docker compose up -d
-```
-
----
-
-## Environment Variables
-
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `DATABASE_URL` | `postgresql://spotifu:spotifu@localhost:5432/spotifu` | PostgreSQL connection string |
-| `CACHE_DIR` | repo `cache/` | Download and cover storage |
-| `API_BASE_URL` | `http://localhost:1985` | Public URL for cover/stream links |
-| `JWT_SECRET` | — | JWT signing secret (≥32 chars) |
-| `SOULSEEK_USERNAME` | — | Soulseek username |
-| `SOULSEEK_PASSWORD` | — | Soulseek password |
-| `SECRETS_FILE` | `.secrets` | Path to secrets file (Docker: `/app/.secrets`) |
-| `MDNS_ENABLED` | on bare metal / off in Docker | LAN service discovery |
-| `ALLOWED_ORIGINS` | `*` | Comma-separated CORS origins |
-| `ALLOW_REGISTRATION` | `true` | Set `false` to disable signup after first user |
-| `VITE_API_URL` | `http://localhost:1985` | Optional client build-time API seed |
-
-**Docker**: Create a `.env` file in the project root:
-```bash
-SOULSEEK_USERNAME=your_username
-SOULSEEK_PASSWORD=your_password
-```
-Then run `docker compose up -d`. Credentials are loaded from env vars inside the container.
-
----
+The wizard also detects pre-existing `.secrets` and pre-fills prompts from it.
 
 ## Tech Stack
 
@@ -190,26 +141,31 @@ Then run `docker compose up -d`. Credentials are loaded from env vars inside the
 - Zustand — state management
 - TanStack Query — data fetching
 
----
-
 ## FAQ / Troubleshooting
 
-### “CSV import matched the wrong song”
+### "Wizard says .secrets is invalid"
 
-- This typically happens only in the looser passes (3/4), especially for compilation albums with shared credited artists.
-- Use the import modal’s unmatched tools to correct a row by pasting the correct MusicBrainz recording MBID.
+Re-run: `bash scripts/install.sh wizard`. It reads the current `.secrets` and only re-prompts fields that fail validation.
 
-### “CSV import is slow / stalls”
+### "Server keeps restarting / Soulseek won't connect"
 
-- MusicBrainz can rate-limit (429) or intermittently 503. The importer retries on these with a short delay.
+`docker compose logs server --tail=200`. Wrong Soulseek password is the most common cause — re-run the wizard.
 
-### “Some tracks are consistently unmatched”
+### "CSV import matched the wrong song"
+
+This typically happens only in the looser passes (3/4), especially for compilation albums with shared credited artists. Use the import modal's unmatched tools to correct a row by pasting the correct MusicBrainz recording MBID.
+
+### "CSV import is slow / stalls"
+
+MusicBrainz can rate-limit (429) or intermittently 503. The importer retries on these with a short delay.
+
+### "Some tracks are consistently unmatched"
 
 Common reasons:
 
-- the playlist artist string doesn’t match the credited artist (e.g. synth voicebank credited as `可不` while CSV says `Kafu`)
+- the playlist artist string doesn't match the credited artist (e.g. synth voicebank credited as `可不` while CSV says `Kafu`)
 - the album name differs between Spotify and MusicBrainz (localized titles / punctuation)
 
-### “Album cover / release is ‘wrong’ after resolving”
+### "Album cover / release is 'wrong' after resolving"
 
 MusicBrainz recordings can appear on many releases. SpotiFU resolves a recording MBID first, then selects the best release using official-release preference + album-hint matching. If you care about a specific release, use the release IDs stored on playlist items (`mb_release_id`, `mb_release_group_id`) to hydrate consistently.

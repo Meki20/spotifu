@@ -60,13 +60,13 @@ export default function ArtistTransitionOverlay() {
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            background: '#231815',
+            background: 'var(--bg-surface)',
           }}
         >
           <span
             style={{
               fontSize: 56,
-              color: '#4A413C',
+              color: 'var(--text-primary)',
               fontFamily: "'Barlow Condensed', sans-serif",
               fontWeight: 700,
               textTransform: 'uppercase',

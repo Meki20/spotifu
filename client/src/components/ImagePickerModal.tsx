@@ -149,10 +149,10 @@ export default function ImagePickerModal({
         <div
           className="fixed top-4 right-4 z-[60] px-4 py-3 rounded flex items-center gap-2 shadow-xl"
           style={{
-            background: '#231815',
-            border: `1px solid ${toast.type === 'success' ? '#3D2820' : '#7a1a1a'}`,
+            background: 'var(--bg-surface)',
+            border: `1px solid ${toast.type === 'success' ? 'var(--border)' : '#7a1a1a'}`,
             fontFamily: FONT_BODY,
-            color: toast.type === 'success' ? '#E8DDD0' : '#f87171',
+            color: toast.type === 'success' ? 'var(--text-primary)' : 'var(--text-primary)',
           }}
         >
           {toast.type === 'success' ? <Check size={15} /> : <AlertCircle size={15} />}
@@ -170,7 +170,7 @@ export default function ImagePickerModal({
           <button
             onClick={() => setPreviewUrl(null)}
             className="absolute top-4 right-4 p-1 rounded"
-            style={{ color: '#9A8E84' }}
+            style={{ color: 'var(--text-primary)' }}
           >
             <X size={24} />
           </button>
@@ -189,24 +189,24 @@ export default function ImagePickerModal({
       >
         <div
           className="w-[860px] max-h-[85vh] flex flex-col rounded-lg overflow-hidden"
-          style={{ background: '#1A1210', border: '1px solid #3D2820' }}
+          style={{ background: 'var(--bg-surface)', border: '1px solid var(--border)' }}
         >
           {/* Header */}
           <div
             className="flex items-center justify-between px-5 py-4 shrink-0"
-            style={{ borderBottom: '1px solid #3D2820' }}
+            style={{ borderBottom: '1px solid var(--border)' }}
           >
             <h2
               className="text-lg font-bold tracking-wide uppercase"
-              style={{ fontFamily: FONT_HEADING, fontWeight: 800, color: '#E8DDD0', letterSpacing: '0.04em' }}
+              style={{ fontFamily: FONT_HEADING, fontWeight: 800, color: 'var(--text-primary)', letterSpacing: '0.04em' }}
             >
               Artist Images
             </h2>
             <button
               onClick={onClose}
               className="p-1 rounded"
-              style={{ color: '#9A8E84' }}
-              onMouseEnter={e => (e.currentTarget.style.background = '#3D2820')}
+              style={{ color: 'var(--text-primary)' }}
+              onMouseEnter={e => (e.currentTarget.style.background = 'var(--border)')}
               onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
             >
               <X size={18} />
@@ -220,13 +220,13 @@ export default function ImagePickerModal({
             <div className="flex-1 min-w-0">
               <p
                 className="text-xs uppercase mb-3 tracking-widest"
-                style={{ fontFamily: FONT_HEADING, color: '#6B5E56', letterSpacing: '0.1em' }}
+                style={{ fontFamily: FONT_HEADING, color: 'var(--text-primary)', letterSpacing: '0.1em' }}
               >
                 Banner
               </p>
               <div className="space-y-2 max-h-[280px] overflow-y-auto pr-1">
                 {banners.length === 0 && (
-                  <p className="text-sm" style={{ fontFamily: FONT_BODY, color: '#6B5E56' }}>No banners available</p>
+                  <p className="text-sm" style={{ fontFamily: FONT_BODY, color: 'var(--text-primary)' }}>No banners available</p>
                 )}
                 {banners.map((url, i) => {
                   const lidx = localIdx(url)
@@ -236,9 +236,9 @@ export default function ImagePickerModal({
                       key={i}
                       onClick={() => setLocalBannerIdx(i)}
                       className="relative cursor-pointer rounded overflow-hidden group"
-                      style={{ border: `1px solid ${selected ? '#b4003e' : '#3D2820'}` }}
+                      style={{ border: `1px solid ${selected ? 'var(--border)' : 'var(--border)'}` }}
                     >
-                      <div className="w-full aspect-[16/6]" style={{ background: '#0e0b09' }}>
+                      <div className="w-full aspect-[16/6]" style={{ background: '--bg-base' }}>
                         <img
                           src={mediaUrl(url)}
                           alt={`Banner ${i + 1}`}
@@ -247,7 +247,7 @@ export default function ImagePickerModal({
                         />
                       </div>
                       {selected && (
-                        <div className="absolute inset-0 pointer-events-none" style={{ background: 'rgba(180,0,62,0.12)' }} />
+                        <div className="absolute inset-0 pointer-events-none" style={{ background: 'color-mix(in srgb, var(--accent) 0.12, transparent)' }} />
                       )}
                       <div
                         className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2"
@@ -256,7 +256,7 @@ export default function ImagePickerModal({
                         <button
                           onClick={(e) => { e.stopPropagation(); setPreviewUrl(mediaUrl(url) ?? url) }}
                           className="p-1.5 rounded"
-                          style={{ background: 'rgba(255,255,255,0.1)', color: '#E8DDD0' }}
+                          style={{ background: 'rgba(255,255,255,0.1)', color: 'var(--text-primary)' }}
                           title="Preview"
                         >
                           <Eye size={13} />
@@ -265,7 +265,7 @@ export default function ImagePickerModal({
                           <button
                             onClick={(e) => { e.stopPropagation(); handleDelete('banner', lidx) }}
                             className="p-1.5 rounded"
-                            style={{ background: 'rgba(255,255,255,0.1)', color: '#f87171' }}
+                            style={{ background: 'rgba(255,255,255,0.1)', color: 'var(--text-primary)' }}
                             title="Delete"
                           >
                             <Trash2 size={13} />
@@ -282,13 +282,13 @@ export default function ImagePickerModal({
             <div className="flex-1 min-w-0">
               <p
                 className="text-xs uppercase mb-3 tracking-widest"
-                style={{ fontFamily: FONT_HEADING, color: '#6B5E56', letterSpacing: '0.1em' }}
+                style={{ fontFamily: FONT_HEADING, color: 'var(--text-primary)', letterSpacing: '0.1em' }}
               >
                 Thumbnail
               </p>
               <div className="grid grid-cols-3 gap-3 max-h-[280px] overflow-y-auto pr-1">
                 {thumbs.length === 0 && (
-                  <p className="text-sm col-span-3" style={{ fontFamily: FONT_BODY, color: '#6B5E56' }}>No thumbnails available</p>
+                  <p className="text-sm col-span-3" style={{ fontFamily: FONT_BODY, color: 'var(--text-primary)' }}>No thumbnails available</p>
                 )}
                 {thumbs.map((url, i) => {
                   const lidx = localIdx(url)
@@ -298,7 +298,7 @@ export default function ImagePickerModal({
                       key={i}
                       onClick={() => setLocalPictureIdx(i)}
                       className="relative cursor-pointer rounded-full overflow-hidden aspect-square group"
-                      style={{ border: `2px solid ${selected ? '#b4003e' : '#3D2820'}` }}
+                      style={{ border: `2px solid ${selected ? 'var(--border)' : 'var(--border)'}` }}
                     >
                       <img
                         src={mediaUrl(url)}
@@ -307,7 +307,7 @@ export default function ImagePickerModal({
                         loading="lazy"
                       />
                       {selected && (
-                        <div className="absolute inset-0 pointer-events-none" style={{ background: 'rgba(180,0,62,0.12)' }} />
+                        <div className="absolute inset-0 pointer-events-none" style={{ background: 'color-mix(in srgb, var(--accent) 0.12, transparent)' }} />
                       )}
                       <div
                         className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-1.5"
@@ -316,7 +316,7 @@ export default function ImagePickerModal({
                         <button
                           onClick={(e) => { e.stopPropagation(); setPreviewUrl(mediaUrl(url) ?? url) }}
                           className="p-1 rounded-full"
-                          style={{ background: 'rgba(255,255,255,0.1)', color: '#E8DDD0' }}
+                          style={{ background: 'rgba(255,255,255,0.1)', color: 'var(--text-primary)' }}
                           title="Preview"
                         >
                           <Eye size={11} />
@@ -325,7 +325,7 @@ export default function ImagePickerModal({
                           <button
                             onClick={(e) => { e.stopPropagation(); handleDelete('thumb', lidx) }}
                             className="p-1 rounded-full"
-                            style={{ background: 'rgba(255,255,255,0.1)', color: '#f87171' }}
+                            style={{ background: 'rgba(255,255,255,0.1)', color: 'var(--text-primary)' }}
                             title="Delete"
                           >
                             <Trash2 size={11} />
@@ -340,10 +340,10 @@ export default function ImagePickerModal({
 
             {/* Search panel */}
             {showSearch && (
-              <div className="flex-1 min-w-0 pl-5" style={{ borderLeft: '1px solid #3D2820' }}>
+              <div className="flex-1 min-w-0 pl-5" style={{ borderLeft: '1px solid var(--border)' }}>
                 <p
                   className="text-xs uppercase mb-3 tracking-widest"
-                  style={{ fontFamily: FONT_HEADING, color: '#6B5E56', letterSpacing: '0.1em' }}
+                  style={{ fontFamily: FONT_HEADING, color: 'var(--text-primary)', letterSpacing: '0.1em' }}
                 >
                   Search Online
                 </p>
@@ -356,8 +356,8 @@ export default function ImagePickerModal({
                       className="px-3 py-1 text-xs rounded"
                       style={{
                         fontFamily: FONT_HEADING,
-                        background: searchType === t ? '#b4003e' : '#3D2820',
-                        color: searchType === t ? '#E8DDD0' : '#9A8E84',
+                        background: searchType === t ? 'var(--bg-surface)' : 'var(--bg-surface)',
+                        color: searchType === t ? 'var(--text-primary)' : 'var(--text-primary)',
                         letterSpacing: '0.04em',
                       }}
                     >
@@ -375,9 +375,9 @@ export default function ImagePickerModal({
                     className="flex-1 px-3 py-1.5 text-sm rounded outline-none"
                     style={{
                       fontFamily: FONT_BODY,
-                      background: '#0e0b09',
-                      border: '1px solid #3D2820',
-                      color: '#E8DDD0',
+                      background: '--bg-base',
+                      border: '1px solid var(--border)',
+                      color: 'var(--text-primary)',
                     }}
                     placeholder="Search query…"
                   />
@@ -385,7 +385,7 @@ export default function ImagePickerModal({
                     onClick={handleSearch}
                     disabled={searchLoading || !searchQuery.trim()}
                     className="p-1.5 rounded disabled:opacity-30"
-                    style={{ background: '#b4003e', color: '#E8DDD0' }}
+                    style={{ background: 'var(--bg-surface)', color: 'var(--text-primary)' }}
                   >
                     {searchLoading ? <Loader2 size={15} className="animate-spin" /> : <Search size={15} />}
                   </button>
@@ -393,7 +393,7 @@ export default function ImagePickerModal({
 
                 <div className="space-y-2 max-h-[220px] overflow-y-auto pr-1">
                   {!searchLoading && searchResults.length === 0 && (
-                    <p className="text-sm" style={{ fontFamily: FONT_BODY, color: '#6B5E56' }}>
+                    <p className="text-sm" style={{ fontFamily: FONT_BODY, color: 'var(--text-primary)' }}>
                       {searchQuery ? 'No results' : ''}
                     </p>
                   )}
@@ -401,7 +401,7 @@ export default function ImagePickerModal({
                     <div
                       key={i}
                       className="relative rounded overflow-hidden group"
-                      style={{ border: '1px solid #3D2820' }}
+                      style={{ border: '1px solid var(--border)' }}
                     >
                       <img
                         src={url}
@@ -417,7 +417,7 @@ export default function ImagePickerModal({
                         <button
                           onClick={() => setPreviewUrl(url)}
                           className="p-1.5 rounded"
-                          style={{ background: 'rgba(255,255,255,0.1)', color: '#E8DDD0' }}
+                          style={{ background: 'rgba(255,255,255,0.1)', color: 'var(--text-primary)' }}
                           title="Preview"
                         >
                           <Eye size={13} />
@@ -426,7 +426,7 @@ export default function ImagePickerModal({
                           onClick={() => handleDownload(url, searchType === 'square' ? 'thumb' : 'banner')}
                           disabled={downloading === url}
                           className="p-1.5 rounded disabled:opacity-30"
-                          style={{ background: '#b4003e', color: '#E8DDD0' }}
+                          style={{ background: 'var(--bg-surface)', color: 'var(--text-primary)' }}
                           title="Download"
                         >
                           {downloading === url
@@ -445,7 +445,7 @@ export default function ImagePickerModal({
           {/* Footer */}
           <div
             className="flex justify-between items-center px-5 py-3.5 shrink-0"
-            style={{ borderTop: '1px solid #3D2820' }}
+            style={{ borderTop: '1px solid var(--border)' }}
           >
             <button
               onClick={() => setShowSearch(!showSearch)}
@@ -453,9 +453,9 @@ export default function ImagePickerModal({
               style={{
                 fontFamily: FONT_HEADING,
                 letterSpacing: '0.05em',
-                background: showSearch ? '#3D2820' : 'transparent',
-                color: showSearch ? '#E8DDD0' : '#9A8E84',
-                border: '1px solid #3D2820',
+                background: showSearch ? 'var(--bg-surface)' : 'transparent',
+                color: showSearch ? 'var(--text-primary)' : 'var(--text-primary)',
+                border: '1px solid var(--border)',
               }}
             >
               {showSearch ? 'Hide Search' : 'Search Online'}
@@ -467,8 +467,8 @@ export default function ImagePickerModal({
                 style={{
                   fontFamily: FONT_HEADING,
                   letterSpacing: '0.05em',
-                  color: '#9A8E84',
-                  border: '1px solid #3D2820',
+                  color: 'var(--text-primary)',
+                  border: '1px solid var(--border)',
                 }}
               >
                 Cancel
@@ -479,8 +479,8 @@ export default function ImagePickerModal({
                 style={{
                   fontFamily: FONT_HEADING,
                   letterSpacing: '0.05em',
-                  background: '#b4003e',
-                  color: '#E8DDD0',
+                  background: 'var(--bg-surface)',
+                  color: 'var(--text-primary)',
                 }}
               >
                 Save

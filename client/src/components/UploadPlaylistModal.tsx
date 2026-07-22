@@ -290,12 +290,12 @@ export default function UploadPlaylistModal({
     >
         <div
           className="w-full max-w-2xl rounded-lg overflow-hidden shadow-xl max-h-[min(92vh,900px)] flex flex-col"
-        style={{ background: '#1A1210', border: '1px solid #3D2820' }}
+        style={{ background: 'var(--bg-surface)', border: '1px solid var(--border)' }}
         onClick={(e) => e.stopPropagation()}
       >
         <div
           className="flex items-center justify-between px-5 py-4 shrink-0"
-          style={{ borderBottom: '1px solid #261A14' }}
+          style={{ borderBottom: '1px solid var(--border-subtle)' }}
         >
           <h2
             style={{
@@ -304,7 +304,7 @@ export default function UploadPlaylistModal({
               fontSize: 18,
               textTransform: 'uppercase',
               letterSpacing: '0.08em',
-              color: '#E8DDD0',
+              color: 'var(--text-primary)',
             }}
           >
             Upload playlist CSV
@@ -312,8 +312,8 @@ export default function UploadPlaylistModal({
           <button
             type="button"
             onClick={handleClose}
-            className="p-1 rounded transition-colors hover:bg-[#2E1E19]"
-            style={{ color: '#9A8E84' }}
+            className="p-1 rounded transition-colors hover:bg-[var(--bg-surface-3)]"
+            style={{ color: 'var(--text-primary)' }}
             aria-label="Close"
           >
             <X size={20} />
@@ -321,7 +321,7 @@ export default function UploadPlaylistModal({
         </div>
 
         <form onSubmit={handleSubmit} className="px-5 py-4 flex flex-col min-h-0 flex-1 overflow-hidden">
-          <p className="text-sm shrink-0 mb-4" style={{ color: '#9A8E84', fontFamily: "'Barlow Semi Condensed', sans-serif" }}>
+          <p className="text-sm shrink-0 mb-4" style={{ color: 'var(--text-primary)', fontFamily: "'Barlow Semi Condensed', sans-serif" }}>
             Spotify-style export works best (columns: Track Name, Album Name, Artist Name(s)). Rows are matched on
             MusicBrainz without downloading audio.
           </p>
@@ -329,7 +329,7 @@ export default function UploadPlaylistModal({
           <div className="shrink-0 mb-4">
             <label
               className="block text-xs uppercase tracking-widest mb-1.5"
-              style={{ fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 600, color: '#b4003e' }}
+              style={{ fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 600, color: 'var(--text-primary)' }}
             >
               Target playlist
             </label>
@@ -339,9 +339,9 @@ export default function UploadPlaylistModal({
               disabled={busy || Boolean(newTitle.trim())}
               className="w-full px-3 py-2 text-sm rounded"
               style={{
-                background: '#231815',
-                border: '1px solid #3D2820',
-                color: '#E8DDD0',
+                background: 'var(--bg-surface)',
+                border: '1px solid var(--border)',
+                color: 'var(--text-primary)',
                 fontFamily: "'Barlow Semi Condensed', sans-serif",
               }}
             >
@@ -357,7 +357,7 @@ export default function UploadPlaylistModal({
           <div className="shrink-0 mb-4">
             <label
               className="block text-xs uppercase tracking-widest mb-1.5"
-              style={{ fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 600, color: '#b4003e' }}
+              style={{ fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 600, color: 'var(--text-primary)' }}
             >
               Or new playlist name
             </label>
@@ -368,9 +368,9 @@ export default function UploadPlaylistModal({
               placeholder="Creates playlist, then imports"
               className="w-full px-3 py-2 text-sm rounded"
               style={{
-                background: '#231815',
-                border: '1px solid #3D2820',
-                color: '#E8DDD0',
+                background: 'var(--bg-surface)',
+                border: '1px solid var(--border)',
+                color: 'var(--text-primary)',
                 fontFamily: "'Barlow Semi Condensed', sans-serif",
               }}
             />
@@ -379,7 +379,7 @@ export default function UploadPlaylistModal({
           <div className="shrink-0 mb-4">
             <label
               className="block text-xs uppercase tracking-widest mb-1.5"
-              style={{ fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 600, color: '#b4003e' }}
+              style={{ fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 600, color: 'var(--text-primary)' }}
             >
               CSV file
             </label>
@@ -391,7 +391,7 @@ export default function UploadPlaylistModal({
               onChange={(e) => handleFileChange(e.target.files?.[0] ?? null)}
               className="w-full text-sm file:mr-3 file:px-3 file:py-1.5 file:rounded file:border file:text-xs"
               style={{
-                color: '#9A8E84',
+                color: 'var(--text-primary)',
                 fontFamily: "'Barlow Semi Condensed', sans-serif",
               }}
             />
@@ -401,29 +401,29 @@ export default function UploadPlaylistModal({
             <div className="space-y-2 shrink-0">
               <div
                 className="h-2 rounded-full overflow-hidden"
-                style={{ background: '#231815', border: '1px solid #3D2820' }}
+                style={{ background: 'var(--bg-surface)', border: '1px solid var(--border)' }}
               >
                 <div
                   className="h-full transition-[width] duration-150 ease-out rounded-full"
-                  style={{ width: `${pct}%`, background: '#b4003e' }}
+                  style={{ width: `${pct}%`, background: 'var(--bg-surface)' }}
                 />
               </div>
               <div
                 className="rounded px-3 py-2 text-xs"
                 style={{
-                  background: '#231815',
-                  border: '1px solid #3D2820',
-                  color: '#C4B8A8',
+                  background: 'var(--bg-surface)',
+                  border: '1px solid var(--border)',
+                  color: 'var(--text-primary)',
                   fontFamily: "'Barlow Semi Condensed', sans-serif",
                 }}
               >
-                <div className="text-[10px] uppercase tracking-widest mb-1" style={{ color: '#b4003e' }}>
+                <div className="text-[10px] uppercase tracking-widest mb-1" style={{ color: 'var(--text-primary)' }}>
                   Now · row {importCurrent} / {importTotal}
                 </div>
-                <div className="text-sm font-medium" style={{ color: '#E8DDD0' }}>
+                <div className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>
                   {liveTitle} <span style={{ color: '#7A6E66' }}>—</span> {liveArtist}
                 </div>
-                <div className="mt-1 text-[11px]" style={{ color: '#9A8E84' }}>
+                <div className="mt-1 text-[11px]" style={{ color: 'var(--text-primary)' }}>
                   {livePhase}
                 </div>
               </div>
@@ -438,22 +438,22 @@ export default function UploadPlaylistModal({
                 <div
                   className="rounded px-3 py-2 text-xs shrink-0"
                   style={{
-                    background: '#231815',
-                    border: '1px solid #3D2820',
-                    color: '#C4B8A8',
+                    background: 'var(--bg-surface)',
+                    border: '1px solid var(--border)',
+                    color: 'var(--text-primary)',
                     fontFamily: "'Barlow Semi Condensed', sans-serif",
                   }}
                 >
-                  <div className="text-[10px] uppercase tracking-widest mb-1" style={{ color: '#b4003e' }}>
+                  <div className="text-[10px] uppercase tracking-widest mb-1" style={{ color: 'var(--text-primary)' }}>
                     Import summary (live)
                   </div>
                   <div>
-                    Needs attention: <span style={{ color: '#E8DDD0' }}>{liveUnmatched.length}</span> unmatched ·{' '}
-                    <span style={{ color: '#E8DDD0' }}>{liveErrored.length}</span> errors
+                    Needs attention: <span style={{ color: 'var(--text-primary)' }}>{liveUnmatched.length}</span> unmatched ·{' '}
+                    <span style={{ color: 'var(--text-primary)' }}>{liveErrored.length}</span> errors
                   </div>
                   {liveUnmatched.length > 0 && (
                     <div className="mt-2">
-                      <div className="text-[10px] uppercase tracking-widest mb-1" style={{ color: '#b4003e' }}>
+                      <div className="text-[10px] uppercase tracking-widest mb-1" style={{ color: 'var(--text-primary)' }}>
                         Unmatched preview
                       </div>
                       <div className="space-y-1 max-h-24 overflow-y-auto pr-1">
@@ -477,28 +477,28 @@ export default function UploadPlaylistModal({
                             // ignore
                           }
                           return (
-                            <div key={r.row_index} style={{ color: '#9A8E84' }}>
-                              <span style={{ color: '#6B5E56' }}>#{r.row_index + 2}</span>{' '}
+                            <div key={r.row_index} style={{ color: 'var(--text-primary)' }}>
+                              <span style={{ color: 'var(--text-primary)' }}>#{r.row_index + 2}</span>{' '}
                               {suggestedMbid ? (
                                 <>
-                                  <span style={{ color: '#C4B8A8' }}>suggested</span>{' '}
-                                  <span style={{ color: '#E8DDD0' }}>{suggestedArtist || '—'} — {suggestedTitle || '—'}</span>{' '}
-                                  <span style={{ color: '#6B5E56' }}>·</span>{' '}
-                                  <span style={{ fontFamily: "'Barlow Semi Condensed', sans-serif", color: '#C4B8A8' }}>
+                                  <span style={{ color: 'var(--text-primary)' }}>suggested</span>{' '}
+                                  <span style={{ color: 'var(--text-primary)' }}>{suggestedArtist || '—'} — {suggestedTitle || '—'}</span>{' '}
+                                  <span style={{ color: 'var(--text-primary)' }}>·</span>{' '}
+                                  <span style={{ fontFamily: "'Barlow Semi Condensed', sans-serif", color: 'var(--text-primary)' }}>
                                     {suggestedMbid}
                                   </span>
                                 </>
                               ) : (
-                                <span style={{ color: '#C4B8A8' }}>no suggestion</span>
+                                <span style={{ color: 'var(--text-primary)' }}>no suggestion</span>
                               )}
                             </div>
                           )
                         })}
                         {liveUnmatched.length > 12 ? (
-                          <div style={{ color: '#6B5E56' }}>…and {liveUnmatched.length - 12} more</div>
+                          <div style={{ color: 'var(--text-primary)' }}>…and {liveUnmatched.length - 12} more</div>
                         ) : null}
                       </div>
-                      <div className="mt-1 text-[11px]" style={{ color: '#6B5E56' }}>
+                      <div className="mt-1 text-[11px]" style={{ color: 'var(--text-primary)' }}>
                         Full unmatched list becomes available after import finishes (below).
                       </div>
                     </div>
@@ -509,24 +509,24 @@ export default function UploadPlaylistModal({
                 <>
                   <div
                     className="text-[10px] uppercase tracking-widest"
-                    style={{ fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 600, color: '#b4003e' }}
+                    style={{ fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 600, color: 'var(--text-primary)' }}
                   >
                     Imported
                   </div>
                   <div
                     className="rounded p-2 min-h-[80px] max-h-[200px] overflow-y-auto text-xs space-y-1.5"
                     style={{
-                      background: '#231815',
-                      border: '1px solid #3D2820',
+                      background: 'var(--bg-surface)',
+                      border: '1px solid var(--border)',
                       fontFamily: "'Barlow Semi Condensed', sans-serif",
                     }}
                   >
                     {successLog.map((line, i) => (
-                      <div key={i} style={{ color: '#C4B8A8' }}>
-                        <span style={{ color: '#E8DDD0' }}>
+                      <div key={i} style={{ color: 'var(--text-primary)' }}>
+                        <span style={{ color: 'var(--text-primary)' }}>
                           {line.artist} — {line.title}
                         </span>
-                        <span style={{ color: '#6B5E56' }}> · </span>
+                        <span style={{ color: 'var(--text-primary)' }}> · </span>
                         <span style={{ color: '#8A7E72' }}>{line.phase}</span>
                       </div>
                     ))}
@@ -537,9 +537,9 @@ export default function UploadPlaylistModal({
                 <pre
                   className="text-xs whitespace-pre-wrap rounded p-3 shrink-0 max-h-28 overflow-y-auto"
                   style={{
-                    background: '#231815',
-                    border: '1px solid #3D2820',
-                    color: '#9A8E84',
+                    background: 'var(--bg-surface)',
+                    border: '1px solid var(--border)',
+                    color: 'var(--text-primary)',
                     fontFamily: "'Barlow Semi Condensed', sans-serif",
                   }}
                 >
@@ -547,7 +547,7 @@ export default function UploadPlaylistModal({
                 </pre>
               )}
               {!busy && jobId != null && (
-                <div className="text-[11px] mt-1" style={{ color: '#6B5E56', fontFamily: "'Barlow Semi Condensed', sans-serif" }}>
+                <div className="text-[11px] mt-1" style={{ color: 'var(--text-primary)', fontFamily: "'Barlow Semi Condensed', sans-serif" }}>
                   Import job: {jobId}
                 </div>
               )}
@@ -555,7 +555,7 @@ export default function UploadPlaylistModal({
                 <div className="mt-3 flex flex-col min-h-0 flex-1">
                   <div
                     className="flex items-center justify-between text-[10px] uppercase tracking-widest"
-                    style={{ fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 600, color: '#b4003e' }}
+                    style={{ fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 600, color: 'var(--text-primary)' }}
                   >
                     <span>Unmatched</span>
                     <button
@@ -565,30 +565,30 @@ export default function UploadPlaylistModal({
                         if (activePlaylistId && jobId) refreshUnmatched(activePlaylistId, jobId)
                       }}
                       className="px-2 py-1 rounded"
-                      style={{ border: '1px solid #3D2820', color: '#9A8E84' }}
+                      style={{ border: '1px solid var(--border)', color: 'var(--text-primary)' }}
                     >
                       {unmatchedBusy ? 'Loading…' : 'Refresh'}
                     </button>
                   </div>
                   {unmatched.length === 0 ? (
-                    <div className="text-xs mt-2" style={{ color: '#9A8E84', fontFamily: "'Barlow Semi Condensed', sans-serif" }}>
+                    <div className="text-xs mt-2" style={{ color: 'var(--text-primary)', fontFamily: "'Barlow Semi Condensed', sans-serif" }}>
                       No unmatched rows.
                     </div>
                   ) : (
                   <div
                     className="rounded p-2 mt-2 flex-1 min-h-0 overflow-y-auto text-xs space-y-2"
                     style={{
-                      background: '#231815',
-                      border: '1px solid #3D2820',
+                      background: 'var(--bg-surface)',
+                      border: '1px solid var(--border)',
                       fontFamily: "'Barlow Semi Condensed', sans-serif",
                     }}
                   >
                       {unmatched.slice(0, 80).map((r) => (
-                        <div key={r.id} className="space-y-1 pb-2" style={{ borderBottom: '1px solid rgba(61,40,32,0.6)' }}>
-                          <div style={{ color: '#E8DDD0' }}>
-                            <span style={{ color: '#6B5E56' }}>#{r.row_index + 2}</span>{' '}
-                            <span style={{ color: '#C4B8A8' }}>CSV:</span> {r.artist} — {r.title}
-                            {r.album ? <span style={{ color: '#6B5E56' }}> · {r.album}</span> : null}
+                        <div key={r.id} className="space-y-1 pb-2" style={{ borderBottom: '1px solid color-mix(in srgb, var(--border) 0.6, transparent)' }}>
+                          <div style={{ color: 'var(--text-primary)' }}>
+                            <span style={{ color: 'var(--text-primary)' }}>#{r.row_index + 2}</span>{' '}
+                            <span style={{ color: 'var(--text-primary)' }}>CSV:</span> {r.artist} — {r.title}
+                            {r.album ? <span style={{ color: 'var(--text-primary)' }}> · {r.album}</span> : null}
                           </div>
                           {(() => {
                             if (!r.details_json) return null
@@ -599,10 +599,10 @@ export default function UploadPlaylistModal({
                               const salb = (d?.album ?? '').trim()
                               if (!st && !sa && !salb) return null
                               return (
-                                <div style={{ color: '#9A8E84' }}>
-                                  <span style={{ color: '#C4B8A8' }}>Suggested:</span>{' '}
-                                  <span style={{ color: '#E8DDD0' }}>{sa || '—'} — {st || '—'}</span>
-                                  {salb ? <span style={{ color: '#6B5E56' }}> · {salb}</span> : null}
+                                <div style={{ color: 'var(--text-primary)' }}>
+                                  <span style={{ color: 'var(--text-primary)' }}>Suggested:</span>{' '}
+                                  <span style={{ color: 'var(--text-primary)' }}>{sa || '—'} — {st || '—'}</span>
+                                  {salb ? <span style={{ color: 'var(--text-primary)' }}> · {salb}</span> : null}
                                 </div>
                               )
                             } catch {
@@ -614,7 +614,7 @@ export default function UploadPlaylistModal({
                               type="button"
                               disabled={unmatchedBusy}
                               className="px-2 py-1 rounded text-xs"
-                              style={{ border: '1px solid #3D2820', color: '#9A8E84' }}
+                              style={{ border: '1px solid var(--border)', color: 'var(--text-primary)' }}
                               onClick={() => {
                                 const q = encodeURIComponent(`${r.artist} ${r.title}`.trim())
                                 window.open(`/search?q=${q}`, '_blank')
@@ -629,7 +629,7 @@ export default function UploadPlaylistModal({
                                   type="button"
                                   disabled={unmatchedBusy}
                                   className="px-3 py-1 rounded text-xs"
-                                  style={{ background: '#b4003e', color: '#E8DDD0' }}
+                                  style={{ background: 'var(--bg-surface)', color: 'var(--text-primary)' }}
                                   onClick={() => {
                                     if (activePlaylistId && jobId) resolveOne(activePlaylistId, jobId, r.id, r.mb_recording_id ?? '')
                                   }}
@@ -641,7 +641,7 @@ export default function UploadPlaylistModal({
                                   type="button"
                                   disabled={unmatchedBusy}
                                   className="px-3 py-1 rounded text-xs"
-                                  style={{ border: '1px solid #3D2820', color: '#9A8E84' }}
+                                  style={{ border: '1px solid var(--border)', color: 'var(--text-primary)' }}
                                   onClick={() => {
                                     if (activePlaylistId && jobId) rejectOne(activePlaylistId, jobId, r.id)
                                   }}
@@ -653,7 +653,7 @@ export default function UploadPlaylistModal({
                                   type="button"
                                   disabled={unmatchedBusy}
                                   className="px-3 py-1 rounded text-xs"
-                                  style={{ border: '1px solid #3D2820', color: '#9A8E84' }}
+                                  style={{ border: '1px solid var(--border)', color: 'var(--text-primary)' }}
                                   onClick={() => setEditRowId((prev) => (prev === r.id ? null : r.id))}
                                   title="Manually edit MBID"
                                 >
@@ -665,7 +665,7 @@ export default function UploadPlaylistModal({
                                 type="button"
                                 disabled={unmatchedBusy}
                                 className="px-3 py-1 rounded text-xs"
-                                style={{ border: '1px solid #3D2820', color: '#9A8E84' }}
+                                style={{ border: '1px solid var(--border)', color: 'var(--text-primary)' }}
                                 onClick={() => setEditRowId((prev) => (prev === r.id ? null : r.id))}
                                 title="Enter MBID manually"
                               >
@@ -681,9 +681,9 @@ export default function UploadPlaylistModal({
                                 disabled={unmatchedBusy}
                                 className="min-w-[280px] flex-1 px-2 py-1 rounded text-xs"
                                 style={{
-                                  background: '#1A1210',
-                                  border: '1px solid #3D2820',
-                                  color: '#E8DDD0',
+                                  background: 'var(--bg-surface)',
+                                  border: '1px solid var(--border)',
+                                  color: 'var(--text-primary)',
                                   fontFamily: "'Barlow Semi Condensed', sans-serif",
                                 }}
                                 onKeyDown={(e) => {
@@ -698,7 +698,7 @@ export default function UploadPlaylistModal({
                                 type="button"
                                 disabled={unmatchedBusy}
                                 className="px-3 py-1 rounded text-xs"
-                                style={{ background: '#b4003e', color: '#E8DDD0' }}
+                                style={{ background: 'var(--bg-surface)', color: 'var(--text-primary)' }}
                                 onClick={(e) => {
                                   const input = (e.currentTarget.parentElement?.querySelector('input') ??
                                     null) as HTMLInputElement | null
@@ -711,14 +711,14 @@ export default function UploadPlaylistModal({
                             </div>
                           ) : null}
                           {r.error ? (
-                            <div style={{ color: '#9A8E84' }}>Reason: {r.error}</div>
+                            <div style={{ color: 'var(--text-primary)' }}>Reason: {r.error}</div>
                           ) : r.phase ? (
-                            <div style={{ color: '#9A8E84' }}>Phase: {r.phase}</div>
+                            <div style={{ color: 'var(--text-primary)' }}>Phase: {r.phase}</div>
                           ) : null}
                         </div>
                       ))}
                       {unmatched.length > 80 ? (
-                        <div style={{ color: '#9A8E84' }}>
+                        <div style={{ color: 'var(--text-primary)' }}>
                           Showing first 80 of {unmatched.length}. Use Refresh after resolving.
                         </div>
                       ) : null}
@@ -729,7 +729,7 @@ export default function UploadPlaylistModal({
             </div>
           )}
 
-          <div className="flex justify-end gap-2 pt-3 pb-1 shrink-0 mt-3" style={{ borderTop: '1px solid #261A14' }}>
+          <div className="flex justify-end gap-2 pt-3 pb-1 shrink-0 mt-3" style={{ borderTop: '1px solid var(--border-subtle)' }}>
             <button
               type="button"
               onClick={handleClose}
@@ -738,8 +738,8 @@ export default function UploadPlaylistModal({
               style={{
                 fontFamily: "'Barlow Condensed', sans-serif",
                 fontWeight: 600,
-                color: '#9A8E84',
-                border: '1px solid #3D2820',
+                color: 'var(--text-primary)',
+                border: '1px solid var(--border)',
                 background: 'transparent',
               }}
             >
@@ -754,8 +754,8 @@ export default function UploadPlaylistModal({
                 fontWeight: 700,
                 textTransform: 'uppercase',
                 letterSpacing: '0.06em',
-                background: '#b4003e',
-                color: '#E8DDD0',
+                background: 'var(--bg-surface)',
+                color: 'var(--text-primary)',
                 border: 'none',
               }}
             >

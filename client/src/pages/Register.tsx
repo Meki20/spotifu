@@ -34,8 +34,8 @@ export default function Register() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-[#121212]">
-      <form onSubmit={handleSubmit} className="bg-[#181818] p-8 rounded-lg w-full max-w-sm space-y-4">
+    <div className="min-h-screen flex items-center justify-center bg-[var(--bg-base)]">
+      <form onSubmit={handleSubmit} className="bg-[var(--bg-surface)] p-8 rounded-lg w-full max-w-sm space-y-4">
         <h1 className="text-2xl font-bold text-white mb-4">Create account</h1>
         {error && <p className="text-red-500 text-sm">{error}</p>}
         <input
@@ -43,7 +43,7 @@ export default function Register() {
           placeholder="Username"
           value={username}
           onChange={(e) => setUsername(e.target.value)}
-          className="w-full px-4 py-3 bg-[#282828] rounded-md text-white placeholder-[#b3b3b3] focus:outline-none focus:ring-2 focus:ring-[#1DB954]"
+          className="w-full px-4 py-3 bg-[var(--bg-surface-2)] rounded-md text-white placeholder-[var(--text-secondary)] focus:outline-none focus:ring-2 focus:ring-[#1DB954]"
           required
         />
         <input
@@ -51,7 +51,7 @@ export default function Register() {
           placeholder="Password"
           value={password}
           onChange={(e) => setPassword(e.target.value)}
-          className="w-full px-4 py-3 bg-[#282828] rounded-md text-white placeholder-[#b3b3b3] focus:outline-none focus:ring-2 focus:ring-[#1DB954]"
+          className="w-full px-4 py-3 bg-[var(--bg-surface-2)] rounded-md text-white placeholder-[var(--text-secondary)] focus:outline-none focus:ring-2 focus:ring-[#1DB954]"
           required
         />
         <button
@@ -60,7 +60,7 @@ export default function Register() {
         >
           Create account
         </button>
-        <p className="text-center text-sm text-[#b3b3b3]">
+        <p className="text-center text-sm text-[var(--text-secondary)]">
           Already have an account?{' '}
           <Link to="/login" className="text-[#1DB954] hover:underline">Sign in</Link>
         </p>

@@ -35,8 +35,8 @@ export default function Login() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-[#121212]">
-      <form onSubmit={handleSubmit} className="bg-[#181818] p-8 rounded-lg w-full max-w-sm space-y-4">
+    <div className="min-h-screen flex items-center justify-center bg-[var(--bg-base)]">
+      <form onSubmit={handleSubmit} className="bg-[var(--bg-surface)] p-8 rounded-lg w-full max-w-sm space-y-4">
         <h1 className="text-2xl font-bold text-white mb-4">Sign in to SpotiFU</h1>
         {error && <p className="text-red-500 text-sm">{error}</p>}
         <input
@@ -44,7 +44,7 @@ export default function Login() {
           placeholder="Username"
           value={username}
           onChange={(e) => setUsername(e.target.value)}
-          className="w-full px-4 py-3 bg-[#282828] rounded-md text-white placeholder-[#b3b3b3] focus:outline-none focus:ring-2 focus:ring-[#1DB954]"
+          className="w-full px-4 py-3 bg-[var(--bg-surface-2)] rounded-md text-white placeholder-[var(--text-secondary)] focus:outline-none focus:ring-2 focus:ring-[#1DB954]"
           required
         />
         <input
@@ -52,10 +52,10 @@ export default function Login() {
           placeholder="Password"
           value={password}
           onChange={(e) => setPassword(e.target.value)}
-          className="w-full px-4 py-3 bg-[#282828] rounded-md text-white placeholder-[#b3b3b3] focus:outline-none focus:ring-2 focus:ring-[#1DB954]"
+          className="w-full px-4 py-3 bg-[var(--bg-surface-2)] rounded-md text-white placeholder-[var(--text-secondary)] focus:outline-none focus:ring-2 focus:ring-[#1DB954]"
           required
         />
-        <label className="flex items-center gap-2 text-sm text-[#b3b3b3] cursor-pointer">
+        <label className="flex items-center gap-2 text-sm text-[var(--text-secondary)] cursor-pointer">
           <input
             type="checkbox"
             checked={remember}
@@ -70,7 +70,7 @@ export default function Login() {
         >
           Sign in
         </button>
-        <p className="text-center text-sm text-[#b3b3b3]">
+        <p className="text-center text-sm text-[var(--text-secondary)]">
           Don't have an account?{' '}
           <Link to="/register" className="text-[#1DB954] hover:underline">Sign up</Link>
         </p>

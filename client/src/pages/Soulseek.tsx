@@ -207,11 +207,11 @@ export default function Soulseek() {
       <div className="p-6 pb-4">
         <h1
           className="text-3xl font-bold mb-1"
-          style={{ fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 800, color: '#E8DDD0', letterSpacing: '0.02em' }}
+          style={{ fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 800, color: 'var(--text-primary)', letterSpacing: '0.02em' }}
         >
           Soulseek
         </h1>
-        <p style={{ color: '#9A8E84', fontFamily: "'Barlow Semi Condensed', sans-serif" }}>
+        <p style={{ color: 'var(--text-primary)', fontFamily: "'Barlow Semi Condensed', sans-serif" }}>
           Search and download music directly
         </p>
       </div>
@@ -220,13 +220,13 @@ export default function Soulseek() {
         <div className="px-6 pb-4">
           <div
             className="p-4 rounded-md flex items-center gap-3"
-            style={{ background: 'rgba(180, 0, 62, 0.15)', border: '1px solid rgba(180, 0, 62, 0.3)' }}
+            style={{ background: 'color-mix(in srgb, var(--accent) 0.15, transparent)', border: '1px solid color-mix(in srgb, var(--accent) 0.3, transparent)' }}
           >
-            <span style={{ color: '#b4003e', fontSize: '1.5rem' }}>⚠</span>
+            <span style={{ color: 'var(--text-primary)', fontSize: '1.5rem' }}>⚠</span>
             <div>
-              <p style={{ color: '#E8DDD0', fontWeight: 600 }}>Soulseek not connected</p>
-              <p style={{ color: '#9A8E84', fontSize: '0.875rem' }}>
-                Go to <Link to="/settings" style={{ color: '#b4003e', textDecoration: 'underline' }}>Settings</Link> to configure Soulseek credentials
+              <p style={{ color: 'var(--text-primary)', fontWeight: 600 }}>Soulseek not connected</p>
+              <p style={{ color: 'var(--text-primary)', fontSize: '0.875rem' }}>
+                Go to <Link to="/settings" style={{ color: 'var(--text-primary)', textDecoration: 'underline' }}>Settings</Link> to configure Soulseek credentials
               </p>
             </div>
           </div>
@@ -242,9 +242,9 @@ export default function Soulseek() {
             placeholder="Search Soulseek (e.g., 'Artist - Title')"
             className="flex-1 px-4 py-2 rounded-md text-sm"
             style={{
-              background: '#1A1210',
-              border: '1px solid #3D2820',
-              color: '#E8DDD0',
+              background: 'var(--bg-surface)',
+              border: '1px solid var(--border)',
+              color: 'var(--text-primary)',
               fontFamily: "'Barlow Semi Condensed', sans-serif",
             }}
             disabled={!connected}
@@ -254,8 +254,8 @@ export default function Soulseek() {
             disabled={!connected || searchLoading}
             className="px-4 py-2 rounded-md text-sm font-semibold transition-colors"
             style={{
-              background: connected ? '#b4003e' : '#3D2820',
-              color: connected ? '#E8DDD0' : '#9A8E84',
+              background: connected ? 'var(--bg-surface)' : 'var(--bg-surface)',
+              color: connected ? 'var(--text-primary)' : 'var(--text-primary)',
               cursor: connected ? 'pointer' : 'not-allowed',
             }}
           >
@@ -268,7 +268,7 @@ export default function Soulseek() {
         <div className="px-6 pb-4">
           <div
             className="p-3 rounded-md text-sm"
-            style={{ background: 'rgba(180, 0, 62, 0.1)', color: '#b4003e' }}
+            style={{ background: 'color-mix(in srgb, var(--accent) 0.1, transparent)', color: 'var(--text-primary)' }}
           >
             Search failed: {(searchError as Error).message}
           </div>
@@ -283,14 +283,14 @@ export default function Soulseek() {
               fontFamily: "'Barlow Condensed', sans-serif",
               textTransform: 'uppercase',
               letterSpacing: '0.15em',
-              color: '#4A413C',
+              color: 'var(--text-primary)',
             }}
           >
             Results ({searchResults.length})
           </h2>
           <div
             className="rounded-md overflow-hidden"
-            style={{ background: '#1A1210', border: '1px solid #3D2820' }}
+            style={{ background: 'var(--bg-surface)', border: '1px solid var(--border)' }}
           >
             {searchResults.slice(0, 20).map((result, idx) => {
               const filename = result.path.split(/[/\\]/).pop() ?? ''
@@ -300,18 +300,18 @@ export default function Soulseek() {
                   key={`${result.username}-${result.path}-${idx}`}
                   className="flex items-center justify-between px-4 py-2 border-b"
                   style={{
-                    borderColor: idx < searchResults.length - 1 ? '#261A14' : 'transparent',
+                    borderColor: idx < searchResults.length - 1 ? 'var(--border)' : 'transparent',
                   }}
                 >
                   <div className="flex-1 min-w-0">
                     <p
                       className="text-sm truncate"
-                      style={{ color: '#E8DDD0', fontFamily: "'Barlow Semi Condensed', sans-serif" }}
+                      style={{ color: 'var(--text-primary)', fontFamily: "'Barlow Semi Condensed', sans-serif" }}
                       title={filename}
                     >
                       {filename}
                     </p>
-                    <p className="text-xs truncate" style={{ color: '#9A8E84' }}>
+                    <p className="text-xs truncate" style={{ color: 'var(--text-primary)' }}>
                       {result.username} · {formatBytes(result.size)} · {result.ext}
                     </p>
                   </div>
@@ -322,8 +322,8 @@ export default function Soulseek() {
                     disabled={isDownloading || downloadMutation.isPending}
                     className="ml-3 px-3 py-1 rounded text-xs font-semibold transition-colors"
                     style={{
-                      background: isDownloading ? '#3D2820' : '#b4003e',
-                      color: isDownloading ? '#9A8E84' : '#E8DDD0',
+                      background: isDownloading ? 'var(--bg-surface)' : 'var(--bg-surface)',
+                      color: isDownloading ? 'var(--text-primary)' : 'var(--text-primary)',
                       cursor: isDownloading ? 'not-allowed' : 'pointer',
                     }}
                   >
@@ -338,7 +338,7 @@ export default function Soulseek() {
 
       {searchResults && searchResults.length === 0 && query && !searchLoading && (
         <div className="px-6 pb-4">
-          <p style={{ color: '#9A8E84' }}>No results found for "{query}"</p>
+          <p style={{ color: 'var(--text-primary)' }}>No results found for "{query}"</p>
         </div>
       )}
 
@@ -350,14 +350,14 @@ export default function Soulseek() {
               fontFamily: "'Barlow Condensed', sans-serif",
               textTransform: 'uppercase',
               letterSpacing: '0.15em',
-              color: '#4A413C',
+              color: 'var(--text-primary)',
             }}
           >
             Active Downloads
           </h2>
           <div
             className="rounded-md overflow-hidden"
-            style={{ background: '#1A1210', border: '1px solid #3D2820' }}
+            style={{ background: 'var(--bg-surface)', border: '1px solid var(--border)' }}
           >
             {downloadsData?.active.map((download) => {
               const progress = downloadProgress[download.track_id]
@@ -367,26 +367,26 @@ export default function Soulseek() {
                 <div
                   key={download.track_id}
                   className="px-4 py-3 border-b"
-                  style={{ borderColor: '#261A14' }}
+                  style={{ borderColor: 'var(--border)' }}
                 >
                   <div className="flex items-center justify-between mb-1">
                     <span
                       className="text-sm truncate"
-                      style={{ color: '#E8DDD0', fontFamily: "'Barlow Semi Condensed', sans-serif" }}
+                      style={{ color: 'var(--text-primary)', fontFamily: "'Barlow Semi Condensed', sans-serif" }}
                     >
                       {download.artist} - {download.title}
                     </span>
-                    <span className="text-xs" style={{ color: '#9A8E84' }}>
+                    <span className="text-xs" style={{ color: 'var(--text-primary)' }}>
                       {percent}% · {formatSpeed(speed)}
                     </span>
                   </div>
                   <div
                     className="h-1 rounded-full overflow-hidden"
-                    style={{ background: '#261A14' }}
+                    style={{ background: 'var(--bg-surface)' }}
                   >
                     <div
                       className="h-full transition-all"
-                      style={{ width: `${percent}%`, background: '#b4003e' }}
+                      style={{ width: `${percent}%`, background: 'var(--bg-surface)' }}
                     />
                   </div>
                 </div>
@@ -404,40 +404,40 @@ export default function Soulseek() {
               fontFamily: "'Barlow Condensed', sans-serif",
               textTransform: 'uppercase',
               letterSpacing: '0.15em',
-              color: '#4A413C',
+              color: 'var(--text-primary)',
             }}
           >
             Recent Downloads
           </h2>
           <div
             className="rounded-md overflow-hidden"
-            style={{ background: '#1A1210', border: '1px solid #3D2820' }}
+            style={{ background: 'var(--bg-surface)', border: '1px solid var(--border)' }}
           >
             {downloadsData?.recent.map((item, idx) => (
               <div
                 key={`${item.track_id}-${item.completed_at}-${idx}`}
                 className="flex items-center justify-between px-4 py-2 border-b"
-                style={{ borderColor: idx < (downloadsData.recent.length - 1) ? '#261A14' : 'transparent' }}
+                style={{ borderColor: idx < (downloadsData.recent.length - 1) ? 'var(--border)' : 'transparent' }}
               >
                 <div className="flex-1 min-w-0">
                   <p
                     className="text-sm truncate"
-                    style={{ color: '#E8DDD0', fontFamily: "'Barlow Semi Condensed', sans-serif" }}
+                    style={{ color: 'var(--text-primary)', fontFamily: "'Barlow Semi Condensed', sans-serif" }}
                   >
                     {item.artist} - {item.title}
                   </p>
-                  <p className="text-xs truncate" style={{ color: '#9A8E84' }}>
+                  <p className="text-xs truncate" style={{ color: 'var(--text-primary)' }}>
                     {item.status === 'completed' ? (
                       <span style={{ color: '#4ADE80' }}>Completed</span>
                     ) : item.status === 'failed' ? (
-                      <span style={{ color: '#b4003e' }}>Failed</span>
+                      <span style={{ color: 'var(--text-primary)' }}>Failed</span>
                     ) : (
                       item.status
                     )}
                   </p>
                 </div>
                 {item.status === 'completed' && (
-                  <span className="text-xs ml-3" style={{ color: '#4A413C' }}>
+                  <span className="text-xs ml-3" style={{ color: 'var(--text-primary)' }}>
                     {formatBytes(item.local_path ? 0 : 0)}
                   </span>
                 )}

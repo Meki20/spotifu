@@ -37,26 +37,26 @@ export default function ArtistCard({ artist, imageUrl, onClick }: ArtistCardProp
       ref={cardRef}
       className="p-5 rounded cursor-pointer border transition-all duration-150 relative overflow-hidden flex flex-col items-center"
       style={{
-        background: '#1A1210',
-        borderColor: '#3D2820',
+        background: 'var(--bg-surface)',
+        borderColor: 'var(--border)',
         borderRadius: 4,
         width: 220,
       }}
       onClick={handleClick}
       onMouseEnter={(e) => {
-        e.currentTarget.style.background = '#231815'
-        e.currentTarget.style.borderColor = '#b4003e'
+        e.currentTarget.style.background = 'var(--text-primary)'
+        e.currentTarget.style.borderColor = 'var(--text-primary)'
       }}
       onMouseLeave={(e) => {
-        e.currentTarget.style.background = '#1A1210'
-        e.currentTarget.style.borderColor = '#3D2820'
+        e.currentTarget.style.background = 'var(--text-primary)'
+        e.currentTarget.style.borderColor = 'var(--text-primary)'
       }}
     >
       <div
         data-transition-circle
         className="relative z-10 flex items-center justify-center overflow-hidden rounded-full mb-4"
         style={{
-          background: '#231815',
+          background: 'var(--bg-surface)',
           width: 128,
           height: 128,
         }}
@@ -72,7 +72,7 @@ export default function ArtistCard({ artist, imageUrl, onClick }: ArtistCardProp
           <span
             style={{
               fontSize: 44,
-              color: '#4A413C',
+              color: 'var(--text-primary)',
               fontFamily: "'Barlow Condensed', sans-serif",
               fontWeight: 700,
               textTransform: 'uppercase',
@@ -87,7 +87,7 @@ export default function ArtistCard({ artist, imageUrl, onClick }: ArtistCardProp
         style={{
           fontFamily: "'Barlow Condensed', sans-serif",
           fontWeight: 600,
-          color: '#E8DDD0',
+          color: 'var(--text-primary)',
         }}
       >
         {artist.name}
@@ -97,7 +97,7 @@ export default function ArtistCard({ artist, imageUrl, onClick }: ArtistCardProp
           className="relative z-10 text-xs truncate text-center mt-1"
           style={{
             fontFamily: "'Barlow Semi Condensed', sans-serif",
-            color: '#9A8E84',
+            color: 'var(--text-primary)',
           }}
         >
           {artist.disambiguation}
@@ -109,7 +109,7 @@ export default function ArtistCard({ artist, imageUrl, onClick }: ArtistCardProp
             className="relative z-10 text-xs"
             style={{
               fontFamily: "'Barlow Semi Condensed', sans-serif",
-              color: '#4A413C',
+              color: 'var(--text-primary)',
             }}
           >
             {artist.type}
@@ -120,7 +120,7 @@ export default function ArtistCard({ artist, imageUrl, onClick }: ArtistCardProp
             className="relative z-10 text-xs"
             style={{
               fontFamily: "'Barlow Semi Condensed', sans-serif",
-              color: '#4A413C',
+              color: 'var(--text-primary)',
             }}
           >
             {artist.country}

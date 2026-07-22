@@ -157,15 +157,15 @@ export default function MainLayout() {
   }
 
   return (
-    <div className="flex flex-col h-screen w-screen overflow-hidden bg-[#100B04]">
+    <div className="flex flex-col h-screen w-screen overflow-hidden bg-[var(--bg-base)]">
       <div className="flex flex-1 overflow-hidden">
         {/* Sidebar */}
         <aside
           className="flex flex-col h-full relative shrink-0 overflow-hidden"
           style={{
             width: sidebarWidthPx,
-            background: '#231815',
-            borderRight: '1px solid #3D2820',
+            background: 'var(--bg-surface)',
+            borderRight: '1px solid var(--border)',
             transition: 'width 220ms cubic-bezier(0.2, 0.9, 0.2, 1)',
             willChange: 'width',
           }}
@@ -182,7 +182,7 @@ export default function MainLayout() {
           <div
             className="absolute inset-0 pointer-events-none opacity-4"
             style={{
-              backgroundImage: `radial-gradient(circle, #3D2820 1px, transparent 1px), linear-gradient(#261A14 1px, transparent 1px), linear-gradient(90deg, #261A14 1px, transparent 1px)`,
+              backgroundImage: `radial-gradient(circle, var(--border) 1px, transparent 1px), linear-gradient(var(--border-subtle) 1px, transparent 1px), linear-gradient(90deg, var(--border-subtle) 1px, transparent 1px)`,
               backgroundSize: '24px 24px',
             }}
           />
@@ -192,7 +192,7 @@ export default function MainLayout() {
             <div
               className="pt-4 pb-3"
               style={{
-                borderBottom: '1px solid #261A14',
+                borderBottom: '1px solid var(--border-subtle)',
                 paddingLeft: collapsed ? 0 : 16,
                 paddingRight: collapsed ? 0 : 16,
                 transition: 'padding 220ms cubic-bezier(0.2, 0.9, 0.2, 1)',
@@ -209,11 +209,11 @@ export default function MainLayout() {
                   <button
                     type="button"
                     onClick={() => setCollapsed(false)}
-                    className="w-9 h-9 rounded flex items-center justify-center transition-colors hover:border-[#b4003e]"
+                    className="w-9 h-9 rounded flex items-center justify-center transition-colors hover:border-[var(--accent)]"
                     style={{
-                      border: '1px solid #3D2820',
+                      border: '1px solid var(--border)',
                       background: 'transparent',
-                      color: '#9A8E84',
+                      color: 'var(--text-primary)',
                     }}
                     aria-label="Expand sidebar"
                     title="Expand"
@@ -237,21 +237,21 @@ export default function MainLayout() {
                         fontWeight: 800,
                         textTransform: 'uppercase',
                         letterSpacing: '0.05em',
-                        color: '#E8DDD0',
+                        color: 'var(--text-primary)',
                         lineHeight: 1,
                         whiteSpace: 'nowrap',
                       }}
                     >
-                      Spoti<span style={{ color: '#b4003e' }}>FU</span>
+                      Spoti<span style={{ color: 'var(--text-primary)' }}>FU</span>
                     </div>
                     <button
                       type="button"
                       onClick={() => setCollapsed(true)}
-                      className="ml-auto w-9 h-9 rounded flex items-center justify-center transition-colors hover:border-[#b4003e]"
+                      className="ml-auto w-9 h-9 rounded flex items-center justify-center transition-colors hover:border-[var(--accent)]"
                       style={{
-                        border: '1px solid #3D2820',
+                        border: '1px solid var(--border)',
                         background: 'transparent',
-                        color: '#9A8E84',
+                        color: 'var(--text-primary)',
                       }}
                       aria-label="Collapse sidebar"
                       title="Collapse"
@@ -261,7 +261,7 @@ export default function MainLayout() {
                   </div>
                   <div
                     className="text-sm mt-1"
-                    style={{ fontFamily: "'Barlow Semi Condensed', sans-serif", color: '#4A413C', letterSpacing: '0.05em' }}
+                    style={{ fontFamily: "'Barlow Semi Condensed', sans-serif", color: 'var(--text-primary)', letterSpacing: '0.05em' }}
                   >
                     local music · soulseek
                   </div>
@@ -278,7 +278,7 @@ export default function MainLayout() {
                   fontWeight: 700,
                   textTransform: 'uppercase',
                   letterSpacing: '0.15em',
-                  color: '#4A413C',
+                  color: 'var(--text-primary)',
                   opacity: collapsed ? 0 : 1,
                   transform: collapsed ? 'translateX(-6px)' : 'translateX(0)',
                   transition: 'opacity 120ms ease, transform 220ms cubic-bezier(0.2, 0.9, 0.2, 1)',
@@ -295,8 +295,8 @@ export default function MainLayout() {
                     to={item.id}
                     className="flex items-center cursor-pointer transition-all duration-150"
                     style={{
-                      background: active ? 'rgba(180, 0, 62, 0.12)' : 'transparent',
-                      borderLeft: active ? '2px solid #b4003e' : '2px solid transparent',
+                      background: active ? 'color-mix(in srgb, var(--accent) 0.12, transparent)' : 'transparent',
+                      borderLeft: active ? '2px solid var(--accent)' : '2px solid transparent',
                       paddingLeft: collapsed ? 0 : 16,
                       paddingRight: collapsed ? 0 : 16,
                       paddingTop: collapsed ? 10 : 6,
@@ -311,13 +311,13 @@ export default function MainLayout() {
                     <item.icon
                       size={collapsed ? 22 : 16}
                       className="w-4 h-4"
-                      style={{ color: active ? '#b4003e' : '#9A8E84' }}
+                      style={{ color: active ? 'var(--text-primary)' : 'var(--text-primary)' }}
                     />
                     <span
                       className="text-sm"
                       style={{
                         fontFamily: "'Barlow Semi Condensed', sans-serif",
-                        color: active ? '#E8DDD0' : '#9A8E84',
+                        color: active ? 'var(--text-primary)' : 'var(--text-primary)',
                         opacity: collapsed ? 0 : 1,
                         width: collapsed ? 0 : 'auto',
                         overflow: 'hidden',
@@ -332,7 +332,7 @@ export default function MainLayout() {
               })}
             </nav>
 
-            <div className="mx-4 my-2" style={{ height: '1px', background: '#261A14' }} />
+            <div className="mx-4 my-2" style={{ height: '1px', background: 'var(--bg-surface)' }} />
 
             {/* Playlists */}
             <div className="flex-1 overflow-y-auto overflow-x-hidden pb-4">
@@ -343,7 +343,7 @@ export default function MainLayout() {
                   fontWeight: 700,
                   textTransform: 'uppercase',
                   letterSpacing: '0.15em',
-                  color: '#4A413C',
+                  color: 'var(--text-primary)',
                   opacity: collapsed ? 0 : 1,
                   transform: collapsed ? 'translateX(-6px)' : 'translateX(0)',
                   transition: 'opacity 120ms ease, transform 220ms cubic-bezier(0.2, 0.9, 0.2, 1)',
@@ -381,11 +381,11 @@ export default function MainLayout() {
                         marginLeft: collapsed ? 0 : undefined,
                         marginRight: collapsed ? 0 : undefined,
                         borderRadius: collapsed ? 6 : 4,
-                        background: active ? 'rgba(180, 0, 62, 0.12)' : collapsed ? '#1A1210' : 'transparent',
+                        background: active ? 'color-mix(in srgb, var(--accent) 0.12, transparent)' : collapsed ? 'var(--bg-surface)' : 'transparent',
                         border: 'none',
                         boxShadow: collapsed
-                          ? `inset 0 0 0 1px ${active ? 'rgba(180, 0, 62, 0.55)' : '#3D2820'}`
-                          : `inset 2px 0 0 0 ${active ? '#b4003e' : 'transparent'}`,
+                          ? `inset 0 0 0 1px ${active ? 'color-mix(in srgb, var(--accent) 0.55, transparent)' : 'var(--text-primary)'}`
+                          : `inset 2px 0 0 0 ${active ? 'var(--text-primary)' : 'transparent'}`,
                         transition: 'width 220ms cubic-bezier(0.2, 0.9, 0.2, 1), height 220ms cubic-bezier(0.2, 0.9, 0.2, 1), padding 220ms cubic-bezier(0.2, 0.9, 0.2, 1), background 120ms ease, border-color 120ms ease',
                       }}
                       title={pl.title}
@@ -409,7 +409,7 @@ export default function MainLayout() {
                           width: coverSize,
                           height: coverSize,
                           borderRadius: 4,
-                          background: '#231815',
+                          background: 'var(--bg-surface)',
                           display: 'grid',
                           placeItems: 'center',
                           transition: 'width 220ms cubic-bezier(0.2, 0.9, 0.2, 1), height 220ms cubic-bezier(0.2, 0.9, 0.2, 1)',
@@ -422,7 +422,7 @@ export default function MainLayout() {
                             className="w-full h-full object-cover block"
                             loading="lazy"
                             style={{
-                              background: '#1A1210',
+                              background: 'var(--bg-surface)',
                               transform: 'scale(1.015)',
                               transformOrigin: 'center',
                               backfaceVisibility: 'hidden',
@@ -433,7 +433,7 @@ export default function MainLayout() {
                             style={{
                               fontFamily: "'Barlow Condensed', sans-serif",
                               fontWeight: 800,
-                              color: '#E8DDD0',
+                              color: 'var(--text-primary)',
                               fontSize: collapsed ? 16 : 12,
                               letterSpacing: '0.06em',
                             }}
@@ -448,7 +448,7 @@ export default function MainLayout() {
                         className="relative z-10 text-xs truncate min-w-0 flex-1"
                         style={{
                           fontFamily: "'Barlow Semi Condensed', sans-serif",
-                          color: active ? '#E8DDD0' : '#9A8E84',
+                          color: active ? 'var(--text-primary)' : 'var(--text-primary)',
                           opacity: collapsed ? 0 : 1,
                           width: collapsed ? 0 : 'auto',
                           overflow: 'hidden',
@@ -468,7 +468,7 @@ export default function MainLayout() {
         </aside>
 
         {/* Main content */}
-        <main className="flex-1 overflow-y-auto bg-[#100B04]">
+        <main className="flex-1 overflow-y-auto bg-[var(--bg-base)]">
           <Outlet />
         </main>
 

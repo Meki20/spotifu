@@ -5,10 +5,10 @@ import { reconnectWebSocket } from '../spotifuWebSocket'
 import { PollyLoading } from './PollyLoading'
 
 const inputStyle: React.CSSProperties = {
-  background: '#1A1410',
-  border: '1px solid #3D2820',
+  background: '--bg-surface',
+  border: '1px solid var(--border)',
   borderRadius: 4,
-  color: '#E8DDD0',
+  color: 'var(--text-primary)',
   fontFamily: "'Barlow Semi Condensed', sans-serif",
 }
 
@@ -111,7 +111,7 @@ export default function ServerConnectionPanel({ compact, onConnected }: ServerCo
       <div
         className="flex items-center gap-2.5 p-3 rounded"
         style={{
-          background: connStatus === 'connected' ? '#1A2820' : '#281818',
+          background: connStatus === 'connected' ? 'var(--bg-surface)' : 'var(--bg-surface)',
           border: connStatus === 'connected'
             ? '1px solid rgba(101, 163, 13, 0.35)'
             : '1px solid rgba(196, 48, 48, 0.35)',
@@ -124,11 +124,11 @@ export default function ServerConnectionPanel({ compact, onConnected }: ServerCo
           <div
             className="w-2 h-2 rounded-full shrink-0"
             style={{
-              background: connStatus === 'connected' ? 'oklch(65% 0.14 160)' : '#b4003e',
+              background: connStatus === 'connected' ? 'var(--color-success)' : 'var(--accent)',
             }}
           />
         )}
-        <span className="text-xs" style={{ fontFamily: "'Barlow Semi Condensed', sans-serif", color: '#E8DDD0' }}>
+        <span className="text-xs" style={{ fontFamily: "'Barlow Semi Condensed', sans-serif", color: 'var(--text-primary)' }}>
           {connStatus === 'checking' && 'Checking server…'}
           {connStatus === 'connected' && `Connected to ${getEffectiveApiUrl()} (${sourceLabels[source]})`}
           {connStatus === 'unreachable' && `Cannot reach ${getEffectiveApiUrl()}`}
@@ -142,7 +142,7 @@ export default function ServerConnectionPanel({ compact, onConnected }: ServerCo
           onClick={() => void runDiscovery()}
           disabled={discoverStatus === 'searching'}
           className="px-3 py-1.5 text-xs rounded cursor-pointer"
-          style={{ background: '#3D2820', color: '#E8DDD0', border: 'none' }}
+          style={{ background: 'var(--bg-surface)', color: 'var(--text-primary)', border: 'none' }}
         >
           {discoverStatus === 'searching' ? 'Searching…' : 'Search LAN'}
         </button>
@@ -150,7 +150,7 @@ export default function ServerConnectionPanel({ compact, onConnected }: ServerCo
           type="button"
           onClick={() => void checkConnection()}
           className="px-3 py-1.5 text-xs rounded cursor-pointer"
-          style={{ background: '#3D2820', color: '#E8DDD0', border: 'none' }}
+          style={{ background: 'var(--bg-surface)', color: 'var(--text-primary)', border: 'none' }}
         >
           Test connection
         </button>
@@ -159,7 +159,7 @@ export default function ServerConnectionPanel({ compact, onConnected }: ServerCo
             type="button"
             onClick={handleClear}
             className="px-3 py-1.5 text-xs rounded cursor-pointer"
-            style={{ background: 'transparent', color: '#9A8E84', border: '1px solid #3D2820' }}
+            style={{ background: 'transparent', color: 'var(--text-primary)', border: '1px solid var(--border)' }}
           >
             Reset URL
           </button>
@@ -174,7 +174,7 @@ export default function ServerConnectionPanel({ compact, onConnected }: ServerCo
                 type="button"
                 onClick={() => handleSelectDiscovered(s)}
                 className="w-full text-left px-3 py-2 text-sm rounded cursor-pointer"
-                style={{ background: '#1A1410', border: '1px solid #3D2820', color: '#E8DDD0' }}
+                style={{ background: '--bg-surface', border: '1px solid var(--border)', color: 'var(--text-primary)' }}
               >
                 {s.name} — {s.host}:{s.port}
               </button>
@@ -184,7 +184,7 @@ export default function ServerConnectionPanel({ compact, onConnected }: ServerCo
       )}
 
       <div>
-        <label className="block text-xs mb-1" style={{ fontFamily: "'Barlow Semi Condensed', sans-serif", color: '#9A8E84' }}>
+        <label className="block text-xs mb-1" style={{ fontFamily: "'Barlow Semi Condensed', sans-serif", color: 'var(--text-primary)' }}>
           Server URL
         </label>
         <div className="flex gap-2">
@@ -200,7 +200,7 @@ export default function ServerConnectionPanel({ compact, onConnected }: ServerCo
             type="button"
             onClick={() => void handleTestManual()}
             className="px-4 py-2 text-sm rounded cursor-pointer shrink-0"
-            style={{ background: '#b4003e', color: '#fff', border: 'none' }}
+            style={{ background: 'var(--bg-surface)', color: '#fff', border: 'none' }}
           >
             Save
           </button>
@@ -208,7 +208,7 @@ export default function ServerConnectionPanel({ compact, onConnected }: ServerCo
       </div>
 
       {message && (
-        <p className="text-xs" style={{ color: '#9A8E84', fontFamily: "'Barlow Semi Condensed', sans-serif" }}>
+        <p className="text-xs" style={{ color: 'var(--text-primary)', fontFamily: "'Barlow Semi Condensed', sans-serif" }}>
           {message}
         </p>
       )}

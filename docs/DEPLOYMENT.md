@@ -1,146 +1,99 @@
 # SpotiFU deployment guide
 
-This document covers running SpotiFU on a home LAN: server on one machine, clients (web browser or Tauri desktop) on the same or another device.
+Docker Compose is the single supported deploy mode. The wizard handles all credentials.
 
-## Topologies
-
-### A — Same machine (development)
+## Topology
 
 ```text
-localhost:1984  →  Vite dev server (client)
-localhost:1985  →  FastAPI server
-localhost:5432  →  PostgreSQL
+localhost:1985     →  FastAPI server (Docker)
+localhost:5432     →  PostgreSQL (loopback-only publish for host tools)
+LAN clients        →  Connect to http://<server-ip>:1985 or via mDNS
 ```
+
+## Install
 
 ```bash
-docker compose up -d postgres   # or local Postgres
-cd server && uvicorn main:app --reload --port 1985
-cd client && npm run dev
+git clone https://github.com/<org>/SpotiFU.git
+cd SpotiFU
+bash scripts/install.sh
 ```
 
-### B — Dedicated LAN server + remote clients
+This runs the wizard (Soulseek + optional API keys) then `docker compose up -d --build`.
 
-```text
-192.168.x.x:1985  →  SpotiFU server (Docker or systemd)
-192.168.x.x:1984  →  Web UI (optional, compose profile `full`)
-Clients           →  Discover via mDNS (spotifu.local) or manual URL in Settings
+## LAN deployment
+
+Copy `docker-compose.override.example.yml` to `docker-compose.override.yml` and set `API_BASE_URL` to this host's LAN IP:
+
+```yaml
+services:
+  server:
+    environment:
+      API_BASE_URL: http://192.168.1.100:1985
+      MDNS_ENABLED: "true"
 ```
 
-## Docker Compose
+Then `docker compose up -d --build`. Remote clients on the same LAN can now discover via `spotifu.local` (mDNS) or connect manually to `http://192.168.1.100:1985`.
 
-### Server only (default)
+mDNS note: in default Docker bridge mode, mDNS multicast often doesn't propagate. If `spotifu.local` doesn't resolve from a remote client, set a manual URL in the client's Settings → Server connection.
 
-Starts PostgreSQL and the API. Cache and database persist in named volumes.
+## Configuration
+
+### `.secrets` (wizard-managed)
+
+| Key | Purpose |
+|---|---|
+| `jwt_secret` | JWT signing (auto-generated, ≥32 chars) |
+| `soulseek_username` / `soulseek_password` | Soulseek login |
+| `lastfm_api_key` | optional |
+| `fanarttv_api_key` | optional |
+
+Bind-mounted to `/app/.secrets` in the server container, mode `0600`. Re-run `bash scripts/install.sh wizard` to update.
+
+### `.env` (optional host overrides)
+
+Copy `.env.example` to `.env` and uncomment anything you want to override. Common:
+
+- `API_BASE_URL` — LAN IP for remote clients (or use the override file above)
+- `ALLOWED_ORIGINS` — restrict CORS (default `*`)
+- `ALLOW_REGISTRATION` — set `false` after creating the first admin
+- `LOG_LEVEL` / `LOG_LEVEL_*` — debug logging per module
+- `MDNS_ENABLED` / `MDNS_HOSTNAME` / `MDNS_PORT` — LAN discovery (auto-off in Docker)
+
+`DATABASE_URL`, `CACHE_DIR`, `SECRETS_FILE`, and the JWT secret are owned by compose / the wizard and should not be set in `.env`.
+
+## Volumes
+
+- `spotifu-db` — PostgreSQL data.
+- `spotifu-cache` — downloaded audio, cover art, artist images. Stored under `/data/spotifu/cache` in the container.
+
+Both persist across `docker compose down`. `bash scripts/install.sh reset` removes them.
+
+## Upgrading from an older version
+
+If you previously ran SpotiFU with a root-owned `spotifu-cache` volume (pre-UID-1000), fix ownership once:
 
 ```bash
-cp .env.example .env
-cp .secrets.example .secrets   # edit with real credentials
-docker compose up -d --build
+docker run --rm -v spotifu_spotifu-cache:/cache alpine chown -R 1000:1000 /cache
+bash scripts/install.sh up
 ```
-
-**Important:** use `--build` after git pull so the container runs current server code.
-
-API: http://localhost:1985
-
-### Full stack (server + web UI)
-
-```bash
-docker compose --profile full up -d
-```
-
-- Web UI: http://localhost:1984
-- API: http://localhost:1985
-
-The web client uses **runtime server discovery** — users can point at a remote API from the connect screen or Settings. `VITE_API_URL` at build time is optional (seeds the default only).
-
-### LAN deployment notes
-
-1. Set `API_BASE_URL` to the LAN-reachable URL (not `localhost`) so cover/stream URLs work for remote clients:
-
-   ```bash
-   API_BASE_URL=http://192.168.1.100:1985
-   ```
-
-   See [`docker-compose.override.example.yml`](../docker-compose.override.example.yml).
-
-2. **mDNS** — The server registers `_spotifu._tcp.local.` as `spotifu.local` on port 1985 when `MDNS_ENABLED=true`. In default Docker bridge mode, mDNS often does not propagate. Options:
-   - Run the server on bare metal or with `network_mode: host` (Linux)
-   - Use manual server URL in the client (Settings → Server connection)
-
-3. **Persistent cache** — `spotifu-cache` volume stores downloads and cover art at `/data/spotifu/cache` inside the server container.
-
-## Environment variables
-
-| Variable | Where | Purpose |
-|----------|-------|---------|
-| `DATABASE_URL` | Server | PostgreSQL connection string |
-| `JWT_SECRET` | Server | JWT signing (≥32 chars) or use `.secrets` |
-| `CACHE_DIR` | Server | Download/cover storage (Docker: `/data/spotifu/cache`) |
-| `API_BASE_URL` | Server | Public URL for self-referential links |
-| `SOULSEEK_USERNAME` / `SOULSEEK_PASSWORD` | Server / `.secrets` | Soulseek account |
-| `MDNS_ENABLED` | Server | Register LAN service (default: off in Docker) |
-| `MDNS_HOSTNAME` | Server | mDNS name without `.local` (default: `spotifu`) |
-| `ALLOWED_ORIGINS` | Server | Comma-separated CORS origins (default: `*`) |
-| `ALLOW_REGISTRATION` | Server | `false` disables signup after first user exists |
-| `VITE_API_URL` | Client build | Optional seed URL (runtime override in Settings) |
-| `VITE_WS_URL` | Client build | Optional WebSocket override |
-
-## Secrets file
-
-Copy [`.secrets.example`](../.secrets.example) to `.secrets` at the repo root:
-
-```json
-{
-  "jwt_secret": "...",
-  "soulseek_username": "...",
-  "soulseek_password": "...",
-  "lastfm_api_key": "",
-  "fanarttv_api_key": ""
-}
-```
-
-Docker mounts `./.secrets` read-only at `/app/.secrets`.
-
-## Bare-metal server (systemd)
-
-Example unit file: [`deploy/spotifu-server.service`](../deploy/spotifu-server.service)
-
-```bash
-sudo cp deploy/spotifu-server.service /etc/systemd/system/
-# Edit paths and EnvironmentFile
-sudo systemctl enable --now spotifu-server
-```
-
-mDNS works best on bare metal (`MDNS_ENABLED=true` by default outside Docker).
-
-## Desktop client (Tauri)
-
-Build for your platform from `client/`:
-
-```bash
-npm run tauri:build:linux      # AppImage / deb
-npm run tauri:build:windows
-npm run tauri:build:macos      # Intel
-npm run tauri:build:macos-arm  # Apple Silicon
-```
-
-On first launch, use **Connect to SpotiFU server** to find the LAN server or enter `http://host:1985` manually. No rebuild required when the server address changes.
 
 ## Backup
 
-- **Database:** Docker volume `spotifu-db` (or your Postgres data directory)
-- **Cache:** Docker volume `spotifu-cache` or `CACHE_DIR` on disk
+- **Database:** `docker run --rm -v spotifu-db:/from -v $PWD:/to alpine tar czf /to/spotifu-db.tgz /from`
+- **Cache:** same pattern with `spotifu-cache`.
 
 ## TLS (optional, beyond LAN)
 
-For HTTPS/WSS, terminate TLS with Caddy or nginx in front of the API. Set the client server URL to `https://…` and ensure `VITE_WS_URL` or runtime connection uses `wss://…` if auto-derivation from `http` is insufficient.
+Terminate TLS with Caddy or nginx in front of the API. Set the client server URL to `https://…` and (if needed) override `VITE_WS_URL=wss://…` in `client/.env`.
 
 ## Troubleshooting
 
 | Problem | Check |
-|---------|--------|
-| Client cannot find server | Manual URL in Settings; verify `curl http://host:1985/health` |
-| Covers/streams use localhost URLs | Set `API_BASE_URL` to LAN IP |
-| Downloads lost after restart | Ensure `CACHE_DIR` volume is mounted |
-| mDNS not found | Enable `MDNS_ENABLED`, use host networking, or manual URL |
-| WebSocket disconnects | Login required; WS uses JWT via `?token=` query param |
+|---------|-------|
+| `docker compose ps` shows server unhealthy | `docker compose logs server --tail=200`. Most often: Soulseek login failed. Re-run `bash scripts/install.sh wizard`. |
+| Server won't start: `.secrets invalid` | Run `bash scripts/install.sh wizard` (it pre-fills valid fields and only re-prompts invalid ones). |
+| `curl localhost:1985/health/ready` returns 503 | DB unreachable. Check `docker compose ps` for `spotifu-postgres (healthy)`. |
+| Covers/streams use `localhost` URLs | Set `API_BASE_URL` to your LAN IP via override file. |
+| Remote client can't find server | Use manual URL in client Settings → Server connection. mDNS is unreliable in Docker bridge mode. |
+| WebSocket disconnects | Login required; WS uses JWT via `?token=` query param. |
+| Port 5432 already in use on host | Loopback-only publish should not collide unless you run local Postgres on 5432. Override: `ports: ["127.0.0.1:5433:5432"]`. |

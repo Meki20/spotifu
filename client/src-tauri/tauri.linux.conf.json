@@ -1,0 +1,13 @@
+{
+  "productName": "spotifu",
+  "bundle": {
+    "linux": {
+      "deb": {
+        "desktopTemplate": "linux/SpotiFU.desktop.hbs"
+      },
+      "appimage": {
+        "bundleMediaFramework": true
+      }
+    }
+  }
+}

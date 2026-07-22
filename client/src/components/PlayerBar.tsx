@@ -117,12 +117,12 @@ export default function PlayerBar() {
       <div
         className="h-20 flex items-center px-5 shrink-0 relative z-50"
         style={{
-          background: 'rgba(26,18,16,0.92)',
+          background: 'color-mix(in srgb, var(--bg-surface) 0.92, transparent)',
           backdropFilter: 'blur(20px)',
-          borderTop: '1px solid #3D2820',
+          borderTop: '1px solid var(--border)',
         }}
       >
-        <div className="text-sm" style={{ color: '#4A413C', fontFamily: "'Barlow Semi Condensed', sans-serif" }}>
+        <div className="text-sm" style={{ color: 'var(--text-primary)', fontFamily: "'Barlow Semi Condensed', sans-serif" }}>
           no track playing
         </div>
       </div>
@@ -139,9 +139,9 @@ export default function PlayerBar() {
       <div
         className="h-20 flex items-center px-5 gap-4 shrink-0 relative z-50"
         style={{
-          background: 'rgba(26,18,16,0.92)',
+          background: 'color-mix(in srgb, var(--bg-surface) 0.92, transparent)',
           backdropFilter: 'blur(20px)',
-          borderTop: '1px solid #3D2820',
+          borderTop: '1px solid var(--border)',
         }}
       >
         {/* Left: now playing */}
@@ -153,8 +153,8 @@ export default function PlayerBar() {
           <div
             className="w-12 h-12 rounded flex items-center justify-center shrink-0 border"
             style={{
-              background: 'linear-gradient(135deg, #b4003e, #1c000f)',
-              borderColor: '#3D2820',
+              background: 'linear-gradient(135deg, var(--accent), var(--accent-faint))',
+              borderColor: 'var(--border)',
               borderRadius: 6,
               overflow: 'hidden',
             }}
@@ -172,7 +172,7 @@ export default function PlayerBar() {
                     className="absolute top-0 right-0 p-0.5"
                     style={{ background: 'rgba(0,0,0,0.6)' }}
                   >
-                    <Computer size={10} className="text-[#9A8E84]" />
+                    <Computer size={10} className="text-[var(--text-secondary)]" />
                   </div>
                 )}
               </div>
@@ -180,7 +180,7 @@ export default function PlayerBar() {
               <div
                 className="w-7 h-7 rounded-full"
                 style={{
-                  background: 'conic-gradient(from 0deg, #b4003e, #b4003e, #1c000f, #b4003e)',
+                  background: 'conic-gradient(from 0deg, var(--accent), var(--accent), var(--accent-faint), var(--accent))',
                   boxShadow: '0 0 10px rgba(139, 42, 26, 0.6)',
                 }}
               />
@@ -194,7 +194,7 @@ export default function PlayerBar() {
                 className="text-sm truncate cursor-pointer hover:underline"
                 style={{
                   fontFamily: "'Barlow Semi Condensed', sans-serif",
-                  color: '#E8DDD0',
+                  color: 'var(--text-primary)',
                 }}
               >
                 {currentTrack.title}
@@ -203,9 +203,9 @@ export default function PlayerBar() {
                 <span
                   className="shrink-0 inline-flex items-center px-1.5 py-0.5 text-xs font-medium rounded"
                   style={{
-                    color: '#E8DDD0',
-                    backgroundColor: '#b4003e',
-                    border: '1px solid #b4003e',
+                    color: 'var(--text-primary)',
+                    backgroundColor: 'var(--bg-surface)',
+                    border: '1px solid var(--accent)',
                     fontFamily: "'Barlow Semi Condensed', sans-serif",
                   }}
                 >
@@ -215,9 +215,9 @@ export default function PlayerBar() {
                 <span
                   className="shrink-0 inline-flex items-center px-1.5 py-0.5 text-xs font-medium rounded animate-pulse"
                   style={{
-                    color: '#E8DDD0',
-                    backgroundColor: '#4A413C',
-                    border: '1px solid #b4003e',
+                    color: 'var(--text-primary)',
+                    backgroundColor: 'var(--bg-surface)',
+                    border: '1px solid var(--accent)',
                     fontFamily: "'Barlow Semi Condensed', sans-serif",
                   }}
                 >
@@ -229,7 +229,7 @@ export default function PlayerBar() {
               className="text-sm truncate cursor-pointer hover:underline mt-0.5"
               style={{
                 fontFamily: "'Barlow Semi Condensed', sans-serif",
-                color: '#9A8E84',
+                color: 'var(--text-primary)',
               }}
             >
               {displayArtist(currentTrack)}
@@ -244,7 +244,7 @@ export default function PlayerBar() {
             disabled={showMascotInsteadOfHeart}
             title={showMascotInsteadOfHeart ? 'Loading…' : liked ? 'Unlike' : 'Like'}
             style={{
-              color: liked ? '#b4003e' : '#4A413C',
+              color: liked ? 'var(--text-primary)' : 'var(--text-primary)',
               opacity: showMascotInsteadOfHeart ? 1 : undefined,
               cursor: showMascotInsteadOfHeart ? 'default' : 'pointer',
             }}
@@ -252,7 +252,7 @@ export default function PlayerBar() {
             {showMascotInsteadOfHeart ? (
               <PollyLoading size={26} />
             ) : (
-              <Heart size={14} fill={liked ? '#b4003e' : 'none'} />
+              <Heart size={14} fill={liked ? 'var(--text-primary)' : 'none'} />
             )}
           </button>
         </div>
@@ -264,7 +264,7 @@ export default function PlayerBar() {
             <button
               onClick={() => controller.setShuffle(!shuffle)}
               className="w-7 h-7 flex items-center justify-center transition-colors"
-              style={{ color: shuffle ? '#b4003e' : '#9A8E84' }}
+              style={{ color: shuffle ? 'var(--text-primary)' : 'var(--text-primary)' }}
               title="Shuffle"
             >
               <Shuffle size={14} />
@@ -272,7 +272,7 @@ export default function PlayerBar() {
             <button
               onClick={() => controller.skipPrev()}
               className="w-7 h-7 flex items-center justify-center transition-colors"
-              style={{ color: '#9A8E84' }}
+              style={{ color: 'var(--text-primary)' }}
               title="Previous"
             >
               <SkipBack size={16} />
@@ -281,8 +281,8 @@ export default function PlayerBar() {
               onClick={handlePlayPause}
               className="w-9 h-9 flex items-center justify-center transition-colors rounded"
               style={{
-                background: '#b4003e',
-                color: '#E8DDD0',
+                background: 'var(--bg-surface)',
+                color: 'var(--text-primary)',
                 boxShadow: '0 0 12px rgba(139, 42, 26, 0.4)',
               }}
               title={isPlaying ? 'Pause' : 'Play'}
@@ -292,7 +292,7 @@ export default function PlayerBar() {
             <button
               onClick={() => controller.skipNext()}
               className="w-7 h-7 flex items-center justify-center transition-colors"
-              style={{ color: '#9A8E84' }}
+              style={{ color: 'var(--text-primary)' }}
               title="Next"
             >
               <SkipForward size={16} />
@@ -300,7 +300,7 @@ export default function PlayerBar() {
             <button
               onClick={cycleRepeat}
               className="w-7 h-7 flex items-center justify-center transition-colors"
-              style={{ color: repeat !== 'off' ? '#b4003e' : '#9A8E84' }}
+              style={{ color: repeat !== 'off' ? 'var(--text-primary)' : 'var(--text-primary)' }}
               title={repeat === 'off' ? 'No repeat' : repeat === 'all' ? 'Repeat all' : 'Repeat one'}
             >
               {repeat === 'one' ? <Repeat1 size={14} /> : <Repeat size={14} />}
@@ -311,14 +311,14 @@ export default function PlayerBar() {
           <div className="flex items-center gap-2 w-full">
             <span
               className="text-sm w-10 text-right"
-              style={{ fontFamily: "'Barlow Semi Condensed', sans-serif", color: '#4A413C' }}
+              style={{ fontFamily: "'Barlow Semi Condensed', sans-serif", color: 'var(--text-primary)' }}
             >
               {formatTime(currentTime)}
             </span>
             <div
               ref={progressRef}
               className="flex-1 h-0.5 relative cursor-pointer group"
-              style={{ background: '#3D2820', borderRadius: 1 }}
+              style={{ background: 'var(--bg-surface)', borderRadius: 1 }}
               onClick={handleProgressClick}
             >
               {/* Fill */}
@@ -326,7 +326,7 @@ export default function PlayerBar() {
                 className="absolute left-0 top-0 h-full rounded"
                 style={{
                   width: `${progress}%`,
-                  background: '#b4003e',
+                  background: 'var(--bg-surface)',
                   boxShadow: '0 0 6px rgba(139, 42, 26, 0.5)',
                 }}
               />
@@ -337,7 +337,7 @@ export default function PlayerBar() {
                     className="h-full"
                     style={{
                       animation: 'shimmerSlide 1.2s ease-in-out infinite',
-                      background: '#9A8E84',
+                      background: 'var(--bg-surface)',
                       width: '33%',
                     }}
                   />
@@ -348,7 +348,7 @@ export default function PlayerBar() {
                 <div
                   className="absolute top-1/2 -translate-y-1/2 w-2 h-2 rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
                   style={{
-                    background: '#b4003e',
+                    background: 'var(--bg-surface)',
                     left: `calc(${progress}% - 4px)`,
                     boxShadow: '0 0 6px rgba(139, 42, 26, 0.7)',
                   }}
@@ -357,7 +357,7 @@ export default function PlayerBar() {
             </div>
             <span
               className="text-sm w-10"
-              style={{ fontFamily: "'Barlow Semi Condensed', sans-serif", color: '#4A413C', textAlign: 'right' }}
+              style={{ fontFamily: "'Barlow Semi Condensed', sans-serif", color: 'var(--text-primary)', textAlign: 'right' }}
             >
               {formatTime(duration)}
             </span>
@@ -369,7 +369,7 @@ export default function PlayerBar() {
           <button
             onClick={handleToggleQueue}
             className="px-1.5 transition-colors"
-            style={{ color: '#9A8E84' }}
+            style={{ color: 'var(--text-primary)' }}
             title="Toggle queue"
           >
             <ListMusic size={14} />
@@ -377,14 +377,14 @@ export default function PlayerBar() {
           <button
             onClick={(e) => setContextMenu({ x: e.clientX, y: e.clientY, track: currentTrack as any })}
             className="px-1.5 transition-colors"
-            style={{ color: '#4A413C' }}
+            style={{ color: 'var(--text-primary)' }}
           >
             <MoreHorizontal size={14} />
           </button>
           {volume > 0 ? (
-            <Volume2 size={14} style={{ color: '#9A8E84' }} />
+            <Volume2 size={14} style={{ color: 'var(--text-primary)' }} />
           ) : (
-            <VolumeX size={14} style={{ color: '#9A8E84' }} />
+            <VolumeX size={14} style={{ color: 'var(--text-primary)' }} />
           )}
           <input
             type="range"
@@ -395,8 +395,8 @@ export default function PlayerBar() {
             onChange={(e) => controller.setVolume(Number(e.target.value))}
             className="w-16 h-0.5 appearance-none cursor-pointer rounded"
             style={{
-              background: `linear-gradient(to right, #9A8E84 ${volume * 100}%, #3D2820 ${volume * 100}%)`,
-              accentColor: '#9A8E84',
+              background: `linear-gradient(to right, var(--text-secondary) ${volume * 100}%, var(--border) ${volume * 100}%)`,
+              accentColor: 'var(--text-primary)',
             }}
           />
                   </div>
@@ -409,23 +409,23 @@ export default function PlayerBar() {
           style={{
             left: contextMenu.x,
             top: contextMenu.y,
-            background: '#1A1210',
-            border: '1px solid #3D2820',
+            background: 'var(--bg-surface)',
+            border: '1px solid var(--border)',
             borderRadius: 4,
           }}
           onMouseLeave={() => setContextMenu(null)}
         >
-          <div className="px-4 py-2" style={{ borderBottom: '1px solid #261A14' }}>
-            <p className="truncate" style={{ fontFamily: "'Barlow Semi Condensed', sans-serif", color: '#E8DDD0' }}>
+          <div className="px-4 py-2" style={{ borderBottom: '1px solid var(--border-subtle)' }}>
+            <p className="truncate" style={{ fontFamily: "'Barlow Semi Condensed', sans-serif", color: 'var(--text-primary)' }}>
               {contextMenu.track.title}
             </p>
-            <p className="text-xs truncate" style={{ fontFamily: "'Barlow Semi Condensed', sans-serif", color: '#9A8E84' }}>
+            <p className="text-xs truncate" style={{ fontFamily: "'Barlow Semi Condensed', sans-serif", color: 'var(--text-primary)' }}>
               {contextMenu.track.artist}
             </p>
           </div>
           <button
-            className="w-full text-left px-4 py-2 hover:bg-[#2E1E19] transition-colors disabled:opacity-40"
-            style={{ fontFamily: "'Barlow Semi Condensed', sans-serif", color: '#E8DDD0' }}
+            className="w-full text-left px-4 py-2 hover:bg-[var(--bg-surface-3)] transition-colors disabled:opacity-40"
+            style={{ fontFamily: "'Barlow Semi Condensed', sans-serif", color: 'var(--text-primary)' }}
             disabled={!contextMenu.track.mb_id}
             onClick={() => {
               const t = contextMenu.track as any
@@ -447,8 +447,8 @@ export default function PlayerBar() {
             Add to playlist
           </button>
           <button
-            className="w-full text-left px-4 py-2 hover:bg-[#2E1E19] transition-colors"
-            style={{ fontFamily: "'Barlow Semi Condensed', sans-serif", color: '#E8DDD0' }}
+            className="w-full text-left px-4 py-2 hover:bg-[var(--bg-surface-3)] transition-colors"
+            style={{ fontFamily: "'Barlow Semi Condensed', sans-serif", color: 'var(--text-primary)' }}
             onClick={() => {
               const track = contextMenu.track as any
               const artistId = track.mb_artist_id
@@ -459,8 +459,8 @@ export default function PlayerBar() {
             Go to artist
           </button>
           <button
-            className="w-full text-left px-4 py-2 hover:bg-[#2E1E19] transition-colors"
-            style={{ fontFamily: "'Barlow Semi Condensed', sans-serif", color: '#E8DDD0' }}
+            className="w-full text-left px-4 py-2 hover:bg-[var(--bg-surface-3)] transition-colors"
+            style={{ fontFamily: "'Barlow Semi Condensed', sans-serif", color: 'var(--text-primary)' }}
             onClick={() => {
               const track = contextMenu.track as any
               const albumId = track.mb_release_id || track.mb_release_group_id || null
@@ -470,10 +470,10 @@ export default function PlayerBar() {
           >
             Go to album
           </button>
-          <div className="mt-1 pt-1" style={{ borderTop: '1px solid #261A14' }}>
+          <div className="mt-1 pt-1" style={{ borderTop: '1px solid var(--border-subtle)' }}>
             <button
-              className="w-full text-left px-4 py-2 hover:bg-[#2E1E19] transition-colors"
-              style={{ fontFamily: "'Barlow Semi Condensed', sans-serif", color: '#b4003e' }}
+              className="w-full text-left px-4 py-2 hover:bg-[var(--bg-surface-3)] transition-colors"
+              style={{ fontFamily: "'Barlow Semi Condensed', sans-serif", color: 'var(--text-primary)' }}
               onClick={() => {
                 setContextMenu(null)
                 usePlayerStore.setState({ currentTrack: null, isPlaying: false, phase: 'idle' })

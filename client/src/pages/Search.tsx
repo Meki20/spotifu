@@ -392,18 +392,18 @@ export default function Search() {
         <div className="relative flex-1">
           <span
             className="absolute left-3 top-1/2 -translate-y-1/2 text-lg"
-            style={{ color: '#4A413C' }}
+            style={{ color: 'var(--text-primary)' }}
           >
             ◎
           </span>
           <input
             className="w-full px-4 py-3 pl-10 rounded text-sm"
             style={{
-              background: '#1A1210',
-              border: `1px solid ${focused ? '#b4003e' : '#3D2820'}`,
+              background: 'var(--bg-surface)',
+              border: `1px solid ${focused ? 'var(--border)' : 'var(--border)'}`,
               fontFamily: "'Barlow Semi Condensed', monospace",
               fontSize: 16,
-              color: '#E8DDD0',
+              color: 'var(--text-primary)',
               outline: 'none',
             }}
             placeholder="search tracks, albums, artists..."
@@ -417,19 +417,19 @@ export default function Search() {
         {/* Local-only toggle pill */}
         <div
           className="flex rounded overflow-hidden border"
-          style={{ borderColor: '#3D2820', fontFamily: "'Barlow Condensed', sans-serif", fontSize: 14, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.1em' }}
+          style={{ borderColor: 'var(--border)', fontFamily: "'Barlow Condensed', sans-serif", fontSize: 14, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.1em' }}
         >
           <button
             onClick={() => setLocalOnly(false)}
             className="px-3 py-2 transition-colors"
-            style={{ background: !localOnly ? '#b4003e' : '#1A1210', color: !localOnly ? '#E8DDD0' : '#9A8E84' }}
+            style={{ background: !localOnly ? 'var(--bg-surface)' : 'var(--bg-surface)', color: !localOnly ? 'var(--text-primary)' : 'var(--text-primary)' }}
           >
             All
           </button>
           <button
             onClick={() => setLocalOnly(true)}
             className="px-3 py-2 transition-colors"
-            style={{ background: localOnly ? '#b4003e' : '#1A1210', color: localOnly ? '#E8DDD0' : '#9A8E84' }}
+            style={{ background: localOnly ? 'var(--bg-surface)' : 'var(--bg-surface)', color: localOnly ? 'var(--text-primary)' : 'var(--text-primary)' }}
           >
             Local Only
           </button>
@@ -447,7 +447,7 @@ export default function Search() {
                 fontWeight: 600,
                 textTransform: 'uppercase',
                 letterSpacing: '0.12em',
-                color: '#b4003e',
+                color: 'var(--text-primary)',
               }}
             >
               Recent Searches
@@ -457,7 +457,7 @@ export default function Search() {
               style={{
                 fontFamily: "'Barlow Condensed', sans-serif",
                 fontSize: 12,
-                color: '#9A8E84',
+                color: 'var(--text-primary)',
                 cursor: 'pointer',
                 background: 'none',
                 border: 'none',
@@ -473,19 +473,19 @@ export default function Search() {
                 onClick={() => handleRecentSearchClick(term)}
                 className="px-3 py-1 rounded text-sm transition-colors"
                 style={{
-                  background: '#1A1210',
-                  border: '1px solid #3D2820',
+                  background: 'var(--bg-surface)',
+                  border: '1px solid var(--border)',
                   fontFamily: "'Barlow Semi Condensed', sans-serif",
-                  color: '#9A8E84',
+                  color: 'var(--text-primary)',
                   cursor: 'pointer',
                 }}
                 onMouseEnter={(e) => {
-                  e.currentTarget.style.borderColor = '#b4003e'
-                  e.currentTarget.style.color = '#E8DDD0'
+                  e.currentTarget.style.borderColor = 'var(--text-primary)'
+                  e.currentTarget.style.color = 'var(--text-primary)'
                 }}
                 onMouseLeave={(e) => {
-                  e.currentTarget.style.borderColor = '#3D2820'
-                  e.currentTarget.style.color = '#9A8E84'
+                  e.currentTarget.style.borderColor = 'var(--text-primary)'
+                  e.currentTarget.style.color = 'var(--text-primary)'
                 }}
               >
                 {term}
@@ -498,17 +498,17 @@ export default function Search() {
       {showResults && (
         <div
           className="flex items-center gap-2.5 mb-3"
-          style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 18, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.12em', color: '#b4003e' }}
+          style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 18, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.12em', color: 'var(--text-primary)' }}
         >
           {`results for "${query}"`}
-          <div className="flex-1 h-px" style={{ background: '#261A14' }} />
+          <div className="flex-1 h-px" style={{ background: 'var(--bg-surface)' }} />
         </div>
       )}
 
       {isLoading && (
         <div className="flex items-center gap-3 py-2">
           <PollyLoading size={36} />
-          <span className="text-sm" style={{ color: '#4A413C', fontFamily: "'Barlow Semi Condensed', sans-serif" }}>
+          <span className="text-sm" style={{ color: 'var(--text-primary)', fontFamily: "'Barlow Semi Condensed', sans-serif" }}>
             searching…
           </span>
         </div>
@@ -516,16 +516,16 @@ export default function Search() {
       {!isLoading && similarStreamPending && !localOnly && bestMatchMbid && (
         <div className="flex items-center gap-3 py-2 mb-1">
           <PollyLoading size={32} />
-          <span className="text-sm" style={{ color: '#4A413C', fontFamily: "'Barlow Semi Condensed', sans-serif" }}>
+          <span className="text-sm" style={{ color: 'var(--text-primary)', fontFamily: "'Barlow Semi Condensed', sans-serif" }}>
             similar tracks…
           </span>
         </div>
       )}
       {error && (
-        <div className="text-base" style={{ color: '#b4003e' }}>Error: {String(error)}</div>
+        <div className="text-base" style={{ color: 'var(--text-primary)' }}>Error: {String(error)}</div>
       )}
       {!isLoading && results?.length === 0 && debouncedQuery.length > 2 && (
-        <div className="text-base" style={{ color: '#4A413C', fontFamily: "'Barlow Semi Condensed', sans-serif" }}>
+        <div className="text-base" style={{ color: 'var(--text-primary)', fontFamily: "'Barlow Semi Condensed', sans-serif" }}>
           no tracks found
         </div>
       )}
@@ -536,12 +536,12 @@ export default function Search() {
           {/* Header row */}
           <div
             className="grid gap-4 px-4 py-2 mb-1"
-            style={{ gridTemplateColumns: 'auto 1fr 1fr auto', borderBottom: '1px solid #261A14' }}
+            style={{ gridTemplateColumns: 'auto 1fr 1fr auto', borderBottom: '1px solid var(--border-subtle)' }}
           >
-            <span className="w-8 text-center text-xs" style={{ color: '#4A413C', fontFamily: "'Barlow Semi Condensed', monospace", fontSize: 15 }}>#</span>
-            <span className="text-sm" style={{ color: '#9A8E84', fontFamily: "'Barlow Semi Condensed', monospace" }}>Title</span>
-            <span className="text-sm" style={{ color: '#9A8E84', fontFamily: "'Barlow Semi Condensed', monospace" }}>Album</span>
-            <span className="text-right text-sm" style={{ color: '#9A8E84', fontFamily: "'Barlow Semi Condensed', monospace" }}>Status</span>
+            <span className="w-8 text-center text-xs" style={{ color: 'var(--text-primary)', fontFamily: "'Barlow Semi Condensed', monospace", fontSize: 15 }}>#</span>
+            <span className="text-sm" style={{ color: 'var(--text-primary)', fontFamily: "'Barlow Semi Condensed', monospace" }}>Title</span>
+            <span className="text-sm" style={{ color: 'var(--text-primary)', fontFamily: "'Barlow Semi Condensed', monospace" }}>Album</span>
+            <span className="text-right text-sm" style={{ color: 'var(--text-primary)', fontFamily: "'Barlow Semi Condensed', monospace" }}>Status</span>
           </div>
           {/* No inner scrolling container: the page itself scrolls. */}
           <div
@@ -569,7 +569,7 @@ export default function Search() {
                     role="separator"
                     aria-label={row.label}
                   >
-                    <div className="flex-1 h-px shrink-0" style={{ background: '#261A14' }} />
+                    <div className="flex-1 h-px shrink-0" style={{ background: 'var(--bg-surface)' }} />
                     <span
                       className="shrink-0 whitespace-nowrap"
                       style={{
@@ -578,12 +578,12 @@ export default function Search() {
                         fontWeight: 600,
                         letterSpacing: '0.14em',
                         textTransform: 'uppercase',
-                        color: '#b4003e',
+                        color: 'var(--text-primary)',
                       }}
                     >
                       {row.label}
                     </span>
-                    <div className="flex-1 h-px shrink-0" style={{ background: '#261A14' }} />
+                    <div className="flex-1 h-px shrink-0" style={{ background: 'var(--bg-surface)' }} />
                   </div>
                 )
               }
@@ -655,13 +655,13 @@ export default function Search() {
           {artistLoading && (
             <div className="flex items-center gap-3">
               <PollyLoading size={36} />
-              <span className="text-sm" style={{ color: '#4A413C', fontFamily: "'Barlow Semi Condensed', sans-serif" }}>
+              <span className="text-sm" style={{ color: 'var(--text-primary)', fontFamily: "'Barlow Semi Condensed', sans-serif" }}>
                 searching artist…
               </span>
             </div>
           )}
           {artistError && !artistLoading && (
-            <div className="text-base" style={{ color: '#b4003e' }}>
+            <div className="text-base" style={{ color: 'var(--text-primary)' }}>
               Error: {String(artistError)}
             </div>
           )}
@@ -675,7 +675,7 @@ export default function Search() {
             />
           )}
           {!artistLoading && !artistError && !artistResult && debouncedQuery.length > 2 && (
-            <div className="text-base" style={{ color: '#4A413C', fontFamily: "'Barlow Semi Condensed', sans-serif" }}>
+            <div className="text-base" style={{ color: 'var(--text-primary)', fontFamily: "'Barlow Semi Condensed', sans-serif" }}>
               no artist found
             </div>
           )}
@@ -691,9 +691,9 @@ export default function Search() {
               onClick={() => setActiveTab(tab)}
               className="px-4 py-1 rounded text-sm font-semibold capitalize transition-colors"
               style={{
-                background: activeTab === tab ? '#b4003e' : '#1A1210',
-                color: activeTab === tab ? '#E8DDD0' : '#9A8E84',
-                border: `1px solid ${activeTab === tab ? '#b4003e' : '#3D2820'}`,
+                background: activeTab === tab ? 'var(--bg-surface)' : 'var(--bg-surface)',
+                color: activeTab === tab ? 'var(--text-primary)' : 'var(--text-primary)',
+                border: `1px solid ${activeTab === tab ? 'var(--border)' : 'var(--border)'}`,
                 fontFamily: "'Barlow Condensed', sans-serif",
                 fontWeight: 600,
                 textTransform: 'uppercase',

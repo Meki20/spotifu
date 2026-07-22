@@ -76,7 +76,7 @@ export default function AlbumPage() {
 
   if (isLoading) {
     return (
-      <div className="p-6 flex flex-col items-center gap-3" style={{ color: '#4A413C', fontFamily: "'Barlow Semi Condensed', sans-serif" }}>
+      <div className="p-6 flex flex-col items-center gap-3" style={{ color: 'var(--text-primary)', fontFamily: "'Barlow Semi Condensed', sans-serif" }}>
         <PollyLoading size={48} />
         <span className="text-sm">loading…</span>
       </div>
@@ -84,7 +84,7 @@ export default function AlbumPage() {
   }
   if (error) {
     return (
-      <div className="p-6" style={{ color: '#b4003e', fontFamily: "'Barlow Semi Condensed', sans-serif" }}>
+      <div className="p-6" style={{ color: 'var(--text-primary)', fontFamily: "'Barlow Semi Condensed', sans-serif" }}>
         Error loading album
       </div>
     )
@@ -100,22 +100,22 @@ export default function AlbumPage() {
       <div
         className="flex items-end gap-4 md:gap-6 p-6"
         style={{
-          background: 'linear-gradient(180deg, #2E1E19 0%, #0C0906 100%)',
-          borderBottom: '1px solid #261A14',
+          background: 'linear-gradient(180deg, var(--bg-surface-3) 0%, var(--bg-base) 100%)',
+          borderBottom: '1px solid var(--border-subtle)',
         }}
       >
         <button
           type="button"
           onClick={() => navigate(-1)}
           className="shrink-0 self-center p-2 rounded mb-1"
-          style={{ color: '#9A8E84', border: '1px solid #3D2820' }}
+          style={{ color: 'var(--text-primary)', border: '1px solid var(--border)' }}
           aria-label="Back"
         >
           <ArrowLeft size={20} />
         </button>
         <div
           className="w-44 h-44 md:w-52 md:h-52 shrink-0 rounded overflow-hidden flex items-center justify-center"
-          style={{ background: '#231815', boxShadow: '0 12px 40px rgba(0,0,0,0.45)' }}
+          style={{ background: 'var(--bg-surface)', boxShadow: '0 12px 40px rgba(0,0,0,0.45)' }}
         >
           {displayCover ? (
             <img
@@ -126,7 +126,7 @@ export default function AlbumPage() {
               onError={(e) => { e.currentTarget.style.display = 'none' }}
             />
           ) : (
-            <span style={{ fontSize: 48, color: '#3D2820' }}>▦</span>
+            <span style={{ fontSize: 48, color: 'var(--text-primary)' }}>▦</span>
           )}
         </div>
         <div className="min-w-0 flex-1 pb-1">
@@ -136,18 +136,18 @@ export default function AlbumPage() {
               fontFamily: "'Barlow Condensed', sans-serif",
               fontWeight: 700,
               letterSpacing: '0.15em',
-              color: '#b4003e',
+              color: 'var(--text-primary)',
             }}
           >
             Album
           </p>
           <h1
             className="text-3xl md:text-4xl font-bold truncate mb-2"
-            style={{ fontFamily: "'Barlow Condensed', sans-serif", color: '#E8DDD0' }}
+            style={{ fontFamily: "'Barlow Condensed', sans-serif", color: 'var(--text-primary)' }}
           >
             {album.title}
           </h1>
-          <p className="text-sm" style={{ color: '#9A8E84', fontFamily: "'Barlow Semi Condensed', sans-serif" }}>
+          <p className="text-sm" style={{ color: 'var(--text-primary)', fontFamily: "'Barlow Semi Condensed', sans-serif" }}>
             {album.artist && (
               <button
                 type="button"
@@ -159,7 +159,7 @@ export default function AlbumPage() {
                   if (album.artist_mb_id) enqueue(album.artist_mb_id)
                 }}
                 className="hover:underline"
-                style={{ color: '#E8DDD0' }}
+                style={{ color: 'var(--text-primary)' }}
               >
                 {album.artist}
               </button>
@@ -177,7 +177,7 @@ export default function AlbumPage() {
           onClick={playAlbumFromStart}
           disabled={!album.tracks?.length}
           className="w-12 h-12 rounded-full flex items-center justify-center transition-transform hover:scale-105 disabled:opacity-40"
-          style={{ background: '#b4003e', color: '#E8DDD0' }}
+          style={{ background: 'var(--bg-surface)', color: 'var(--text-primary)' }}
           aria-label="Play album"
         >
           <Play size={22} fill="currentColor" className="ml-0.5 shrink-0" />
@@ -190,8 +190,8 @@ export default function AlbumPage() {
           style={{
             fontFamily: "'Barlow Condensed', sans-serif",
             fontWeight: 700,
-            color: '#4A413C',
-            borderBottom: '1px solid #261A14',
+            color: 'var(--text-primary)',
+            borderBottom: '1px solid var(--border-subtle)',
           }}
         >
           <span className="w-8 text-center">#</span>

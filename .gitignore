@@ -51,14 +51,13 @@ env/
 node_modules/
 .npm
 *.log
-*.lock
-package-lock.json
 yarn.lock
 pnpm-lock.yaml
 .npmrc
 .yarn/
 .pnp.*
 .pnp
+# package-lock.json is tracked so `npm ci` produces reproducible installs.
 
 # Client build
 client/dist/

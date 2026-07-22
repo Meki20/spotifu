@@ -198,7 +198,7 @@ export default function CDJewelCase({
         <mesh position={[0.2, 0, 0.036]}>
           <ringGeometry args={[0.15, 0.38, 32]} />
           <meshStandardMaterial
-            color="#080808"
+            color="var(--bg-surface)"
             metalness={0.2}
             roughness={0.9}
             side={THREE.DoubleSide}
@@ -215,7 +215,7 @@ export default function CDJewelCase({
         {corners.map(([x, y], i) => (
           <mesh key={i} position={[x, y, 0.18]}>
             <cylinderGeometry args={[0.06, 0.06, 0.02, 16]} />
-            <meshStandardMaterial color="#1a1a1a" metalness={0.6} roughness={0.4} />
+            <meshStandardMaterial color="var(--bg-surface-2)" metalness={0.6} roughness={0.4} />
           </mesh>
         ))}
 

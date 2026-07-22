@@ -57,8 +57,8 @@ function itemToPlayableTrack(
 const modalShell = {
   overlay: { background: 'rgba(0,0,0,0.75)' } as const,
   panel: {
-    background: '#1A1210',
-    border: '1px solid #3D2820',
+    background: 'var(--bg-surface)',
+    border: '1px solid var(--border)',
   } as const,
 }
 
@@ -71,7 +71,7 @@ export default function PlaylistPage() {
 
   if (isNaN(id)) {
     return (
-      <div className="flex items-center justify-center h-full" style={{ color: '#9A8E84' }}>
+      <div className="flex items-center justify-center h-full" style={{ color: 'var(--text-primary)' }}>
         Invalid playlist
       </div>
     )
@@ -207,7 +207,7 @@ export default function PlaylistPage() {
 
   if (isLoading) {
     return (
-      <div className="p-6 flex flex-col items-center gap-3" style={{ color: '#4A413C', fontFamily: "'Barlow Semi Condensed', sans-serif" }}>
+      <div className="p-6 flex flex-col items-center gap-3" style={{ color: 'var(--text-primary)', fontFamily: "'Barlow Semi Condensed', sans-serif" }}>
         <PollyLoading size={48} />
         <span className="text-sm">loading…</span>
       </div>
@@ -216,7 +216,7 @@ export default function PlaylistPage() {
 
   if (error || !playlist) {
     return (
-      <div className="p-6" style={{ color: '#b4003e', fontFamily: "'Barlow Semi Condensed', sans-serif" }}>
+      <div className="p-6" style={{ color: 'var(--text-primary)', fontFamily: "'Barlow Semi Condensed', sans-serif" }}>
         Could not load playlist
       </div>
     )
@@ -243,7 +243,7 @@ export default function PlaylistPage() {
           <div
             className="absolute inset-0"
             style={{
-              background: 'linear-gradient(180deg, rgba(12,9,6,0.55) 0%, #0C0906 100%)',
+              background: 'linear-gradient(180deg, color-mix(in srgb, var(--bg-base) 0.55, transparent) 0%, var(--bg-base) 100%)',
             }}
           />
         </div>
@@ -251,15 +251,15 @@ export default function PlaylistPage() {
       <div
         className="relative z-[1] flex items-end gap-4 md:gap-6 p-6"
         style={{
-          background: 'linear-gradient(180deg, #2E1E19 0%, #0C0906 100%)',
-          borderBottom: '1px solid #261A14',
+          background: 'linear-gradient(180deg, var(--bg-surface-3) 0%, var(--bg-base) 100%)',
+          borderBottom: '1px solid var(--border-subtle)',
         }}
       >
         <button
           type="button"
           onClick={() => navigate(-1)}
           className="shrink-0 self-center p-2 rounded"
-          style={{ color: '#9A8E84', border: '1px solid #3D2820' }}
+          style={{ color: 'var(--text-primary)', border: '1px solid var(--border)' }}
           aria-label="Back"
         >
           <ArrowLeft size={20} />
@@ -267,15 +267,15 @@ export default function PlaylistPage() {
         <button
           type="button"
           onClick={openCoverEditor}
-          className="w-44 h-44 md:w-52 md:h-52 shrink-0 rounded overflow-hidden flex items-center justify-center cursor-pointer transition-opacity hover:opacity-90 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#b4003e] focus-visible:ring-offset-2 focus-visible:ring-offset-[#0C0906]"
-          style={{ background: '#231815', boxShadow: '0 12px 40px rgba(0,0,0,0.45)', border: 'none', padding: 0 }}
+          className="w-44 h-44 md:w-52 md:h-52 shrink-0 rounded overflow-hidden flex items-center justify-center cursor-pointer transition-opacity hover:opacity-90 focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--bg-base)]"
+          style={{ background: 'var(--bg-surface)', boxShadow: '0 12px 40px rgba(0,0,0,0.45)', border: 'none', padding: 0 }}
           aria-label="Change playlist cover"
           title="Change cover art"
         >
           {cover ? (
             <img src={cover} alt="" className="w-full h-full object-cover" loading="lazy" />
           ) : (
-            <span style={{ fontSize: 48, color: '#3D2820' }}>▦</span>
+            <span style={{ fontSize: 48, color: 'var(--text-primary)' }}>▦</span>
           )}
         </button>
         <div className="min-w-0 flex-1 pb-1">
@@ -285,23 +285,23 @@ export default function PlaylistPage() {
               fontFamily: "'Barlow Condensed', sans-serif",
               fontWeight: 700,
               letterSpacing: '0.15em',
-              color: '#b4003e',
+              color: 'var(--text-primary)',
             }}
           >
             Playlist
           </p>
           <h1
             className="text-3xl md:text-4xl font-bold truncate mb-2"
-            style={{ fontFamily: "'Barlow Condensed', sans-serif", color: '#E8DDD0' }}
+            style={{ fontFamily: "'Barlow Condensed', sans-serif", color: 'var(--text-primary)' }}
           >
             {playlist.title}
           </h1>
           {playlist.description ? (
-            <p className="text-sm mb-2 line-clamp-2" style={{ color: '#9A8E84', fontFamily: "'Barlow Semi Condensed', sans-serif" }}>
+            <p className="text-sm mb-2 line-clamp-2" style={{ color: 'var(--text-primary)', fontFamily: "'Barlow Semi Condensed', sans-serif" }}>
               {playlist.description}
             </p>
           ) : null}
-          <p className="text-sm" style={{ color: '#4A413C', fontFamily: "'Barlow Semi Condensed', sans-serif" }}>
+          <p className="text-sm" style={{ color: 'var(--text-primary)', fontFamily: "'Barlow Semi Condensed', sans-serif" }}>
             {playlist.items.length} tracks
           </p>
         </div>
@@ -313,7 +313,7 @@ export default function PlaylistPage() {
           onClick={playAll}
           disabled={!playlist.items.length}
           className="w-12 h-12 rounded-full flex items-center justify-center transition-transform hover:scale-105 disabled:opacity-40"
-          style={{ background: '#b4003e', color: '#E8DDD0' }}
+          style={{ background: 'var(--bg-surface)', color: 'var(--text-primary)' }}
           aria-label="Play"
         >
           <Play size={22} fill="currentColor" className="ml-0.5" />
@@ -321,10 +321,10 @@ export default function PlaylistPage() {
         <button
           type="button"
           onClick={() => setUploadOpen(true)}
-          className="w-11 h-11 rounded flex items-center justify-center transition-colors hover:border-[#b4003e]"
+          className="w-11 h-11 rounded flex items-center justify-center transition-colors hover:border-[var(--accent)]"
           style={{
-            color: '#E8DDD0',
-            border: '1px solid #3D2820',
+            color: 'var(--text-primary)',
+            border: '1px solid var(--border)',
             background: 'transparent',
           }}
           aria-label="Upload CSV"
@@ -337,10 +337,10 @@ export default function PlaylistPage() {
             <button
               type="button"
               onClick={openRename}
-              className="w-11 h-11 rounded flex items-center justify-center transition-colors hover:border-[#b4003e]"
+              className="w-11 h-11 rounded flex items-center justify-center transition-colors hover:border-[var(--accent)]"
               style={{
-                color: '#E8DDD0',
-                border: '1px solid #3D2820',
+                color: 'var(--text-primary)',
+                border: '1px solid var(--border)',
                 background: 'transparent',
               }}
               aria-label="Rename playlist"
@@ -351,10 +351,10 @@ export default function PlaylistPage() {
             <button
               type="button"
               onClick={() => setDeleteOpen(true)}
-              className="w-11 h-11 rounded flex items-center justify-center transition-colors hover:border-[#b4003e]"
+              className="w-11 h-11 rounded flex items-center justify-center transition-colors hover:border-[var(--accent)]"
               style={{
-                color: '#b4003e',
-                border: '1px solid #b4003e',
+                color: 'var(--text-primary)',
+                border: '1px solid var(--accent)',
                 background: 'transparent',
               }}
               aria-label="Delete playlist"
@@ -374,8 +374,8 @@ export default function PlaylistPage() {
               gridTemplateColumns: '2rem 2.25rem minmax(0,1.2fr) minmax(0,1fr) minmax(0,1fr) 3rem',
               fontFamily: "'Barlow Condensed', sans-serif",
               fontWeight: 700,
-              color: '#4A413C',
-              borderBottom: '1px solid #261A14',
+              color: 'var(--text-primary)',
+              borderBottom: '1px solid var(--border-subtle)',
             }}
           >
             <span className="text-center">#</span>
@@ -386,7 +386,7 @@ export default function PlaylistPage() {
             <span className="text-right"> </span>
           </div>
           {playlist.items.length === 0 ? (
-            <p className="py-8 text-sm" style={{ color: '#4A413C', fontFamily: "'Barlow Semi Condensed', sans-serif" }}>
+            <p className="py-8 text-sm" style={{ color: 'var(--text-primary)', fontFamily: "'Barlow Semi Condensed', sans-serif" }}>
               No tracks yet. Upload a CSV to import from Spotify exports.
             </p>
           ) : (
@@ -395,7 +395,7 @@ export default function PlaylistPage() {
               const isPlaying = currentTrack?.mb_id === mbid
               const isCached =
                 Boolean(item.is_cached) || Boolean(mbid && cachedMbIds.has(mbid))
-              const titleColor = isPlaying ? '#b4003e' : isCached ? '#E8DDD0' : '#4A413C'
+              const titleColor = isPlaying ? 'var(--text-primary)' : isCached ? 'var(--text-primary)' : 'var(--text-primary)'
               const downloadPercent = mbid ? downloadStates[mbid]?.percent : undefined
               const isDownloading = mbid ? downloadStates[mbid]?.status === 'downloading' : false
               return (
@@ -404,10 +404,10 @@ export default function PlaylistPage() {
                   className="grid gap-4 px-1 py-2 items-center rounded cursor-pointer group"
                   style={{
                     gridTemplateColumns: '2rem 2.25rem minmax(0,1.2fr) minmax(0,1fr) minmax(0,1fr) 3rem',
-                    borderBottom: '1px solid #1A1210',
+                    borderBottom: '1px solid var(--bg-surface)',
                   }}
                   onMouseEnter={(e) => {
-                    e.currentTarget.style.background = '#1A1210'
+                    e.currentTarget.style.background = 'var(--text-primary)'
                   }}
                   onMouseLeave={(e) => {
                     e.currentTarget.style.background = 'transparent'
@@ -418,13 +418,13 @@ export default function PlaylistPage() {
                   <div className="relative w-8 h-8 flex items-center justify-center shrink-0 justify-self-center">
                     <span
                       className="text-sm tabular-nums group-hover:hidden"
-                      style={{ color: '#4A413C', fontFamily: "'Barlow Semi Condensed', monospace" }}
+                      style={{ color: 'var(--text-primary)', fontFamily: "'Barlow Semi Condensed', monospace" }}
                     >
                       {isPlaying ? '▶' : i + 1}
                     </span>
                     <span
                       className="absolute inset-0 hidden group-hover:flex items-center justify-center"
-                      style={{ color: '#b4003e' }}
+                      style={{ color: 'var(--text-primary)' }}
                     >
                       <Play size={12} fill="currentColor" />
                     </span>
@@ -446,7 +446,7 @@ export default function PlaylistPage() {
                   </div>
                   <span
                     className="text-sm truncate min-w-0"
-                    style={{ fontFamily: "'Barlow Semi Condensed', monospace", color: '#9A8E84' }}
+                    style={{ fontFamily: "'Barlow Semi Condensed', monospace", color: 'var(--text-primary)' }}
                     onMouseEnter={() => {
                       if (item.mb_artist_id) {
                         enqueue(
@@ -460,13 +460,13 @@ export default function PlaylistPage() {
                   </span>
                   <span
                     className="text-sm truncate min-w-0"
-                    style={{ fontFamily: "'Barlow Semi Condensed', monospace", color: '#9A8E84' }}
+                    style={{ fontFamily: "'Barlow Semi Condensed', monospace", color: 'var(--text-primary)' }}
                   >
                     {item.album || '—'}
                   </span>
                   <span
                     className="text-sm tabular-nums text-right shrink-0 flex items-center justify-end"
-                    style={{ fontFamily: "'Barlow Semi Condensed', monospace", color: '#4A413C' }}
+                    style={{ fontFamily: "'Barlow Semi Condensed', monospace", color: 'var(--text-primary)' }}
                   >
                     {isDownloading ? `${downloadPercent ?? 0}%` : isCached ? '✓' : '—'}
                   </span>
@@ -490,7 +490,7 @@ export default function PlaylistPage() {
           >
             <div
               className="flex items-center justify-between px-5 py-4"
-              style={{ borderBottom: '1px solid #261A14' }}
+              style={{ borderBottom: '1px solid var(--border-subtle)' }}
             >
               <h2
                 style={{
@@ -499,7 +499,7 @@ export default function PlaylistPage() {
                   fontSize: 18,
                   textTransform: 'uppercase',
                   letterSpacing: '0.08em',
-                  color: '#E8DDD0',
+                  color: 'var(--text-primary)',
                 }}
               >
                 Playlist cover
@@ -508,8 +508,8 @@ export default function PlaylistPage() {
                 type="button"
                 disabled={coverMutation.isPending}
                 onClick={() => setCoverOpen(false)}
-                className="p-1 rounded hover:bg-[#2E1E19]"
-                style={{ color: '#9A8E84' }}
+                className="p-1 rounded hover:bg-[var(--bg-surface-3)]"
+                style={{ color: 'var(--text-primary)' }}
                 aria-label="Close"
               >
                 <X size={20} />
@@ -523,7 +523,7 @@ export default function PlaylistPage() {
                 coverMutation.mutate(t === '' ? null : t)
               }}
             >
-              <p className="text-xs" style={{ color: '#9A8E84', fontFamily: "'Barlow Semi Condensed', sans-serif" }}>
+              <p className="text-xs" style={{ color: 'var(--text-primary)', fontFamily: "'Barlow Semi Condensed', sans-serif" }}>
                 Use a direct link to a JPEG or PNG. Leave empty and save to remove.
               </p>
               <input
@@ -532,16 +532,16 @@ export default function PlaylistPage() {
                 disabled={coverMutation.isPending}
                 className="w-full px-3 py-2 text-sm rounded"
                 style={{
-                  background: '#231815',
-                  border: '1px solid #3D2820',
-                  color: '#E8DDD0',
+                  background: 'var(--bg-surface)',
+                  border: '1px solid var(--border)',
+                  color: 'var(--text-primary)',
                   fontFamily: "'Barlow Semi Condensed', sans-serif",
                 }}
                 placeholder="https://…"
                 autoFocus
               />
               {coverMutation.isError && (
-                <p className="text-sm" style={{ color: '#b4003e' }}>
+                <p className="text-sm" style={{ color: 'var(--text-primary)' }}>
                   {coverMutation.error instanceof Error ? coverMutation.error.message : 'Save failed'}
                 </p>
               )}
@@ -555,8 +555,8 @@ export default function PlaylistPage() {
                     style={{
                       fontFamily: "'Barlow Condensed', sans-serif",
                       fontWeight: 600,
-                      color: '#b4003e',
-                      border: '1px solid #b4003e',
+                      color: 'var(--text-primary)',
+                      border: '1px solid var(--accent)',
                       background: 'transparent',
                     }}
                   >
@@ -571,8 +571,8 @@ export default function PlaylistPage() {
                   style={{
                     fontFamily: "'Barlow Condensed', sans-serif",
                     fontWeight: 600,
-                    color: '#9A8E84',
-                    border: '1px solid #3D2820',
+                    color: 'var(--text-primary)',
+                    border: '1px solid var(--border)',
                     background: 'transparent',
                   }}
                 >
@@ -587,8 +587,8 @@ export default function PlaylistPage() {
                     fontWeight: 700,
                     textTransform: 'uppercase',
                     letterSpacing: '0.06em',
-                    background: '#b4003e',
-                    color: '#E8DDD0',
+                    background: 'var(--bg-surface)',
+                    color: 'var(--text-primary)',
                     border: 'none',
                   }}
                 >
@@ -624,7 +624,7 @@ export default function PlaylistPage() {
           >
             <div
               className="flex items-center justify-between px-5 py-4"
-              style={{ borderBottom: '1px solid #261A14' }}
+              style={{ borderBottom: '1px solid var(--border-subtle)' }}
             >
               <h2
                 style={{
@@ -633,7 +633,7 @@ export default function PlaylistPage() {
                   fontSize: 18,
                   textTransform: 'uppercase',
                   letterSpacing: '0.08em',
-                  color: '#E8DDD0',
+                  color: 'var(--text-primary)',
                 }}
               >
                 Rename playlist
@@ -642,8 +642,8 @@ export default function PlaylistPage() {
                 type="button"
                 disabled={renameMutation.isPending}
                 onClick={() => setRenameOpen(false)}
-                className="p-1 rounded hover:bg-[#2E1E19]"
-                style={{ color: '#9A8E84' }}
+                className="p-1 rounded hover:bg-[var(--bg-surface-3)]"
+                style={{ color: 'var(--text-primary)' }}
                 aria-label="Close"
               >
                 <X size={20} />
@@ -660,7 +660,7 @@ export default function PlaylistPage() {
               <div>
                 <label
                   className="block text-xs uppercase tracking-widest mb-1.5"
-                  style={{ fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 600, color: '#b4003e' }}
+                  style={{ fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 600, color: 'var(--text-primary)' }}
                 >
                   Name
                 </label>
@@ -670,9 +670,9 @@ export default function PlaylistPage() {
                   disabled={renameMutation.isPending}
                   className="w-full px-3 py-2 text-sm rounded"
                   style={{
-                    background: '#231815',
-                    border: '1px solid #3D2820',
-                    color: '#E8DDD0',
+                    background: 'var(--bg-surface)',
+                    border: '1px solid var(--border)',
+                    color: 'var(--text-primary)',
                     fontFamily: "'Barlow Semi Condensed', sans-serif",
                   }}
                   autoFocus
@@ -681,7 +681,7 @@ export default function PlaylistPage() {
               <div>
                 <label
                   className="block text-xs uppercase tracking-widest mb-1.5"
-                  style={{ fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 600, color: '#b4003e' }}
+                  style={{ fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 600, color: 'var(--text-primary)' }}
                 >
                   Description (optional)
                 </label>
@@ -692,15 +692,15 @@ export default function PlaylistPage() {
                   rows={3}
                   className="w-full px-3 py-2 text-sm rounded resize-y min-h-[4rem]"
                   style={{
-                    background: '#231815',
-                    border: '1px solid #3D2820',
-                    color: '#E8DDD0',
+                    background: 'var(--bg-surface)',
+                    border: '1px solid var(--border)',
+                    color: 'var(--text-primary)',
                     fontFamily: "'Barlow Semi Condensed', sans-serif",
                   }}
                 />
               </div>
               {renameMutation.isError && (
-                <p className="text-sm" style={{ color: '#b4003e' }}>
+                <p className="text-sm" style={{ color: 'var(--text-primary)' }}>
                   {renameMutation.error instanceof Error ? renameMutation.error.message : 'Save failed'}
                 </p>
               )}
@@ -713,8 +713,8 @@ export default function PlaylistPage() {
                   style={{
                     fontFamily: "'Barlow Condensed', sans-serif",
                     fontWeight: 600,
-                    color: '#9A8E84',
-                    border: '1px solid #3D2820',
+                    color: 'var(--text-primary)',
+                    border: '1px solid var(--border)',
                     background: 'transparent',
                   }}
                 >
@@ -729,8 +729,8 @@ export default function PlaylistPage() {
                     fontWeight: 700,
                     textTransform: 'uppercase',
                     letterSpacing: '0.06em',
-                    background: '#b4003e',
-                    color: '#E8DDD0',
+                    background: 'var(--bg-surface)',
+                    color: 'var(--text-primary)',
                     border: 'none',
                   }}
                 >
@@ -761,17 +761,17 @@ export default function PlaylistPage() {
                 fontSize: 18,
                 textTransform: 'uppercase',
                 letterSpacing: '0.08em',
-                color: '#E8DDD0',
+                color: 'var(--text-primary)',
               }}
             >
               Delete playlist?
             </h2>
-            <p className="text-sm mb-6" style={{ color: '#9A8E84', fontFamily: "'Barlow Semi Condensed', sans-serif" }}>
+            <p className="text-sm mb-6" style={{ color: 'var(--text-primary)', fontFamily: "'Barlow Semi Condensed', sans-serif" }}>
               “{playlist.title}” and all of its tracks in this list will be removed. Cached downloads in your library are
               not deleted.
             </p>
             {deleteMutation.isError && (
-              <p className="text-sm mb-4" style={{ color: '#b4003e' }}>
+              <p className="text-sm mb-4" style={{ color: 'var(--text-primary)' }}>
                 {deleteMutation.error instanceof Error ? deleteMutation.error.message : 'Delete failed'}
               </p>
             )}
@@ -784,8 +784,8 @@ export default function PlaylistPage() {
                 style={{
                   fontFamily: "'Barlow Condensed', sans-serif",
                   fontWeight: 600,
-                  color: '#9A8E84',
-                  border: '1px solid #3D2820',
+                  color: 'var(--text-primary)',
+                  border: '1px solid var(--border)',
                   background: 'transparent',
                 }}
               >
@@ -801,8 +801,8 @@ export default function PlaylistPage() {
                   fontWeight: 700,
                   textTransform: 'uppercase',
                   letterSpacing: '0.06em',
-                  background: '#b4003e',
-                  color: '#E8DDD0',
+                  background: 'var(--bg-surface)',
+                  color: 'var(--text-primary)',
                   border: 'none',
                 }}
               >

@@ -47,7 +47,7 @@ const TrackRowImpl = ({
   onHoverArtist,
   style,
 }: TrackRowProps) => {
-  const titleColor = isCached ? '#E8DDD0' : '#4A413C'
+  const titleColor = isCached ? 'var(--text-primary)' : 'var(--text-primary)'
 
   return (
     <div
@@ -65,14 +65,14 @@ const TrackRowImpl = ({
         {index != null && (
           <span
             className="text-sm group-hover:hidden"
-            style={{ fontFamily: "'Barlow Semi Condensed', monospace", color: isPlaying ? '#b4003e' : '#4A413C' }}
+            style={{ fontFamily: "'Barlow Semi Condensed', monospace", color: isPlaying ? 'var(--text-primary)' : 'var(--text-primary)' }}
           >
             {isPlaying ? '▶' : index + 1}
           </span>
         )}
         <span
           className="absolute inset-0 hidden group-hover:flex items-center justify-center"
-          style={{ color: '#b4003e' }}
+          style={{ color: 'var(--text-primary)' }}
         >
           <Play size={12} fill="currentColor" />
         </span>
@@ -107,16 +107,16 @@ const TrackRowImpl = ({
                 className="absolute top-0 right-0 p-0.5"
                 style={{ background: 'rgba(0,0,0,0.6)' }}
               >
-                <Computer size={10} className="text-[#9A8E84]" />
+                <Computer size={10} className="text-[var(--text-secondary)]" />
               </div>
             )}
           </div>
         )}
         {showCover && !playlistStyleCover && !track.album_cover && track.mb_id && coverBatchLoading && (
-          <div className="w-8 h-8 rounded shrink-0 animate-pulse bg-[#231815]" aria-hidden />
+          <div className="w-8 h-8 rounded shrink-0 animate-pulse bg-[var(--bg-surface-2)]" aria-hidden />
         )}
         {showCover && !playlistStyleCover && !track.album_cover && track.mb_id && !coverBatchLoading && (
-          <div className="w-8 h-8 rounded shrink-0 bg-[#231815]" aria-hidden />
+          <div className="w-8 h-8 rounded shrink-0 bg-[var(--bg-surface-2)]" aria-hidden />
         )}
         <div className="min-w-0">
           <p
@@ -127,7 +127,7 @@ const TrackRowImpl = ({
           </p>
           <p
             className="text-xs truncate mt-0.5"
-            style={{ fontFamily: "'Barlow Semi Condensed', monospace", color: '#9A8E84' }}
+            style={{ fontFamily: "'Barlow Semi Condensed', monospace", color: 'var(--text-primary)' }}
             onMouseEnter={() => {
               if (track.mb_artist_id && onHoverArtist) {
                 onHoverArtist(track.mb_artist_id, track.mb_release_id ? [track.mb_release_id] : [])
@@ -143,7 +143,7 @@ const TrackRowImpl = ({
       {showAlbum && (
         <span
           className="text-sm truncate flex items-center"
-          style={{ fontFamily: "'Barlow Semi Condensed', monospace", color: '#9A8E84' }}
+          style={{ fontFamily: "'Barlow Semi Condensed', monospace", color: 'var(--text-primary)' }}
         >
           {track.album}
         </span>
@@ -153,7 +153,7 @@ const TrackRowImpl = ({
       {showStatus && (
         <span
           className="text-sm flex items-center justify-end gap-1.5"
-          style={{ fontFamily: "'Barlow Semi Condensed', monospace", color: '#4A413C' }}
+          style={{ fontFamily: "'Barlow Semi Condensed', monospace", color: 'var(--text-primary)' }}
         >
           {downloadState?.status === 'downloading' ? (
             <>
@@ -170,7 +170,7 @@ const TrackRowImpl = ({
       {!showStatus && showDuration && (
         <span
           className="text-xs tabular-nums text-right shrink-0"
-          style={{ fontFamily: "'Barlow Semi Condensed', monospace", color: '#4A413C' }}
+          style={{ fontFamily: "'Barlow Semi Condensed', monospace", color: 'var(--text-primary)' }}
         >
           {downloadState?.status === 'downloading' ? `${downloadState.percent ?? 0}%` : formatDuration(track.duration)}
         </span>

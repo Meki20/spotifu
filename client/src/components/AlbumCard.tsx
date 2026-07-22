@@ -21,20 +21,20 @@ export default function AlbumCard({ album, onClick, onMouseEnter, onContextMenu 
     <div
       className="p-4 rounded cursor-pointer border transition-all duration-150 relative overflow-hidden"
       style={{
-        background: '#1A1210',
-        borderColor: '#3D2820',
+        background: 'var(--bg-surface)',
+        borderColor: 'var(--border)',
         borderRadius: 4,
       }}
       onClick={() => onClick(album.id)}
       onContextMenu={onContextMenu ? (e) => onContextMenu(e, album) : undefined}
       onMouseEnter={(e) => {
         onMouseEnter?.()
-        e.currentTarget.style.background = '#231815'
-        e.currentTarget.style.borderColor = '#b4003e'
+        e.currentTarget.style.background = 'var(--text-primary)'
+        e.currentTarget.style.borderColor = 'var(--text-primary)'
       }}
       onMouseLeave={(e) => {
-        e.currentTarget.style.background = '#1A1210'
-        e.currentTarget.style.borderColor = '#3D2820'
+        e.currentTarget.style.background = 'var(--text-primary)'
+        e.currentTarget.style.borderColor = 'var(--text-primary)'
       }}
     >
       {album.cover && (
@@ -50,30 +50,30 @@ export default function AlbumCard({ album, onClick, onMouseEnter, onContextMenu 
       )}
       <div
         className="relative z-10 w-full aspect-square flex items-center justify-center overflow-hidden rounded mb-3"
-        style={{ background: '#231815' }}
+        style={{ background: 'var(--bg-surface)' }}
       >
         {album.cover ? (
           <img src={album.cover} alt={album.title} className="w-full h-full object-cover" loading="lazy" />
         ) : (
-          <span style={{ fontSize: 16, color: '#4A413C' }}>▦</span>
+          <span style={{ fontSize: 16, color: 'var(--text-primary)' }}>▦</span>
         )}
       </div>
       <p
         className="relative z-10 text-sm truncate"
-        style={{ fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 600, color: '#E8DDD0' }}
+        style={{ fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 600, color: 'var(--text-primary)' }}
       >
         {album.title}
       </p>
       <p
         className="relative z-10 text-sm truncate mt-0.5"
-        style={{ fontFamily: "'Barlow Semi Condensed', sans-serif", color: '#9A8E84' }}
+        style={{ fontFamily: "'Barlow Semi Condensed', sans-serif", color: 'var(--text-primary)' }}
       >
         {album.artist}
       </p>
       {year && (
         <p
           className="relative z-10 text-xs mt-1"
-          style={{ fontFamily: "'Barlow Semi Condensed', sans-serif", color: '#4A413C' }}
+          style={{ fontFamily: "'Barlow Semi Condensed', sans-serif", color: 'var(--text-primary)' }}
         >
           {year}
         </p>

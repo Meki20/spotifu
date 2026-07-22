@@ -162,7 +162,7 @@ export default function Home() {
             textTransform: 'uppercase',
             letterSpacing: '0.04em',
             lineHeight: 0.95,
-            color: '#E8DDD0',
+            color: 'var(--text-primary)',
           }}
         >
           {getGreeting()}
@@ -173,17 +173,17 @@ export default function Home() {
         <div className="mb-8">
           <div
             className="flex items-center gap-2.5 mb-3"
-            style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 16, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.12em', color: '#b4003e' }}
+            style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 16, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.12em', color: 'var(--text-primary)' }}
           >
             For You
-            <div className="flex-1 h-px" style={{ background: '#261A14' }} />
+            <div className="flex-1 h-px" style={{ background: 'var(--bg-surface)' }} />
           </div>
           <div className="flex flex-wrap gap-3">
             {showHottestTracks && (
               <Link
                 to={`/auto-playlist/${hottestTracksWithDef.definition.id}`}
-                className="relative flex items-center gap-3 px-4 py-3 cursor-pointer border transition-colors hover:border-[#b4003e] overflow-hidden"
-                style={{ background: '#1A1210', borderColor: '#3D2820', borderRadius: 4, display: 'inline-flex', minWidth: 200 }}
+                className="relative flex items-center gap-3 px-4 py-3 cursor-pointer border transition-colors hover:border-[var(--accent)] overflow-hidden"
+                style={{ background: 'var(--bg-surface)', borderColor: 'var(--border)', borderRadius: 4, display: 'inline-flex', minWidth: 200 }}
               >
                 {hottestTracksWithDef.definition.cover_url && (
                     <div
@@ -198,7 +198,7 @@ export default function Home() {
                   )}
                   <div
                     className="relative z-10 w-10 h-10 rounded overflow-hidden shrink-0 flex items-center justify-center"
-                    style={{ background: '#231815' }}
+                    style={{ background: 'var(--bg-surface)' }}
                   >
                     {hottestTracksWithDef.definition.cover_url ? (
                       <img src={hottestTracksWithDef.definition.cover_url} alt="" className="w-full h-full object-cover" loading="lazy" />
@@ -208,7 +208,7 @@ export default function Home() {
                   </div>
                   <span
                     className="relative z-10 text-xs truncate"
-                    style={{ fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 600, color: '#E8DDD0' }}
+                    style={{ fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 600, color: 'var(--text-primary)' }}
                   >
                     {hottestTracksWithDef.definition.name}
                   </span>
@@ -217,8 +217,8 @@ export default function Home() {
             {showTagMix && (
               <Link
                 to={`/auto-playlist/${tagMixWithDef.definition.id}`}
-                className="relative flex items-center gap-3 px-4 py-3 cursor-pointer border transition-colors hover:border-[#b4003e] overflow-hidden"
-                style={{ background: '#1A1210', borderColor: '#3D2820', borderRadius: 4, display: 'inline-flex', minWidth: 200 }}
+                className="relative flex items-center gap-3 px-4 py-3 cursor-pointer border transition-colors hover:border-[var(--accent)] overflow-hidden"
+                style={{ background: 'var(--bg-surface)', borderColor: 'var(--border)', borderRadius: 4, display: 'inline-flex', minWidth: 200 }}
               >
                 {tagMixWithDef.definition.cover_url && (
                     <div
@@ -233,7 +233,7 @@ export default function Home() {
                   )}
                   <div
                     className="relative z-10 w-10 h-10 rounded overflow-hidden shrink-0 flex items-center justify-center"
-                    style={{ background: '#231815' }}
+                    style={{ background: 'var(--bg-surface)' }}
                   >
                     {tagMixWithDef.definition.cover_url ? (
                       <img src={tagMixWithDef.definition.cover_url} alt="" className="w-full h-full object-cover" loading="lazy" />
@@ -243,7 +243,7 @@ export default function Home() {
                   </div>
                   <span
                     className="relative z-10 text-xs truncate"
-                    style={{ fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 600, color: '#E8DDD0' }}
+                    style={{ fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 600, color: 'var(--text-primary)' }}
                   >
                     {tagMixWithDef.definition.name}
                   </span>
@@ -258,18 +258,18 @@ export default function Home() {
         <div className="mb-8">
           <div
             className="flex items-center gap-2.5 mb-3"
-            style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 16, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.12em', color: '#b4003e' }}
+            style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 16, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.12em', color: 'var(--text-primary)' }}
           >
             Your Playlists
-            <div className="flex-1 h-px" style={{ background: '#261A14' }} />
+            <div className="flex-1 h-px" style={{ background: 'var(--bg-surface)' }} />
           </div>
           <div className="grid grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3">
             {playlists.slice(0, 6).map((pl: Playlist) => (
               <Link
                 key={pl.id}
                 to={`/playlist/${pl.id}`}
-                className="relative flex items-center gap-3 px-4 py-3 cursor-pointer border transition-colors hover:border-[#b4003e] overflow-hidden"
-                style={{ background: '#1A1210', borderColor: '#3D2820', borderRadius: 4 }}
+                className="relative flex items-center gap-3 px-4 py-3 cursor-pointer border transition-colors hover:border-[var(--accent)] overflow-hidden"
+                style={{ background: 'var(--bg-surface)', borderColor: 'var(--border)', borderRadius: 4 }}
               >
                 {pl.cover_image_url && (
                   <div
@@ -284,7 +284,7 @@ export default function Home() {
                 )}
                 <div
                   className="relative z-10 w-10 h-10 rounded overflow-hidden shrink-0 flex items-center justify-center"
-                  style={{ background: '#231815' }}
+                  style={{ background: 'var(--bg-surface)' }}
                 >
                   {pl.cover_image_url ? (
                     <img src={pl.cover_image_url} alt="" className="w-full h-full object-cover" loading="lazy" />
@@ -294,7 +294,7 @@ export default function Home() {
                 </div>
                 <span
                   className="relative z-10 text-xs truncate"
-                  style={{ fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 600, color: '#E8DDD0' }}
+                  style={{ fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 600, color: 'var(--text-primary)' }}
                 >
                   {pl.title}
                 </span>
@@ -308,15 +308,15 @@ export default function Home() {
       <div className="mb-6">
         <div
           className="flex items-center gap-2.5 mb-3"
-          style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 16, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.12em', color: '#b4003e' }}
+          style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 16, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.12em', color: 'var(--text-primary)' }}
         >
           Recently Played
-          <div className="flex-1 h-px" style={{ background: '#261A14' }} />
+          <div className="flex-1 h-px" style={{ background: 'var(--bg-surface)' }} />
           <button
             onClick={refreshRecentlyPlayed}
-            className="p-1.5 rounded hover:bg-[#3D2820] transition-colors"
+            className="p-1.5 rounded hover:bg-[var(--border)] transition-colors"
             title="Refresh recently played"
-            style={{ color: '#4A413C' }}
+            style={{ color: 'var(--text-primary)' }}
           >
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <path d="M21 2v6h-6M3 12a9 9 0 0 1 15-6.7L21 8M3 22v-6h6M21 12a9 9 0 0 1-15 6.7L3 16" />
@@ -335,7 +335,7 @@ export default function Home() {
               >
                 <span
                   className="w-8 text-center text-xs shrink-0"
-                  style={{ fontFamily: "'Barlow Semi Condensed', monospace", color: '#4A413C' }}
+                  style={{ fontFamily: "'Barlow Semi Condensed', monospace", color: 'var(--text-primary)' }}
                 >
                   {i + 1}
                 </span>
@@ -351,7 +351,7 @@ export default function Home() {
               </div>
             ))
           ) : (
-            <p className="text-sm" style={{ color: '#4A413C', fontFamily: "'Barlow Semi Condensed', sans-serif" }}>no recently played tracks</p>
+            <p className="text-sm" style={{ color: 'var(--text-primary)', fontFamily: "'Barlow Semi Condensed', sans-serif" }}>no recently played tracks</p>
           )}
         </div>
       </div>
@@ -360,10 +360,10 @@ export default function Home() {
       <div>
         <div
           className="flex items-center gap-2.5 mb-3"
-          style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 16, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.12em', color: '#b4003e' }}
+          style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 16, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.12em', color: 'var(--text-primary)' }}
         >
           Recently Downloaded
-          <div className="flex-1 h-px" style={{ background: '#261A14' }} />
+          <div className="flex-1 h-px" style={{ background: 'var(--bg-surface)' }} />
         </div>
         <div
           className="flex gap-2.5 overflow-x-auto pb-1"
@@ -374,7 +374,7 @@ export default function Home() {
               <TrackCard key={track.track_id} track={track} onPlay={playFromRecentlyDownloaded} onHoverArtist={(aid, albs) => enqueue(aid, albs)} onContextMenu={(e) => handleRecentlyDownloadedContextMenu(e, track)} />
             ))
           ) : (
-            <p className="text-sm" style={{ color: '#4A413C', fontFamily: "'Barlow Semi Condensed', sans-serif" }}>no recently downloaded tracks</p>
+            <p className="text-sm" style={{ color: 'var(--text-primary)', fontFamily: "'Barlow Semi Condensed', sans-serif" }}>no recently downloaded tracks</p>
           )}
         </div>
       </div>

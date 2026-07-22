@@ -86,9 +86,9 @@ export default function AlbumTrackPanel({ album, onClose }: AlbumTrackPanelProps
         <div
           className="rounded-t-xl overflow-hidden"
           style={{
-            background: 'rgba(26,18,16,0.97)',
+            background: 'color-mix(in srgb, var(--bg-surface) 0.97, transparent)',
             backdropFilter: 'blur(24px)',
-            borderTop: '1px solid #3D2820',
+            borderTop: '1px solid var(--border)',
           }}
         >
           {album ? (
@@ -96,7 +96,7 @@ export default function AlbumTrackPanel({ album, onClose }: AlbumTrackPanelProps
               {/* Header */}
               <div
                 className="flex items-center gap-4 px-5 py-4"
-                style={{ borderBottom: '1px solid #261A14' }}
+                style={{ borderBottom: '1px solid var(--border-subtle)' }}
               >
                 {album.cover && (
                   <img
@@ -109,19 +109,19 @@ export default function AlbumTrackPanel({ album, onClose }: AlbumTrackPanelProps
                 <div className="flex-1 min-w-0">
                   <p
                     className="text-sm font-semibold truncate"
-                    style={{ fontFamily: "'Barlow Condensed', sans-serif", color: '#E8DDD0' }}
+                    style={{ fontFamily: "'Barlow Condensed', sans-serif", color: 'var(--text-primary)' }}
                   >
                     {album.title}
                   </p>
                   <p
                     className="text-xs truncate"
-                    style={{ fontFamily: "'Barlow Semi Condensed', sans-serif", color: '#9A8E84' }}
+                    style={{ fontFamily: "'Barlow Semi Condensed', sans-serif", color: 'var(--text-primary)' }}
                   >
                     {album.artist}
                   </p>
                   <p
                     className="text-xs mt-0.5"
-                    style={{ fontFamily: "'Barlow Semi Condensed', sans-serif", color: '#b4003e' }}
+                    style={{ fontFamily: "'Barlow Semi Condensed', sans-serif", color: 'var(--text-primary)' }}
                   >
                     {album.cached_count} of {album.track_count} cached
                   </p>
@@ -129,7 +129,7 @@ export default function AlbumTrackPanel({ album, onClose }: AlbumTrackPanelProps
                 <button
                   onClick={handleClose}
                   className="w-8 h-8 flex items-center justify-center rounded-full shrink-0"
-                  style={{ background: '#231815', color: '#9A8E84' }}
+                  style={{ background: 'var(--bg-surface)', color: 'var(--text-primary)' }}
                 >
                   <X size={16} />
                 </button>
@@ -140,7 +140,7 @@ export default function AlbumTrackPanel({ album, onClose }: AlbumTrackPanelProps
                 {album.tracks.map((track, i) => (
                   <div
                     key={track.mb_id || i}
-                    style={{ borderBottom: '1px solid #1A1210', padding: '0 20px' }}
+                    style={{ borderBottom: '1px solid var(--bg-surface)', padding: '0 20px' }}
                   >
                     <TrackRow
                       track={track}

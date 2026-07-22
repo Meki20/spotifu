@@ -29,10 +29,10 @@ const TrackCardImpl = ({ track, size = 96, onPlay, onHoverArtist, onContextMenu 
   return (
     <div
       ref={rootRef}
-      className="flex flex-col items-center gap-2 px-3 py-3 rounded cursor-pointer border shrink-0 transition-colors hover:border-[#b4003e] group relative overflow-hidden"
+      className="flex flex-col items-center gap-2 px-3 py-3 rounded cursor-pointer border shrink-0 transition-colors hover:border-[var(--accent)] group relative overflow-hidden"
       style={{
-        background: '#1A1210',
-        borderColor: '#3D2820',
+        background: 'var(--bg-surface)',
+        borderColor: 'var(--border)',
         width: size + 48,
       }}
       onClick={() => onPlay(track)}
@@ -69,28 +69,28 @@ const TrackCardImpl = ({ track, size = 96, onPlay, onHoverArtist, onContextMenu 
                 className="absolute top-1 right-1 p-1 rounded"
                 style={{ background: 'rgba(0,0,0,0.6)' }}
               >
-                <Computer size={14} className="text-[#9A8E84]" />
+                <Computer size={14} className="text-[var(--text-secondary)]" />
               </div>
             )}
           </div>
         ) : (
           <div
             className="rounded flex items-center justify-center shrink-0"
-            style={{ width: size, height: size, background: '#231815' }}
+            style={{ width: size, height: size, background: 'var(--bg-surface)' }}
           >
-            <span style={{ fontSize: Math.floor(size * 0.25), color: '#4A413C' }}>▦</span>
+            <span style={{ fontSize: Math.floor(size * 0.25), color: 'var(--text-primary)' }}>▦</span>
           </div>
         )}
         <div className="w-full text-center min-w-0">
           <p
             className="text-xs truncate"
-            style={{ fontFamily: "'Barlow Semi Condensed', sans-serif", fontWeight: 600, color: '#E8DDD0' }}
+            style={{ fontFamily: "'Barlow Semi Condensed', sans-serif", fontWeight: 600, color: 'var(--text-primary)' }}
           >
             {track.title}
           </p>
           <p
             className="text-xs truncate mt-0.5"
-            style={{ fontFamily: "'Barlow Semi Condensed', sans-serif", color: '#9A8E84' }}
+            style={{ fontFamily: "'Barlow Semi Condensed', sans-serif", color: 'var(--text-primary)' }}
           >
             {displayArtist(track)}
           </p>

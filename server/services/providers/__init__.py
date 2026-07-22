@@ -305,7 +305,11 @@ class MetadataService:
                     logger.debug("_get_fanart_fallback get_artist_head (ignored)", exc_info=True)
 
             from services.soulseek import get_secrets_data
-            api_key = get_secrets_data().get("fanarttv_api_key", "")
+            # Env wins, then .secrets — mirrors lastfm.py precedence.
+            api_key = (
+                os.environ.get("FANARTTV_API_KEY", "").strip()
+                or get_secrets_data().get("fanarttv_api_key", "")
+            ).strip()
             logger.debug(f"[providers] _get_fanart_fallback {artist_id}: api_key present={bool(api_key)}")
 
             async def do_fanart() -> Any:

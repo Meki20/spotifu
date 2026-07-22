@@ -296,7 +296,12 @@ def health():
 
 @app.get("/health/ready")
 def health_ready():
-    """Liveness: process up. Readiness: DB + Soulseek status for monitoring."""
+    """Liveness: process up. Readiness: DB + Soulseek status for monitoring.
+
+    Returns 503 when the database is unreachable so compose / external monitors
+    can gate on this endpoint. Soulseek state is informational only.
+    """
+    from fastapi.responses import JSONResponse
     from sqlalchemy import text
 
     from services.soulseek import is_connected
@@ -309,10 +314,13 @@ def health_ready():
         logger.exception("readiness: database ping failed")
         db_ok = False
 
-    return {
-        "ready": db_ok,
-        "soulseek_connected": is_connected(),
-    }
+    return JSONResponse(
+        status_code=200 if db_ok else 503,
+        content={
+            "ready": db_ok,
+            "soulseek_connected": is_connected(),
+        },
+    )
 
 
 if __name__ == "__main__":

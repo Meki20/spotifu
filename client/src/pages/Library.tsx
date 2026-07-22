@@ -65,18 +65,18 @@ function PlaylistCard({
     <div
       className="p-4 rounded cursor-pointer border transition-all duration-150 relative overflow-hidden"
       style={{
-        background: '#1A1210',
-        borderColor: '#3D2820',
+        background: 'var(--bg-surface)',
+        borderColor: 'var(--border)',
         borderRadius: 4,
       }}
       onClick={() => onOpen?.(playlist)}
       onMouseEnter={(e) => {
-        e.currentTarget.style.background = '#231815'
-        e.currentTarget.style.borderColor = '#b4003e'
+        e.currentTarget.style.background = 'var(--text-primary)'
+        e.currentTarget.style.borderColor = 'var(--text-primary)'
       }}
       onMouseLeave={(e) => {
-        e.currentTarget.style.background = '#1A1210'
-        e.currentTarget.style.borderColor = '#3D2820'
+        e.currentTarget.style.background = 'var(--text-primary)'
+        e.currentTarget.style.borderColor = 'var(--text-primary)'
       }}
       onContextMenu={onContextMenu ? (e) => onContextMenu(e, playlist) : undefined}
     >
@@ -93,17 +93,17 @@ function PlaylistCard({
       )}
       <div
         className="relative z-10 w-full aspect-square rounded mb-3 flex items-center justify-center overflow-hidden"
-        style={{ background: '#231815' }}
+        style={{ background: 'var(--bg-surface)' }}
       >
         {playlist.cover_image_url ? (
           <img src={playlist.cover_image_url} alt="" className="w-full h-full object-cover" loading="lazy" />
         ) : (
-          <span style={{ fontSize: 24, color: '#3D2820' }}>▦</span>
+          <span style={{ fontSize: 24, color: 'var(--text-primary)' }}>▦</span>
         )}
       </div>
       <p
         className="relative z-10 text-sm truncate"
-        style={{ fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 600, color: '#E8DDD0' }}
+        style={{ fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 600, color: 'var(--text-primary)' }}
       >
         {playlist.title}
       </p>
@@ -217,7 +217,7 @@ export default function Library() {
               fontWeight: 800,
               textTransform: 'uppercase',
               letterSpacing: '0.04em',
-              color: '#E8DDD0',
+              color: 'var(--text-primary)',
               lineHeight: 1,
             }}
           >
@@ -231,10 +231,10 @@ export default function Library() {
       <div className="mb-8">
         <div
           className="flex items-center gap-2.5 mb-4"
-          style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 16, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.12em', color: '#b4003e' }}
+          style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 16, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.12em', color: 'var(--text-primary)' }}
         >
           Albums
-          <div className="flex-1 h-px" style={{ background: '#261A14' }} />
+          <div className="flex-1 h-px" style={{ background: 'var(--bg-surface)' }} />
           {libraryAlbums && libraryAlbums.length > 1 && (
             <button
               onClick={openReorderModal}
@@ -245,8 +245,8 @@ export default function Library() {
                 textTransform: 'uppercase',
                 letterSpacing: '0.1em',
                 background: 'transparent',
-                color: '#9A8E84',
-                borderColor: '#3D2820',
+                color: 'var(--text-primary)',
+                borderColor: 'var(--border)',
                 cursor: 'pointer',
               }}
             >
@@ -255,12 +255,12 @@ export default function Library() {
           )}
         </div>
         {!libraryAlbums ? (
-          <div className="flex items-center gap-2 text-sm" style={{ color: '#4A413C', fontFamily: "'Barlow Semi Condensed', sans-serif" }}>
+          <div className="flex items-center gap-2 text-sm" style={{ color: 'var(--text-primary)', fontFamily: "'Barlow Semi Condensed', sans-serif" }}>
             <PollyLoading size={28} />
             <span>loading…</span>
           </div>
         ) : libraryAlbums.length === 0 ? (
-          <div className="text-sm" style={{ color: '#4A413C', fontFamily: "'Barlow Semi Condensed', sans-serif" }}>no cached albums yet</div>
+          <div className="text-sm" style={{ color: 'var(--text-primary)', fontFamily: "'Barlow Semi Condensed', sans-serif" }}>no cached albums yet</div>
         ) : (
           <LibraryDiscStrip
             albums={libraryAlbums}
@@ -275,10 +275,10 @@ export default function Library() {
         <div className="flex items-center justify-between mb-4">
           <div
             className="flex items-center gap-2.5"
-            style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 16, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.12em', color: '#b4003e' }}
+            style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 16, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.12em', color: 'var(--text-primary)' }}
           >
             Playlists
-            <div className="h-px flex-1" style={{ background: '#261A14' }} />
+            <div className="h-px flex-1" style={{ background: 'var(--bg-surface)' }} />
           </div>
           <div className="flex gap-2">
             <button
@@ -291,8 +291,8 @@ export default function Library() {
                 textTransform: 'uppercase',
                 letterSpacing: '0.1em',
                 background: 'transparent',
-                color: '#9A8E84',
-                borderColor: '#3D2820',
+                color: 'var(--text-primary)',
+                borderColor: 'var(--border)',
                 cursor: 'pointer',
               }}
             >
@@ -308,8 +308,8 @@ export default function Library() {
                 textTransform: 'uppercase',
                 letterSpacing: '0.1em',
                 background: 'transparent',
-                color: '#9A8E84',
-                borderColor: '#3D2820',
+                color: 'var(--text-primary)',
+                borderColor: 'var(--border)',
                 cursor: 'pointer',
               }}
             >
@@ -326,11 +326,11 @@ export default function Library() {
               placeholder="playlist name"
               className="flex-1 px-3 py-2 text-sm"
               style={{
-                background: '#1A1210',
-                border: '1px solid #3D2820',
+                background: 'var(--bg-surface)',
+                border: '1px solid var(--border)',
                 borderRadius: 4,
                 fontFamily: "'Barlow Semi Condensed', sans-serif",
-                color: '#E8DDD0',
+                color: 'var(--text-primary)',
                 outline: 'none',
               }}
             />
@@ -338,8 +338,8 @@ export default function Library() {
               type="submit"
               className="px-4 py-2 text-sm font-bold transition-colors"
               style={{
-                background: '#b4003e',
-                color: '#E8DDD0',
+                background: 'var(--bg-surface)',
+                color: 'var(--text-primary)',
                 border: 'none',
                 cursor: 'pointer',
                 fontFamily: "'Barlow Condensed', sans-serif",
@@ -354,13 +354,13 @@ export default function Library() {
         )}
 
         {loadingPlaylists && (
-          <div className="flex items-center gap-2 text-sm mb-2" style={{ color: '#4A413C', fontFamily: "'Barlow Semi Condensed', sans-serif" }}>
+          <div className="flex items-center gap-2 text-sm mb-2" style={{ color: 'var(--text-primary)', fontFamily: "'Barlow Semi Condensed', sans-serif" }}>
             <PollyLoading size={28} />
             <span>loading…</span>
           </div>
         )}
         {!loadingPlaylists && playlists?.length === 0 && (
-          <div className="text-sm" style={{ color: '#4A413C', fontFamily: "'Barlow Semi Condensed', sans-serif" }}>no playlists yet</div>
+          <div className="text-sm" style={{ color: 'var(--text-primary)', fontFamily: "'Barlow Semi Condensed', sans-serif" }}>no playlists yet</div>
         )}
         <div className="grid grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
           {playlists?.map((pl) => (
@@ -396,7 +396,7 @@ export default function Library() {
         >
           <div
             className="w-full max-w-lg max-h-[80vh] flex flex-col rounded p-6"
-            style={{ background: '#1A1210', border: '1px solid #3D2820' }}
+            style={{ background: 'var(--bg-surface)', border: '1px solid var(--border)' }}
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-center justify-between mb-6">
@@ -407,17 +407,17 @@ export default function Library() {
                   fontSize: 20,
                   textTransform: 'uppercase',
                   letterSpacing: '0.1em',
-                  color: '#E8DDD0',
+                  color: 'var(--text-primary)',
                 }}
               >
                 Reorder Albums
               </h2>
-              <button onClick={() => setShowReorder(false)} style={{ color: '#9A8E84' }}>
+              <button onClick={() => setShowReorder(false)} style={{ color: 'var(--text-primary)' }}>
                 <X size={18} />
               </button>
             </div>
 
-            <p className="text-sm mb-4" style={{ color: '#9A8E84', fontFamily: "'Barlow Semi Condensed', sans-serif" }}>
+            <p className="text-sm mb-4" style={{ color: 'var(--text-primary)', fontFamily: "'Barlow Semi Condensed', sans-serif" }}>
               Drag albums to reorder how they appear in the disc strip.
             </p>
 
@@ -431,12 +431,12 @@ export default function Library() {
                   onDragEnd={handleDragEnd}
                   className="flex items-center gap-3 p-3 rounded cursor-grab active:cursor-grabbing"
                   style={{
-                    background: '#231815',
-                    border: '1px solid #3D2820',
+                    background: 'var(--bg-surface)',
+                    border: '1px solid var(--border)',
                     opacity: draggedIdx === idx ? 0.5 : 1,
                   }}
                 >
-                  <GripVertical size={14} style={{ color: '#4A413C', flexShrink: 0 }} />
+                  <GripVertical size={14} style={{ color: 'var(--text-primary)', flexShrink: 0 }} />
                   {album.cover ? (
                     <img
                       src={album.cover}
@@ -447,18 +447,18 @@ export default function Library() {
                   ) : (
                     <div
                       className="w-10 h-10 rounded shrink-0"
-                      style={{ background: '#3D2820' }}
+                      style={{ background: 'var(--bg-surface)' }}
                     />
                   )}
                   <div className="min-w-0 flex-1">
-                    <p className="text-sm truncate" style={{ fontFamily: "'Barlow Semi Condensed', sans-serif", color: '#E8DDD0' }}>
+                    <p className="text-sm truncate" style={{ fontFamily: "'Barlow Semi Condensed', sans-serif", color: 'var(--text-primary)' }}>
                       {album.title}
                     </p>
-                    <p className="text-xs truncate" style={{ fontFamily: "'Barlow Semi Condensed', sans-serif", color: '#9A8E84' }}>
+                    <p className="text-xs truncate" style={{ fontFamily: "'Barlow Semi Condensed', sans-serif", color: 'var(--text-primary)' }}>
                       {album.artist}
                     </p>
                   </div>
-                  <span className="text-xs shrink-0" style={{ color: '#4A413C', fontFamily: "'Barlow Semi Condensed', sans-serif" }}>
+                  <span className="text-xs shrink-0" style={{ color: 'var(--text-primary)', fontFamily: "'Barlow Semi Condensed', sans-serif" }}>
                     {idx + 1}
                   </span>
                 </div>
@@ -474,9 +474,9 @@ export default function Library() {
                   fontWeight: 600,
                   textTransform: 'uppercase',
                   letterSpacing: '0.1em',
-                  color: '#9A8E84',
+                  color: 'var(--text-primary)',
                   background: 'transparent',
-                  border: '1px solid #3D2820',
+                  border: '1px solid var(--border)',
                   cursor: 'pointer',
                 }}
               >
@@ -491,8 +491,8 @@ export default function Library() {
                   fontWeight: 700,
                   textTransform: 'uppercase',
                   letterSpacing: '0.1em',
-                  color: '#E8DDD0',
-                  background: '#b4003e',
+                  color: 'var(--text-primary)',
+                  background: 'var(--bg-surface)',
                   border: 'none',
                   cursor: 'pointer',
                   opacity: saveOrderMutation.isPending ? 0.6 : 1,

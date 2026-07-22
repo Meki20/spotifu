@@ -55,7 +55,7 @@ function buildNormalizedTexture(url: string): Promise<THREE.CanvasTexture> {
       resolve(tex)
     }
     img.onerror = () => {
-      ctx.fillStyle = '#222'
+      ctx.fillStyle = 'var(--bg-surface-2)'
       ctx.fillRect(0, 0, SIZE, SIZE)
       const tex = new THREE.CanvasTexture(offscreen)
       normalizedTextureCache.set(url, tex)
@@ -205,7 +205,7 @@ function Disc({ album, position, onClick }: DiscProps) {
 
         <mesh position={[0.2, 0, 0.032]}>
           <ringGeometry args={[0.15, 0.38, 32]} />
-          <meshStandardMaterial color="#080808" metalness={0.2} roughness={0.9} side={THREE.DoubleSide} />
+          <meshStandardMaterial color="var(--bg-surface)" metalness={0.2} roughness={0.9} side={THREE.DoubleSide} />
         </mesh>
 
         <mesh position={[0.2, 0, 0.034]} rotation={[Math.PI / 2, 0, 0]}>
@@ -216,7 +216,7 @@ function Disc({ album, position, onClick }: DiscProps) {
         {corners.map(([x, y], i) => (
           <mesh key={i} position={[x, y, 0.18]}>
             <cylinderGeometry args={[0.06, 0.06, 0.02, 16]} />
-            <meshStandardMaterial color="#1a1a1a" metalness={0.6} roughness={0.4} />
+            <meshStandardMaterial color="var(--bg-surface-2)" metalness={0.6} roughness={0.4} />
           </mesh>
         ))}
 
@@ -326,9 +326,9 @@ export default function LibraryDiscStrip({ albums, onDiscClick }: LibraryDiscStr
           className="absolute left-0 z-10 w-8 h-8 rounded-full flex items-center justify-center"
           style={{
             top: CANVAS_HEIGHT / 2 - 16,
-            background: 'rgba(26,18,16,0.9)',
-            border: '1px solid #3D2820',
-            color: '#9A8E84',
+            background: 'color-mix(in srgb, var(--bg-surface) 0.9, transparent)',
+            border: '1px solid var(--border)',
+            color: 'var(--text-primary)',
             boxShadow: '0 2px 8px rgba(0,0,0,0.4)',
           }}
         >
@@ -367,7 +367,7 @@ export default function LibraryDiscStrip({ albums, onDiscClick }: LibraryDiscStr
           >
             <p
               className="text-xs truncate"
-              style={{ fontFamily: "'Barlow Semi Condensed', sans-serif", color: '#9A8E84' }}
+              style={{ fontFamily: "'Barlow Semi Condensed', sans-serif", color: 'var(--text-primary)' }}
             >
               {album.title}
             </p>
@@ -381,9 +381,9 @@ export default function LibraryDiscStrip({ albums, onDiscClick }: LibraryDiscStr
           className="absolute right-0 z-10 w-8 h-8 rounded-full flex items-center justify-center"
           style={{
             top: CANVAS_HEIGHT / 2 - 16,
-            background: 'rgba(26,18,16,0.9)',
-            border: '1px solid #3D2820',
-            color: '#9A8E84',
+            background: 'color-mix(in srgb, var(--bg-surface) 0.9, transparent)',
+            border: '1px solid var(--border)',
+            color: 'var(--text-primary)',
             boxShadow: '0 2px 8px rgba(0,0,0,0.4)',
           }}
         >

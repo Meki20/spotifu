@@ -243,7 +243,7 @@ export default function PlaylistPage() {
           <div
             className="absolute inset-0"
             style={{
-              background: 'linear-gradient(180deg, color-mix(in srgb, var(--bg-base) 0.55, transparent) 0%, var(--bg-base) 100%)',
+              background: 'linear-gradient(180deg, color-mix(in srgb, var(--bg-base) 55%, transparent) 0%, color-mix(in srgb, var(--bg-base) 90%, transparent) 100%)',
             }}
           />
         </div>

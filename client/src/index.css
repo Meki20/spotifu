@@ -58,9 +58,12 @@
   /* Background image (set by themes with backgroundUrl) */
   --bg-image: none;
   --bg-image-opacity: 0;
+  --bg-image-dim: 0;
 
   /* Texture overlay (scanlines + grid, used by Y2K theme) */
   --texture-overlay-opacity: 0;
+  --tex-line: transparent;
+  --tex-grid: transparent;
 
   /* Typography */
   --font-display: 'Barlow Condensed', sans-serif;
@@ -152,13 +155,14 @@
   --text-muted-icon-border: rgba(96, 120, 160, 0.4);
   --overlay-dim: rgba(4, 8, 16, 0.7);
   --texture-overlay-opacity: 0.35;
+  --tex-line: rgba(255, 255, 255, 0.004);
+  --tex-grid: rgba(59, 164, 255, 0.007);
   --bg-image-opacity: 0.15;
   --section-title-color: var(--accent);
 }
 
 /* ── Technical frame utilities ─────────────────────────────────────────────
    .tf      — thin-bordered translucent panel (adapts to any theme's vars)
-   .tf-brackets — adds corner-bracket ticks (only rendered for y2k flavor)
    .tfx / .tfxb — micro annotation text, hidden unless y2k flavor
    ──────────────────────────────────────────────────────────────────────────── */
 
@@ -193,27 +197,22 @@
 }
 
 [data-flavor="y2k"] .tf:hover {
-  box-shadow:
-    0 0 14px color-mix(in srgb, var(--accent) 0.12, transparent),
-    inset 0 0 10px color-mix(in srgb, var(--accent) 0.05, transparent);
+  border-color: var(--accent);
 }
 
+/* Corner brackets, drawn as ONE static SVG layer (painted once, no per-scroll
+   gradient recompute). Uses currentColor so it stays neutral/cheap; tinted
+   toward the accent but kept subtle for repaint-free composition. */
 [data-flavor="y2k"] .tf-brackets::after {
   content: '';
   position: absolute;
-  inset: -1px;
+  inset: 0;
   pointer-events: none;
-  opacity: 0.75;
-  background:
-    linear-gradient(to right, var(--accent) 1px, transparent 1px) 0 0 / 7px 7px,
-    linear-gradient(to bottom, var(--accent) 1px, transparent 1px) 0 0 / 7px 7px,
-    linear-gradient(to left, var(--accent) 1px, transparent 1px) 100% 0 / 7px 7px,
-    linear-gradient(to bottom, var(--accent) 1px, transparent 1px) 100% 0 / 7px 7px,
-    linear-gradient(to right, var(--accent) 1px, transparent 1px) 0 100% / 7px 7px,
-    linear-gradient(to top, var(--accent) 1px, transparent 1px) 0 100% / 7px 7px,
-    linear-gradient(to left, var(--accent) 1px, transparent 1px) 100% 100% / 7px 7px,
-    linear-gradient(to top, var(--accent) 1px, transparent 1px) 100% 100% / 7px 7px;
+  z-index: 1;
+  color: color-mix(in srgb, var(--accent) 42%, transparent);
+  background-image: url("data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20width='100'%20height='100'%20viewBox='0%200%20100%20100'%20fill='none'%20stroke='currentColor'%20stroke-width='2'%3E%3Cpath%20d='M6%2022V6h16'/%3E%3Cpath%20d='M78%206h16v16'/%3E%3Cpath%20d='M94%2078v16H78'/%3E%3Cpath%20d='M22%2094H6V78'/%3E%3C/svg%3E");
   background-repeat: no-repeat;
+  background-size: 100% 100%;
 }
 
 [data-flavor="y2k"] .tfx {
@@ -263,7 +262,7 @@ html, body, #root {
 }
 
 body {
-  background: var(--bg-base);
+  background-color: var(--bg-base);
   color: var(--text-primary);
   font-family: var(--font-body);
   font-size: 18px;
@@ -271,51 +270,23 @@ body {
   transition: background-color 200ms ease, color 200ms ease;
 }
 
-/* Background image overlay — controlled by theme vars --bg-image and --bg-image-opacity */
+/* Background photo lives on a single fixed, GPU-composited layer painted once.
+   Because it is `position: fixed` (not a scroll-attached <body> background),
+   it never re-rasterizes while inner containers scroll — avoiding the per-frame
+   repaint that made the Y2K view jank on the horizontal recently-downloaded row. */
 body::before {
   content: '';
   position: fixed;
   inset: 0;
   z-index: 0;
   pointer-events: none;
-  background-image: var(--bg-image, none);
-  background-size: cover;
-  background-position: center;
-  opacity: var(--bg-image-opacity, 0);
-  transition: opacity 300ms ease;
-}
-
-/* Texture overlay — scanlines + blueprint grid (default off, activated by Y2K theme) */
-body::after {
-  content: '';
-  position: fixed;
-  inset: 0;
-  z-index: 1;
-  pointer-events: none;
-  opacity: var(--texture-overlay-opacity, 0);
+  transform: translateZ(0);
   background-image:
-    repeating-linear-gradient(
-      0deg,
-      transparent 0px,
-      transparent 2px,
-      rgba(255, 255, 255, 0.012) 2px,
-      rgba(255, 255, 255, 0.012) 4px
-    ),
-    repeating-linear-gradient(
-      90deg,
-      transparent 0px,
-      transparent 40px,
-      rgba(59, 164, 255, 0.02) 40px,
-      rgba(59, 164, 255, 0.02) 41px
-    ),
-    repeating-linear-gradient(
-      0deg,
-      transparent 0px,
-      transparent 40px,
-      rgba(59, 164, 255, 0.02) 40px,
-      rgba(59, 164, 255, 0.02) 41px
-    );
-  transition: opacity 300ms ease;
+    linear-gradient(rgba(0, 0, 0, var(--bg-image-dim, 0)), rgba(0, 0, 0, var(--bg-image-dim, 0))),
+    var(--bg-image, none);
+  background-position: center;
+  background-size: auto, cover;
+  background-repeat: no-repeat, no-repeat;
 }
 
 #root {
@@ -374,20 +345,6 @@ h2, h3 {
   text-transform: uppercase;
   letter-spacing: 0.03em;
   color: var(--text-primary);
-}
-
-.grain {
-  position: relative;
-}
-.grain::after {
-  content: '';
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-  opacity: 0.08;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='200' height='200' filter='url(%23n)'/%3E%3C/svg%3E");
-  background-size: 200px 200px;
-  border-radius: inherit;
 }
 
 @keyframes pulse {

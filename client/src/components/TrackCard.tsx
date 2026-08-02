@@ -70,6 +70,7 @@ const TrackCardImpl = ({ track, size = 96, index, onPlay, onHoverArtist, onConte
               className="w-full h-full"
               style={{ objectFit: 'cover', borderRadius: 1 }}
               loading="lazy"
+              decoding="async"
             />
             {isLocalTrack(track) && (
               <div

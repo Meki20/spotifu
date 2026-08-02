@@ -182,7 +182,7 @@ export default function MainLayout() {
   }
 
   return (
-    <div className="flex flex-col h-screen w-screen overflow-hidden bg-[var(--bg-base)]">
+    <div className="flex flex-col h-screen w-screen overflow-hidden">
       <div className="flex flex-1 overflow-hidden">
         {/* Sidebar */}
         <aside
@@ -195,14 +195,6 @@ export default function MainLayout() {
             willChange: 'width',
           }}
         >
-          {/* Grain overlay */}
-          <div
-            className="absolute inset-0 pointer-events-none opacity-7"
-            style={{
-              backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='200' height='200' filter='url(%23n)'/%3E%3C/svg%3E")`,
-              backgroundSize: '180px 180px',
-            }}
-          />
           {/* Circuit pattern overlay */}
           <div
             className="absolute inset-0 pointer-events-none opacity-4"
@@ -650,7 +642,7 @@ export default function MainLayout() {
         </aside>
 
         {/* Main content */}
-        <main className="flex-1 overflow-y-auto bg-[var(--bg-base)]">
+        <main className="flex-1 overflow-y-auto">
           <Outlet />
         </main>
 

@@ -1,4 +1,6 @@
+import { useRef } from 'react'
 import { useQuery } from '@tanstack/react-query'
+import { useVirtualizer } from '@tanstack/react-virtual'
 import { queryClient } from '../queryClient'
 import { useAuthStore } from '../stores/authStore'
 import { authFetch } from '../api'
@@ -151,6 +153,23 @@ export default function Home() {
   function refreshRecentlyPlayed() {
     queryClient.invalidateQueries({ queryKey: ['recently-played'] })
   }
+
+  const recentlyPlayedScrollRef = useRef<HTMLDivElement>(null)
+  const recentlyPlayedVirtualizer = useVirtualizer({
+    count: recentlyPlayed?.length ?? 0,
+    getScrollElement: () => recentlyPlayedScrollRef.current,
+    estimateSize: () => 40,
+    overscan: 8,
+  })
+
+  const recentlyDownloadedScrollRef = useRef<HTMLDivElement>(null)
+  const recentlyDownloadedVirtualizer = useVirtualizer({
+    count: recentlyDownloaded?.length ?? 0,
+    getScrollElement: () => recentlyDownloadedScrollRef.current,
+    estimateSize: () => 146,
+    horizontal: true,
+    overscan: 4,
+  })
 
   return (
     <div className="p-6 flex-1 overflow-y-auto">
@@ -316,32 +335,50 @@ export default function Home() {
           </button>
         </div>
         <div
-          className="flex flex-col gap-0.5 overflow-y-auto"
+          ref={recentlyPlayedScrollRef}
+          className="overflow-y-auto"
           style={{ maxHeight: 256 }}
         >
           {recentlyPlayed && recentlyPlayed.length > 0 ? (
-            recentlyPlayed.map((track, i) => (
-              <div
-                key={track.track_id}
-                className="flex items-center"
-              >
-                <span
-                  className="w-8 text-center text-xs shrink-0"
-                  style={{ fontFamily: 'var(--font-mono)', color: 'var(--text-faint)' }}
-                >
-                  {i + 1}
-                </span>
-                <TrackRow
-                  track={track}
-                  isCached={track.is_cached}
-                  playlistStyleCover
-                  onPlay={playFromRecentlyPlayed}
-                  onHoverArtist={(aid, albs) => enqueue(aid, albs)}
-                  onContextMenu={handleRecentlyPlayedContextMenu}
-                  style={{ padding: '8px 16px 8px 0' }}
-                />
-              </div>
-            ))
+            <div
+              className="relative"
+              style={{ height: `${recentlyPlayedVirtualizer.getTotalSize()}px` }}
+            >
+              {recentlyPlayedVirtualizer.getVirtualItems().map((vr) => {
+                const track = recentlyPlayed[vr.index]
+                return (
+                  <div
+                    key={track.track_id}
+                    data-index={vr.index}
+                    ref={recentlyPlayedVirtualizer.measureElement}
+                    className="flex items-center"
+                    style={{
+                      position: 'absolute',
+                      top: 0,
+                      left: 0,
+                      width: '100%',
+                      transform: `translateY(${vr.start}px)`,
+                    }}
+                  >
+                    <span
+                      className="w-8 text-center text-xs shrink-0"
+                      style={{ fontFamily: 'var(--font-mono)', color: 'var(--text-faint)' }}
+                    >
+                      {vr.index + 1}
+                    </span>
+                    <TrackRow
+                      track={track}
+                      isCached={track.is_cached}
+                      playlistStyleCover
+                      onPlay={playFromRecentlyPlayed}
+                      onHoverArtist={(aid, albs) => enqueue(aid, albs)}
+                      onContextMenu={handleRecentlyPlayedContextMenu}
+                      style={{ padding: '8px 16px 8px 0' }}
+                    />
+                  </div>
+                )
+              })}
+            </div>
           ) : (
             <p className="text-sm" style={{ color: 'var(--text-primary)', fontFamily: "'Barlow Semi Condensed', sans-serif" }}>no recently played tracks</p>
           )}
@@ -358,13 +395,48 @@ export default function Home() {
           <div className="flex-1 h-px" style={{ background: 'var(--bg-surface)' }} />
         </div>
         <div
-          className="flex gap-2.5 overflow-x-auto pb-1"
-          style={{ maxHeight: 256, overflowY: 'auto' }}
+          ref={recentlyDownloadedScrollRef}
+          className="overflow-x-auto overflow-y-auto pb-1"
+          style={{ maxHeight: 256 }}
         >
           {recentlyDownloaded && recentlyDownloaded.length > 0 ? (
-            recentlyDownloaded.map((track, idx) => (
-              <TrackCard key={track.track_id} track={track} index={idx} onPlay={playFromRecentlyDownloaded} onHoverArtist={(aid, albs) => enqueue(aid, albs)} onContextMenu={(e) => handleRecentlyDownloadedContextMenu(e, track)} />
-            ))
+            <div
+              className="relative"
+              style={{
+                width: `${recentlyDownloadedVirtualizer.getTotalSize()}px`,
+                height: 190,
+              }}
+            >
+              {recentlyDownloadedVirtualizer.getVirtualItems().map((vr) => {
+                const track = recentlyDownloaded[vr.index]
+                return (
+                  <div
+                    key={track.track_id}
+                    data-index={vr.index}
+                    ref={recentlyDownloadedVirtualizer.measureElement}
+                    className="flex"
+                    style={{
+                      position: 'absolute',
+                      top: 0,
+                      left: 0,
+                      height: 190,
+                      width: vr.size,
+                      paddingLeft: 10,
+                      transform: `translateX(${vr.start}px)`,
+                      alignItems: 'flex-start',
+                    }}
+                  >
+                    <TrackCard
+                      track={track}
+                      index={vr.index}
+                      onPlay={playFromRecentlyDownloaded}
+                      onHoverArtist={(aid, albs) => enqueue(aid, albs)}
+                      onContextMenu={(e) => handleRecentlyDownloadedContextMenu(e, track)}
+                    />
+                  </div>
+                )
+              })}
+            </div>
           ) : (
             <p className="text-sm" style={{ color: 'var(--text-primary)', fontFamily: "'Barlow Semi Condensed', sans-serif" }}>no recently downloaded tracks</p>
           )}

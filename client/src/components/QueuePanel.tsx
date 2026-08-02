@@ -378,14 +378,6 @@ export default function QueuePanel({ width, onWidthChange, onClose, onOpen, maxW
         </div>
       )}
 
-      {/* Grain overlay */}
-      <div
-        className="absolute inset-0 pointer-events-none opacity-7"
-        style={{
-          backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='200' height='200' filter='url(%23n)'/%3E%3C/svg%3E")`,
-          backgroundSize: '180px 180px',
-        }}
-      />
       {/* Circuit pattern overlay */}
       <div
         className="absolute inset-0 pointer-events-none opacity-4"

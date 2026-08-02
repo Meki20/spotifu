@@ -101,6 +101,7 @@ const TrackRowImpl = ({
               alt={track.album || ''}
               className="w-full h-full object-cover"
               loading="lazy"
+              decoding="async"
             />
             {isLocalTrack(track) && (
               <div

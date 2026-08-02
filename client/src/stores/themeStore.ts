@@ -1,4 +1,4 @@
-// Theme store. Persists active theme + custom themes to localStorage.
+// Theme store. Persists active theme + custom themes + background to localStorage.
 // Applies the active theme by writing CSS variables onto <html>.
 
 import { create } from 'zustand'
@@ -10,11 +10,21 @@ import {
   normalizeHex,
 } from '../lib/themes'
 
+interface AppliedBg {
+  url: string
+  opacity: number
+}
+
 interface ThemeState {
   activeId: string
   customs: Theme[]
+  /** Currently applied background image, persisted so it survives a reload. */
+  appliedBg: AppliedBg
   setActive: (id: string) => void
+  /** Live preview of a draft theme. Touches the DOM only; does NOT persist. */
   applyCustom: (vars: Record<string, string>, backgroundUrl?: string, backgroundOpacity?: number, flavor?: string) => void
+  /** Persist and apply a background image for the active theme. */
+  applyBackground: (url: string, opacity: number) => void
   saveCustom: (name: string, vars: Record<string, string>, backgroundUrl?: string, backgroundOpacity?: number, flavor?: string) => string
   deleteCustom: (id: string) => void
 }
@@ -28,14 +38,16 @@ function applyVars(vars: Record<string, string>) {
   }
 }
 
-function applyBackground(url?: string, opacity?: number) {
+function applyBackgroundImage(url: string, opacity: number) {
   const root = document.documentElement
-  if (url && url.trim()) {
+  if (url.trim()) {
     root.style.setProperty('--bg-image', `url("${url}")`)
-    root.style.setProperty('--bg-image-opacity', String(opacity ?? 0.15))
+    root.style.setProperty('--bg-image-opacity', String(opacity))
+    root.style.setProperty('--bg-image-dim', String(Math.min(0.95, Math.max(0, 1 - opacity))))
   } else {
     root.style.setProperty('--bg-image', 'none')
     root.style.setProperty('--bg-image-opacity', '0')
+    root.style.setProperty('--bg-image-dim', '0')
   }
 }
 
@@ -43,11 +55,26 @@ function applyFlavor(flavor?: string) {
   document.documentElement.dataset.flavor = flavor ?? ''
 }
 
-function applyTheme(theme: Theme) {
+/** Background to use for a theme: its own backgroundUrl when set, else the applied one. */
+function backgroundFor(
+  theme: Theme,
+  applied: AppliedBg
+): { url: string; opacity: number } {
+  if (theme.backgroundUrl?.trim()) {
+    return {
+      url: theme.backgroundUrl,
+      opacity: theme.backgroundOpacity ?? applied.opacity,
+    }
+  }
+  return { url: applied.url, opacity: applied.opacity }
+}
+
+function applyTheme(theme: Theme, applied: AppliedBg) {
   document.documentElement.removeAttribute('data-theme')
   applyVars(theme.vars)
-  applyBackground(theme.backgroundUrl, theme.backgroundOpacity)
   applyFlavor(theme.flavor)
+  const bg = backgroundFor(theme, applied)
+  applyBackgroundImage(bg.url, bg.opacity)
 }
 
 export const useThemeStore = create<ThemeState>()(
@@ -55,36 +82,46 @@ export const useThemeStore = create<ThemeState>()(
     (set, get) => ({
       activeId: DEFAULT_THEME_ID,
       customs: [],
+      appliedBg: { url: '', opacity: 0.15 },
 
       setActive: (id: string) => {
         const theme =
           get().customs.find((t) => t.id === id) ?? getTheme(id)
-        applyTheme(theme)
-        set({ activeId: theme.id })
+        const bg = backgroundFor(theme, get().appliedBg)
+        applyTheme(theme, bg)
+        set({ activeId: theme.id, appliedBg: bg })
       },
 
-      applyCustom: (vars: Record<string, string>, backgroundUrl?: string, backgroundOpacity?: number, flavor?: string) => {
+      applyCustom: (vars, backgroundUrl = '', backgroundOpacity = 0.15, flavor) => {
         document.documentElement.removeAttribute('data-theme')
         applyVars(vars)
-        applyBackground(backgroundUrl, backgroundOpacity)
         applyFlavor(flavor)
-        set({ activeId: '__custom__preview__' })
+        applyBackgroundImage(backgroundUrl, backgroundOpacity)
       },
 
-      saveCustom: (name: string, vars: Record<string, string>, backgroundUrl?: string, backgroundOpacity?: number, flavor?: string) => {
+      applyBackground: (url, opacity) => {
+        const theme =
+          get().customs.find((t) => t.id === get().activeId) ??
+          getTheme(get().activeId)
+        applyTheme(theme, { url, opacity })
+        set({ appliedBg: { url, opacity } })
+      },
+
+      saveCustom: (name, vars, backgroundUrl = '', backgroundOpacity = 0.15, flavor) => {
         const id = `custom-${Date.now().toString(36)}`
         const theme: Theme = {
           id,
           name: name.trim() || 'Custom theme',
           builtin: false,
           vars,
-          ...(backgroundUrl?.trim() ? { backgroundUrl: backgroundUrl.trim() } : {}),
+          ...(backgroundUrl.trim() ? { backgroundUrl: backgroundUrl.trim() } : {}),
           ...(backgroundOpacity !== undefined ? { backgroundOpacity } : {}),
           ...(flavor ? { flavor } : {}),
         }
         set((s) => ({ customs: [...s.customs, theme] }))
-        applyTheme(theme)
-        set({ activeId: id })
+        const bg = backgroundFor(theme, get().appliedBg)
+        applyTheme(theme, bg)
+        set({ activeId: id, appliedBg: bg })
         return id
       },
 
@@ -98,13 +135,13 @@ export const useThemeStore = create<ThemeState>()(
     {
       name: STORAGE_KEY,
       storage: createJSONStorage(() => localStorage),
-      partialize: (s) => ({ activeId: s.activeId, customs: s.customs }),
+      partialize: (s) => ({ activeId: s.activeId, customs: s.customs, appliedBg: s.appliedBg }),
       onRehydrateStorage: () => (state) => {
         if (!state) return
         const theme =
           state.customs.find((t) => t.id === state.activeId) ??
           getTheme(state.activeId)
-        applyTheme(theme)
+        applyTheme(theme, state.appliedBg)
       },
     }
   )

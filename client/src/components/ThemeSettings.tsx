@@ -42,6 +42,7 @@ export default function ThemeSettings() {
   const activeId = useThemeStore((s) => s.activeId)
   const setActive = useThemeStore((s) => s.setActive)
   const applyCustom = useThemeStore((s) => s.applyCustom)
+  const applyBackground = useThemeStore((s) => s.applyBackground)
   const saveCustom = useThemeStore((s) => s.saveCustom)
   const deleteCustom = useThemeStore((s) => s.deleteCustom)
 
@@ -67,6 +68,10 @@ export default function ThemeSettings() {
   function commitDraft() {
     const cleaned = normalizeVars(draftVars)
     applyCustom(cleaned, bgUrl, bgOpacity, flavor)
+  }
+
+  function changeBackground() {
+    applyBackground(bgUrl, bgOpacity)
   }
 
   function handlePresetPick(id: string) {
@@ -121,9 +126,9 @@ export default function ThemeSettings() {
   }
 
   function handleResetToPreset() {
-    if (activeId === '__custom__preview__' || customs.some((t) => t.id === activeId)) {
-      const def = getTheme('polly-dark')
-      setActive('polly-dark')
+    if (customs.some((t) => t.id === activeId)) {
+      const def = getTheme('y2k')
+      setActive('y2k')
       setDraftVars({ ...def.vars })
       setBgUrl(def.backgroundUrl ?? '')
       setBgOpacity(def.backgroundOpacity ?? 0.15)
@@ -277,17 +282,19 @@ export default function ThemeSettings() {
             <input
               type="text"
               value={bgUrl}
-              onChange={(e) => {
-                const url = e.target.value
-                setBgUrl(url)
-                const cleaned = normalizeVars(draftVars)
-                applyCustom(cleaned, url, bgOpacity, flavor)
-              }}
+              onChange={(e) => setBgUrl(e.target.value)}
               placeholder="https://example.com/bg.jpg"
               className="w-full px-3 py-2 text-sm"
               style={inputStyle()}
             />
           </label>
+          <button
+            onClick={changeBackground}
+            disabled={!bgUrl.trim()}
+            style={primaryBtn()}
+          >
+            Change background
+          </button>
           <label className="flex flex-col gap-1" style={{ width: 100 }}>
             <span className="text-xs" style={label()}>Opacity</span>
             <div className="flex items-center gap-2">
@@ -371,7 +378,7 @@ export default function ThemeSettings() {
         <button onClick={handleResetToPreset} style={secondaryBtn()}>Reset to default</button>
         <span className="text-xs" style={hint()}>
           Tip: exported theme is stored in your browser only. Re-installing or
-          clearing site data will reset to <strong>Polly Dark</strong>.
+          clearing site data will reset to <strong>Y2K</strong>.
         </span>
       </div>
     </div>

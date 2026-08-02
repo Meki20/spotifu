@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useInView } from './useInView'
 import { useCover, type UseCoverResult } from './useCover'
 import type { CoverPriority } from '../lib/coverManager'
 
@@ -13,27 +13,6 @@ export function useCoverWhenVisible(
   priority?: CoverPriority,
   options?: UseCoverWhenVisibleOptions,
 ): UseCoverResult {
-  const { rootMargin = '200px', threshold = 0 } = options ?? {}
-  const [isVisible, setIsVisible] = useState(false)
-  const observerRef = useRef<IntersectionObserver | null>(null)
-
-  useEffect(() => {
-    const el = elementRef.current
-    if (!el) return
-
-    observerRef.current = new IntersectionObserver(
-      ([entry]) => {
-        setIsVisible(entry.isIntersecting)
-      },
-      { rootMargin, threshold },
-    )
-    observerRef.current.observe(el)
-
-    return () => {
-      observerRef.current?.disconnect()
-      observerRef.current = null
-    }
-  }, [elementRef, rootMargin, threshold])
-
+  const isVisible = useInView(elementRef, options)
   return useCover(isVisible ? mbid : null, priority)
 }

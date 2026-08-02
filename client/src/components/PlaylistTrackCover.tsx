@@ -68,6 +68,7 @@ export default function PlaylistTrackCover({
         alt=""
         className={`${className} object-cover bg-[var(--bg-surface-2)]`}
         loading="lazy"
+        decoding="async"
         onError={() => {
           if (primary && !primaryBroken) {
             setPrimaryBroken(true)

@@ -192,13 +192,15 @@ export default function PlayerBar() {
   return (
     <>
       <div
-        className="h-20 flex items-center px-5 gap-4 shrink-0 relative z-50"
+        className="h-20 flex flex-col shrink-0 relative z-50"
         style={{
           background: 'color-mix(in srgb, var(--bg-surface) 0.92, transparent)',
           backdropFilter: 'blur(20px)',
           borderTop: '1px solid var(--border)',
         }}
       >
+        {/* Main row */}
+        <div className="flex-1 flex items-center px-5 gap-4 min-h-0">
         {/* Left: now playing */}
         <div
           className="flex items-center gap-2.5 w-64 shrink-0"
@@ -206,11 +208,11 @@ export default function PlayerBar() {
         >
           {/* Album art / disc */}
           <div
-            className="w-12 h-12 rounded flex items-center justify-center shrink-0 border"
+            className="w-11 h-11 flex items-center justify-center shrink-0"
             style={{
-              background: 'linear-gradient(135deg, var(--accent), var(--accent-faint))',
-              borderColor: 'var(--border)',
-              borderRadius: 6,
+              background: 'var(--bg-surface)',
+              border: '1px solid var(--border)',
+              borderRadius: 2,
               overflow: 'hidden',
             }}
           >
@@ -236,7 +238,7 @@ export default function PlayerBar() {
                 className="w-7 h-7 rounded-full"
                 style={{
                   background: 'conic-gradient(from 0deg, var(--accent), var(--accent), var(--accent-faint), var(--accent))',
-                  boxShadow: '0 0 10px rgba(139, 42, 26, 0.6)',
+                  boxShadow: '0 0 10px color-mix(in srgb, var(--accent) 0.5, transparent)',
                 }}
               />
             )}
@@ -249,6 +251,8 @@ export default function PlayerBar() {
                 className="text-sm truncate cursor-pointer hover:underline"
                 style={{
                   fontFamily: "'Barlow Semi Condensed', sans-serif",
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.04em',
                   color: 'var(--text-primary)',
                 }}
               >
@@ -281,10 +285,10 @@ export default function PlayerBar() {
               ) : null}
             </div>
             <p
-              className="text-sm truncate cursor-pointer hover:underline mt-0.5"
+              className="text-xs truncate cursor-pointer hover:underline mt-0.5"
               style={{
                 fontFamily: "'Barlow Semi Condensed', sans-serif",
-                color: 'var(--text-primary)',
+                color: 'var(--text-secondary)',
               }}
             >
               {displayArtist(currentTrack)}
@@ -299,7 +303,7 @@ export default function PlayerBar() {
             disabled={showMascotInsteadOfHeart}
             title={showMascotInsteadOfHeart ? 'Loading…' : liked ? 'Unlike' : 'Like'}
             style={{
-              color: liked ? 'var(--text-primary)' : 'var(--text-primary)',
+              color: liked ? 'var(--accent)' : 'var(--text-secondary)',
               opacity: showMascotInsteadOfHeart ? 1 : undefined,
               cursor: showMascotInsteadOfHeart ? 'default' : 'pointer',
             }}
@@ -307,134 +311,67 @@ export default function PlayerBar() {
             {showMascotInsteadOfHeart ? (
               <PollyLoading size={26} />
             ) : (
-              <Heart size={14} fill={liked ? 'var(--text-primary)' : 'none'} />
+              <Heart size={14} fill={liked ? 'var(--accent)' : 'none'} />
             )}
           </button>
         </div>
 
-        {/* Center: controls + progress */}
-        <div className="flex-1 flex flex-col items-center gap-1.5">
-          {/* Control buttons */}
-          <div className="flex items-center gap-1.5">
-            <button
-              onClick={() => controller.setShuffle(!shuffle)}
-              className="w-7 h-7 flex items-center justify-center transition-colors"
-              style={{ color: shuffle ? 'var(--text-primary)' : 'var(--text-primary)' }}
-              title="Shuffle"
-            >
-              <Shuffle size={14} />
-            </button>
-            <button
-              onClick={() => controller.skipPrev()}
-              className="w-7 h-7 flex items-center justify-center transition-colors"
-              style={{ color: 'var(--text-primary)' }}
-              title="Previous"
-            >
-              <SkipBack size={16} />
-            </button>
-            <button
-              onClick={handlePlayPause}
-              className="w-9 h-9 flex items-center justify-center transition-colors rounded"
-              style={{
-                background: 'var(--bg-surface)',
-                color: 'var(--text-primary)',
-                boxShadow: '0 0 12px rgba(139, 42, 26, 0.4)',
-              }}
-              title={isPlaying ? 'Pause' : 'Play'}
-            >
-              {isPlaying ? <Pause size={14} /> : <Play size={14} />}
-            </button>
-            <button
-              onClick={() => controller.skipNext()}
-              className="w-7 h-7 flex items-center justify-center transition-colors"
-              style={{ color: 'var(--text-primary)' }}
-              title="Next"
-            >
-              <SkipForward size={16} />
-            </button>
-            <button
-              onClick={cycleRepeat}
-              className="w-7 h-7 flex items-center justify-center transition-colors"
-              style={{ color: repeat !== 'off' ? 'var(--text-primary)' : 'var(--text-primary)' }}
-              title={repeat === 'off' ? 'No repeat' : repeat === 'all' ? 'Repeat all' : 'Repeat one'}
-            >
-              {repeat === 'one' ? <Repeat1 size={14} /> : <Repeat size={14} />}
-            </button>
-          </div>
-
-          {/* Progress bar */}
-          <div className="flex items-center gap-2 w-full">
-            <span
-              className="text-sm w-10 text-right"
-              style={{ fontFamily: "'Barlow Semi Condensed', sans-serif", color: 'var(--text-primary)' }}
-            >
-              {formatTime(currentTime)}
-            </span>
-            <div
-              ref={progressRef}
-              className="flex-1 relative cursor-pointer group"
-              style={{ height: '20px' }}
-            >
-              <div
-                ref={progressHitboxRef}
-                className="absolute inset-0 cursor-pointer"
-                onMouseDown={handleBarMouseDown}
-              />
-              <div
-                className="absolute inset-x-0 top-1/2 -translate-y-1/2 h-0.5 pointer-events-none rounded"
-                style={{ background: 'var(--bg-surface)' }}
-              >
-                {/* Fill */}
-                <div
-                  className="absolute left-0 top-0 h-full rounded"
-                  style={{
-                    width: `${displayProgress}%`,
-                    background: 'var(--accent)',
-                    boxShadow: '0 0 6px rgba(139, 42, 26, 0.5)',
-                  }}
-                />
-                {/* Buffering */}
-                {isBuffering && (
-                  <div className="absolute top-0 left-0 h-full overflow-hidden w-full">
-                    <div
-                      className="h-full"
-                      style={{
-                        animation: 'shimmerSlide 1.2s ease-in-out infinite',
-                        background: 'var(--accent)',
-                        width: '33%',
-                        opacity: 0.5,
-                      }}
-                    />
-                  </div>
-                )}
-                {/* Handle */}
-                {!seekBlocked && (
-                  <div
-                    className="absolute top-1/2 -translate-y-1/2 w-2.5 h-2.5 rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
-                    style={{
-                      background: 'var(--accent)',
-                      left: `calc(${displayProgress}% - 5px)`,
-                      boxShadow: '0 0 6px rgba(139, 42, 26, 0.7)',
-                    }}
-                  />
-                )}
-              </div>
-            </div>
-            <span
-              className="text-sm w-10"
-              style={{ fontFamily: "'Barlow Semi Condensed', sans-serif", color: 'var(--text-primary)', textAlign: 'right' }}
-            >
-              {formatTime(duration)}
-            </span>
-          </div>
+        {/* Center: control buttons */}
+        <div className="flex-1 flex items-center justify-center gap-1.5">
+          <button
+            onClick={() => controller.setShuffle(!shuffle)}
+            className="w-7 h-7 flex items-center justify-center transition-colors"
+            style={{ color: shuffle ? 'var(--accent)' : 'var(--text-secondary)' }}
+            title="Shuffle"
+          >
+            <Shuffle size={14} />
+          </button>
+          <button
+            onClick={() => controller.skipPrev()}
+            className="w-7 h-7 flex items-center justify-center transition-colors"
+            style={{ color: 'var(--text-primary)' }}
+            title="Previous"
+          >
+            <SkipBack size={16} />
+          </button>
+          <button
+            onClick={handlePlayPause}
+            className="w-8 h-8 flex items-center justify-center transition-colors"
+            style={{
+              background: 'color-mix(in srgb, var(--accent) 0.1, transparent)',
+              border: '1px solid var(--accent)',
+              borderRadius: 2,
+              color: 'var(--text-primary)',
+              boxShadow: '0 0 12px color-mix(in srgb, var(--accent) 0.35, transparent)',
+            }}
+            title={isPlaying ? 'Pause' : 'Play'}
+          >
+            {isPlaying ? <Pause size={14} /> : <Play size={14} />}
+          </button>
+          <button
+            onClick={() => controller.skipNext()}
+            className="w-7 h-7 flex items-center justify-center transition-colors"
+            style={{ color: 'var(--text-primary)' }}
+            title="Next"
+          >
+            <SkipForward size={16} />
+          </button>
+          <button
+            onClick={cycleRepeat}
+            className="w-7 h-7 flex items-center justify-center transition-colors"
+            style={{ color: repeat !== 'off' ? 'var(--accent)' : 'var(--text-secondary)' }}
+            title={repeat === 'off' ? 'No repeat' : repeat === 'all' ? 'Repeat all' : 'Repeat one'}
+          >
+            {repeat === 'one' ? <Repeat1 size={14} /> : <Repeat size={14} />}
+          </button>
         </div>
 
-        {/* Right: volume + download badge */}
+        {/* Right: volume + queue */}
         <div className="flex items-center gap-2 w-52 shrink-0 justify-end">
           <button
             onClick={handleToggleQueue}
             className="px-1.5 transition-colors"
-            style={{ color: 'var(--text-primary)' }}
+            style={{ color: 'var(--text-secondary)' }}
             title="Toggle queue"
           >
             <ListMusic size={14} />
@@ -442,14 +379,14 @@ export default function PlayerBar() {
           <button
             onClick={(e) => setContextMenu({ x: e.clientX, y: e.clientY, track: currentTrack as any })}
             className="px-1.5 transition-colors"
-            style={{ color: 'var(--text-primary)' }}
+            style={{ color: 'var(--text-secondary)' }}
           >
             <MoreHorizontal size={14} />
           </button>
           {volume > 0 ? (
-            <Volume2 size={14} style={{ color: 'var(--text-primary)' }} />
+            <Volume2 size={14} style={{ color: 'var(--text-secondary)' }} />
           ) : (
-            <VolumeX size={14} style={{ color: 'var(--text-primary)' }} />
+            <VolumeX size={14} style={{ color: 'var(--text-secondary)' }} />
           )}
           <input
             type="range"
@@ -464,7 +401,74 @@ export default function PlayerBar() {
               accentColor: 'var(--text-primary)',
             }}
           />
-                  </div>
+        </div>
+        </div>
+
+        {/* Full-width progress row */}
+        <div className="flex items-center gap-2 px-5 pb-2">
+          <span
+            className="text-xs w-9 text-right shrink-0"
+            style={{ fontFamily: 'var(--font-mono)', color: 'var(--text-secondary)' }}
+          >
+            {formatTime(currentTime)}
+          </span>
+          <div
+            ref={progressRef}
+            className="flex-1 relative cursor-pointer group"
+            style={{ height: '14px' }}
+          >
+            <div
+              ref={progressHitboxRef}
+              className="absolute inset-0 cursor-pointer"
+              onMouseDown={handleBarMouseDown}
+            />
+            <div
+              className="absolute inset-x-0 top-1/2 -translate-y-1/2 h-px pointer-events-none"
+              style={{ background: 'var(--border)' }}
+            >
+              {/* Fill */}
+              <div
+                className="absolute left-0 top-0 h-full"
+                style={{
+                  width: `${displayProgress}%`,
+                  background: 'var(--accent)',
+                  boxShadow: '0 0 6px color-mix(in srgb, var(--accent) 0.6, transparent)',
+                }}
+              />
+              {/* Buffering */}
+              {isBuffering && (
+                <div className="absolute top-0 left-0 h-full overflow-hidden w-full">
+                  <div
+                    className="h-full"
+                    style={{
+                      animation: 'shimmerSlide 1.2s ease-in-out infinite',
+                      background: 'var(--accent)',
+                      width: '33%',
+                      opacity: 0.5,
+                    }}
+                  />
+                </div>
+              )}
+              {/* Handle */}
+              {!seekBlocked && (
+                <div
+                  className="absolute top-1/2 -translate-y-1/2 w-2 h-2 rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
+                  style={{
+                    background: 'var(--accent)',
+                    left: `calc(${displayProgress}% - 4px)`,
+                    boxShadow: '0 0 6px color-mix(in srgb, var(--accent) 0.8, transparent)',
+                  }}
+                />
+              )}
+            </div>
+          </div>
+          <span
+            className="text-xs w-9 shrink-0"
+            style={{ fontFamily: 'var(--font-mono)', color: 'var(--text-secondary)', textAlign: 'right' }}
+          >
+            {formatTime(duration)}
+          </span>
+        </div>
       </div>
 
       {/* Context Menu */}

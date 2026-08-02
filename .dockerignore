@@ -6,5 +6,6 @@
 **/.git
 **/.env
 **/.env.*
+**/.secrets
 **/*.md
 **/tests

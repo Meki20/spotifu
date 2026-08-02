@@ -39,6 +39,7 @@ services:
       ALLOWED_ORIGINS: ${ALLOWED_ORIGINS:-*}
       ALLOW_REGISTRATION: ${ALLOW_REGISTRATION:-true}
     volumes:
+      - ./server:/app
       - ./.secrets:/app/.secrets
       - spotifu-cache:/data/spotifu/cache
     ports:

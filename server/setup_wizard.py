@@ -45,11 +45,19 @@ def _read_existing() -> dict:
 
 
 def _atomic_write(data: dict) -> None:
+    payload = json.dumps(data, indent=2, sort_keys=True)
     tmp = SECRETS_PATH.with_suffix(SECRETS_PATH.suffix + ".tmp")
     try:
         with open(tmp, "w") as f:
-            json.dump(data, f, indent=2, sort_keys=True)
-        os.replace(tmp, SECRETS_PATH)
+            f.write(payload)
+        try:
+            os.replace(tmp, SECRETS_PATH)
+        except OSError:
+            # os.replace can't cross mount boundaries (bind-mounted .secrets
+            # inside the container). Fall back to a direct overwrite.
+            with open(SECRETS_PATH, "w") as f:
+                f.write(payload)
+            tmp.unlink(missing_ok=True)
         os.chmod(SECRETS_PATH, 0o600)
     except Exception:
         if tmp.exists():

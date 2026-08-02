@@ -3,7 +3,7 @@ import { createRoot } from 'react-dom/client'
 import './index.css'
 import App from './App.tsx'
 import { useConnectionStore } from './config/connectionStore'
-import { PRESET_THEMES } from './lib/themes'
+import { PRESET_THEMES, type Theme } from './lib/themes'
 
 useConnectionStore.getState().seedFromEnv()
 
@@ -17,17 +17,22 @@ useConnectionStore.getState().seedFromEnv()
       return
     }
     const parsed = JSON.parse(raw) as {
-      state?: { activeId?: string; customs?: { id: string; vars: Record<string, string> }[] }
+      state?: { activeId?: string; customs?: Theme[] }
     }
     const activeId = parsed.state?.activeId ?? 'polly-dark'
     const custom = parsed.state?.customs?.find((c) => c.id === activeId)
     const preset = PRESET_THEMES.find((t) => t.id === activeId)
-    const theme = preset ?? custom
+    const theme: Theme | undefined = preset ?? custom
     if (theme) {
       const root = document.documentElement
       for (const [k, v] of Object.entries(theme.vars)) {
         root.style.setProperty(k, v)
       }
+      if (theme.backgroundUrl?.trim()) {
+        root.style.setProperty('--bg-image', `url("${theme.backgroundUrl}")`)
+        root.style.setProperty('--bg-image-opacity', String(theme.backgroundOpacity ?? 0.15))
+      }
+      root.dataset.flavor = theme.flavor ?? ''
     }
   } catch {
     /* fall back to :root defaults (polly-dark) */

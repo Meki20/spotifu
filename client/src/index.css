@@ -55,6 +55,13 @@
   /* Overlays */
   --overlay-dim: rgba(0, 0, 0, 0.55);
 
+  /* Background image (set by themes with backgroundUrl) */
+  --bg-image: none;
+  --bg-image-opacity: 0;
+
+  /* Texture overlay (scanlines + grid, used by Y2K theme) */
+  --texture-overlay-opacity: 0;
+
   /* Typography */
   --font-display: 'Barlow Condensed', sans-serif;
   --font-body: 'Barlow Semi Condensed', sans-serif;
@@ -112,6 +119,139 @@
   --overlay-dim: rgba(43, 27, 18, 0.45);
 }
 
+[data-theme="y2k"] {
+  --bg-base: #090B12;
+  --bg-surface: #0D111A;
+  --bg-surface-2: #111827;
+  --bg-surface-3: #1A2236;
+  --border: #2A3550;
+  --border-subtle: #1E2740;
+  --border-active: #3BA4FF;
+  --accent: #3BA4FF;
+  --accent-hover: #5CB8FF;
+  --accent-muted: #3BA4FF;
+  --accent-faint: #0A1A3A;
+  --text-primary: #E8F0FF;
+  --text-secondary: #8899BB;
+  --text-faint: #405070;
+  --text-muted: #6078A0;
+  --color-success: #4ADE80;
+  --color-success-strong: #22C55E;
+  --color-success-bg: #0A1F14;
+  --color-success-border: rgba(74, 222, 128, 0.25);
+  --color-success-border-alt: rgba(74, 222, 128, 0.25);
+  --color-success-glow: rgba(74, 222, 128, 0.4);
+  --color-success-icon-bg: rgba(74, 222, 128, 0.12);
+  --color-success-icon-border: rgba(74, 222, 128, 0.45);
+  --color-danger: #F87171;
+  --color-danger-bg: #1F1414;
+  --color-danger-border: rgba(248, 113, 113, 0.3);
+  --color-danger-glow: rgba(248, 113, 113, 0.4);
+  --color-danger-faint-bg: rgba(248, 113, 113, 0.12);
+  --text-muted-icon-bg: rgba(96, 120, 160, 0.15);
+  --text-muted-icon-border: rgba(96, 120, 160, 0.4);
+  --overlay-dim: rgba(4, 8, 16, 0.7);
+  --texture-overlay-opacity: 0.35;
+  --bg-image-opacity: 0.15;
+  --section-title-color: var(--accent);
+}
+
+/* ── Technical frame utilities ─────────────────────────────────────────────
+   .tf      — thin-bordered translucent panel (adapts to any theme's vars)
+   .tf-brackets — adds corner-bracket ticks (only rendered for y2k flavor)
+   .tfx / .tfxb — micro annotation text, hidden unless y2k flavor
+   ──────────────────────────────────────────────────────────────────────────── */
+
+.tf {
+  background: color-mix(in srgb, var(--bg-surface) 0.55, transparent);
+  border: 1px solid var(--border);
+  border-radius: 2px;
+  transition: border-color 150ms ease, box-shadow 150ms ease, background 150ms ease;
+}
+.tf:hover {
+  border-color: color-mix(in srgb, var(--accent) 0.55, var(--border));
+}
+
+.tf-brackets {
+  position: relative;
+}
+
+.tfx,
+.tfxb {
+  display: none;
+}
+
+/* Structural decorations shown only for the y2k flavor (revert = natural display) */
+.y2k-only {
+  display: none;
+}
+[data-flavor="y2k"] .y2k-only {
+  display: revert;
+}
+[data-flavor="y2k"] .y2k-hidden {
+  display: none !important;
+}
+
+[data-flavor="y2k"] .tf:hover {
+  box-shadow:
+    0 0 14px color-mix(in srgb, var(--accent) 0.12, transparent),
+    inset 0 0 10px color-mix(in srgb, var(--accent) 0.05, transparent);
+}
+
+[data-flavor="y2k"] .tf-brackets::after {
+  content: '';
+  position: absolute;
+  inset: -1px;
+  pointer-events: none;
+  opacity: 0.75;
+  background:
+    linear-gradient(to right, var(--accent) 1px, transparent 1px) 0 0 / 7px 7px,
+    linear-gradient(to bottom, var(--accent) 1px, transparent 1px) 0 0 / 7px 7px,
+    linear-gradient(to left, var(--accent) 1px, transparent 1px) 100% 0 / 7px 7px,
+    linear-gradient(to bottom, var(--accent) 1px, transparent 1px) 100% 0 / 7px 7px,
+    linear-gradient(to right, var(--accent) 1px, transparent 1px) 0 100% / 7px 7px,
+    linear-gradient(to top, var(--accent) 1px, transparent 1px) 0 100% / 7px 7px,
+    linear-gradient(to left, var(--accent) 1px, transparent 1px) 100% 100% / 7px 7px,
+    linear-gradient(to top, var(--accent) 1px, transparent 1px) 100% 100% / 7px 7px;
+  background-repeat: no-repeat;
+}
+
+[data-flavor="y2k"] .tfx {
+  display: inline;
+  font-family: var(--font-mono);
+  font-size: 9px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+  white-space: nowrap;
+}
+
+[data-flavor="y2k"] .tfxb {
+  display: block;
+  font-family: var(--font-mono);
+  font-size: 9px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+}
+
+/* Barcode strip decoration */
+[data-flavor="y2k"] .tbarcode {
+  height: 18px;
+  background-image: repeating-linear-gradient(
+    90deg,
+    var(--text-faint) 0px, var(--text-faint) 1px,
+    transparent 1px, transparent 3px,
+    var(--text-faint) 3px, var(--text-faint) 4px,
+    transparent 4px, transparent 5px,
+    var(--text-faint) 5px, var(--text-faint) 8px,
+    transparent 8px, transparent 10px,
+    var(--text-faint) 10px, var(--text-faint) 11px,
+    transparent 11px, transparent 14px
+  );
+  opacity: 0.55;
+}
+
 * {
   box-sizing: border-box;
 }
@@ -129,6 +269,58 @@ body {
   font-size: 18px;
   -webkit-font-smoothing: antialiased;
   transition: background-color 200ms ease, color 200ms ease;
+}
+
+/* Background image overlay — controlled by theme vars --bg-image and --bg-image-opacity */
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background-image: var(--bg-image, none);
+  background-size: cover;
+  background-position: center;
+  opacity: var(--bg-image-opacity, 0);
+  transition: opacity 300ms ease;
+}
+
+/* Texture overlay — scanlines + blueprint grid (default off, activated by Y2K theme) */
+body::after {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+  opacity: var(--texture-overlay-opacity, 0);
+  background-image:
+    repeating-linear-gradient(
+      0deg,
+      transparent 0px,
+      transparent 2px,
+      rgba(255, 255, 255, 0.012) 2px,
+      rgba(255, 255, 255, 0.012) 4px
+    ),
+    repeating-linear-gradient(
+      90deg,
+      transparent 0px,
+      transparent 40px,
+      rgba(59, 164, 255, 0.02) 40px,
+      rgba(59, 164, 255, 0.02) 41px
+    ),
+    repeating-linear-gradient(
+      0deg,
+      transparent 0px,
+      transparent 40px,
+      rgba(59, 164, 255, 0.02) 40px,
+      rgba(59, 164, 255, 0.02) 41px
+    );
+  transition: opacity 300ms ease;
+}
+
+#root {
+  position: relative;
+  z-index: 2;
 }
 
 input, button {

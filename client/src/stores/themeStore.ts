@@ -14,8 +14,8 @@ interface ThemeState {
   activeId: string
   customs: Theme[]
   setActive: (id: string) => void
-  applyCustom: (vars: Record<string, string>) => void
-  saveCustom: (name: string, vars: Record<string, string>) => string
+  applyCustom: (vars: Record<string, string>, backgroundUrl?: string, backgroundOpacity?: number, flavor?: string) => void
+  saveCustom: (name: string, vars: Record<string, string>, backgroundUrl?: string, backgroundOpacity?: number, flavor?: string) => string
   deleteCustom: (id: string) => void
 }
 
@@ -28,6 +28,28 @@ function applyVars(vars: Record<string, string>) {
   }
 }
 
+function applyBackground(url?: string, opacity?: number) {
+  const root = document.documentElement
+  if (url && url.trim()) {
+    root.style.setProperty('--bg-image', `url("${url}")`)
+    root.style.setProperty('--bg-image-opacity', String(opacity ?? 0.15))
+  } else {
+    root.style.setProperty('--bg-image', 'none')
+    root.style.setProperty('--bg-image-opacity', '0')
+  }
+}
+
+function applyFlavor(flavor?: string) {
+  document.documentElement.dataset.flavor = flavor ?? ''
+}
+
+function applyTheme(theme: Theme) {
+  document.documentElement.removeAttribute('data-theme')
+  applyVars(theme.vars)
+  applyBackground(theme.backgroundUrl, theme.backgroundOpacity)
+  applyFlavor(theme.flavor)
+}
+
 export const useThemeStore = create<ThemeState>()(
   persist(
     (set, get) => ({
@@ -37,29 +59,31 @@ export const useThemeStore = create<ThemeState>()(
       setActive: (id: string) => {
         const theme =
           get().customs.find((t) => t.id === id) ?? getTheme(id)
-        document.documentElement.removeAttribute('data-theme')
-        applyVars(theme.vars)
+        applyTheme(theme)
         set({ activeId: theme.id })
       },
 
-      applyCustom: (vars: Record<string, string>) => {
+      applyCustom: (vars: Record<string, string>, backgroundUrl?: string, backgroundOpacity?: number, flavor?: string) => {
         document.documentElement.removeAttribute('data-theme')
         applyVars(vars)
+        applyBackground(backgroundUrl, backgroundOpacity)
+        applyFlavor(flavor)
         set({ activeId: '__custom__preview__' })
       },
 
-      saveCustom: (name: string, vars: Record<string, string>) => {
+      saveCustom: (name: string, vars: Record<string, string>, backgroundUrl?: string, backgroundOpacity?: number, flavor?: string) => {
         const id = `custom-${Date.now().toString(36)}`
         const theme: Theme = {
           id,
           name: name.trim() || 'Custom theme',
           builtin: false,
           vars,
+          ...(backgroundUrl?.trim() ? { backgroundUrl: backgroundUrl.trim() } : {}),
+          ...(backgroundOpacity !== undefined ? { backgroundOpacity } : {}),
+          ...(flavor ? { flavor } : {}),
         }
         set((s) => ({ customs: [...s.customs, theme] }))
-        // Mark it active too.
-        document.documentElement.removeAttribute('data-theme')
-        applyVars(vars)
+        applyTheme(theme)
         set({ activeId: id })
         return id
       },
@@ -77,12 +101,10 @@ export const useThemeStore = create<ThemeState>()(
       partialize: (s) => ({ activeId: s.activeId, customs: s.customs }),
       onRehydrateStorage: () => (state) => {
         if (!state) return
-        // Re-apply on hydration (after page reload).
         const theme =
           state.customs.find((t) => t.id === state.activeId) ??
           getTheme(state.activeId)
-        document.documentElement.removeAttribute('data-theme')
-        applyVars(theme.vars)
+        applyTheme(theme)
       },
     }
   )

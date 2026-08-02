@@ -40,19 +40,25 @@ function isHexOnly(v: string): boolean {
 
 export default function ThemeSettings() {
   const activeId = useThemeStore((s) => s.activeId)
-  const customs = useThemeStore((s) => s.customs)
   const setActive = useThemeStore((s) => s.setActive)
   const applyCustom = useThemeStore((s) => s.applyCustom)
   const saveCustom = useThemeStore((s) => s.saveCustom)
   const deleteCustom = useThemeStore((s) => s.deleteCustom)
 
-  const baseTheme = useMemo(() => getTheme(activeId), [activeId])
+  const customs = useThemeStore((s) => s.customs)
+  const baseTheme = useMemo(() => {
+    const custom = customs.find((t) => t.id === activeId)
+    return custom ?? getTheme(activeId)
+  }, [activeId, customs])
   const [draftVars, setDraftVars] = useState<Record<string, string>>(() => ({ ...baseTheme.vars }))
   const [newName, setNewName] = useState('')
   const [saveStatus, setSaveStatus] = useState('')
   const [genSeed, setGenSeed] = useState('#b4003e')
   const [genDark, setGenDark] = useState(true)
   const [genError, setGenError] = useState('')
+  const [bgUrl, setBgUrl] = useState(baseTheme.backgroundUrl ?? '')
+  const [bgOpacity, setBgOpacity] = useState(baseTheme.backgroundOpacity ?? 0.15)
+  const [flavor, setFlavor] = useState(baseTheme.flavor)
 
   function updateVar(key: string, value: string) {
     setDraftVars((d) => ({ ...d, [key]: value }))
@@ -60,12 +66,15 @@ export default function ThemeSettings() {
 
   function commitDraft() {
     const cleaned = normalizeVars(draftVars)
-    applyCustom(cleaned)
+    applyCustom(cleaned, bgUrl, bgOpacity, flavor)
   }
 
   function handlePresetPick(id: string) {
     const theme = getTheme(id)
     setDraftVars({ ...theme.vars })
+    setBgUrl(theme.backgroundUrl ?? '')
+    setBgOpacity(theme.backgroundOpacity ?? 0.15)
+    setFlavor(theme.flavor)
     setActive(id)
   }
 
@@ -80,7 +89,7 @@ export default function ThemeSettings() {
     const merged = { ...draftVars, ...generated }
     setDraftVars(merged)
     const cleaned = normalizeVars(merged)
-    applyCustom(cleaned)
+    applyCustom(cleaned, bgUrl, bgOpacity, flavor)
   }
 
   function handleRandomize() {
@@ -99,13 +108,13 @@ export default function ThemeSettings() {
     const generated = paletteFromAccent(hex, genDark)
     const merged = { ...draftVars, ...generated }
     setDraftVars(merged)
-    applyCustom(normalizeVars(merged))
+    applyCustom(normalizeVars(merged), bgUrl, bgOpacity, flavor)
   }
 
   function handleSave() {
     setSaveStatus('')
     const cleaned = normalizeVars(draftVars)
-    const id = saveCustom(newName, cleaned)
+    const id = saveCustom(newName, cleaned, bgUrl, bgOpacity, flavor)
     setNewName('')
     setSaveStatus(`Saved as "${getTheme(id).name}".`)
     setTimeout(() => setSaveStatus(''), 2500)
@@ -113,8 +122,12 @@ export default function ThemeSettings() {
 
   function handleResetToPreset() {
     if (activeId === '__custom__preview__' || customs.some((t) => t.id === activeId)) {
+      const def = getTheme('polly-dark')
       setActive('polly-dark')
-      setDraftVars({ ...getTheme('polly-dark').vars })
+      setDraftVars({ ...def.vars })
+      setBgUrl(def.backgroundUrl ?? '')
+      setBgOpacity(def.backgroundOpacity ?? 0.15)
+      setFlavor(def.flavor)
     }
   }
 
@@ -251,6 +264,55 @@ export default function ThemeSettings() {
         </div>
       </section>
 
+      {/* Background image */}
+      <section>
+        <SectionLabel>Background image</SectionLabel>
+        <p className="text-xs mb-3" style={hint()}>
+          Optionally set a background image URL. Applied at low opacity so it
+          never competes with interface content.
+        </p>
+        <div className="flex flex-wrap items-end gap-3">
+          <label className="flex-1 min-w-[200px] flex flex-col gap-1">
+            <span className="text-xs" style={label()}>Image URL</span>
+            <input
+              type="text"
+              value={bgUrl}
+              onChange={(e) => {
+                const url = e.target.value
+                setBgUrl(url)
+                const cleaned = normalizeVars(draftVars)
+                applyCustom(cleaned, url, bgOpacity, flavor)
+              }}
+              placeholder="https://example.com/bg.jpg"
+              className="w-full px-3 py-2 text-sm"
+              style={inputStyle()}
+            />
+          </label>
+          <label className="flex flex-col gap-1" style={{ width: 100 }}>
+            <span className="text-xs" style={label()}>Opacity</span>
+            <div className="flex items-center gap-2">
+              <input
+                type="range"
+                min="0"
+                max="0.5"
+                step="0.01"
+                value={bgOpacity}
+                onChange={(e) => {
+                  const v = parseFloat(e.target.value)
+                  setBgOpacity(v)
+                  const cleaned = normalizeVars(draftVars)
+                  applyCustom(cleaned, bgUrl, v, flavor)
+                }}
+                style={{ flex: 1, accentColor: 'var(--accent)' }}
+              />
+              <span className="text-xs font-mono" style={{ color: 'var(--text-secondary)', width: 32, textAlign: 'right' }}>
+                {Math.round(bgOpacity * 100)}%
+              </span>
+            </div>
+          </label>
+        </div>
+      </section>
+
       {/* Save / load */}
       <section>
         <SectionLabel>Save current as new theme</SectionLabel>
@@ -282,6 +344,9 @@ export default function ThemeSettings() {
                 <button
                   onClick={() => {
                     setDraftVars({ ...theme.vars })
+                    setBgUrl(theme.backgroundUrl ?? '')
+                    setBgOpacity(theme.backgroundOpacity ?? 0.15)
+                    setFlavor(theme.flavor)
                     setActive(theme.id)
                   }}
                   className="flex-1 text-left text-sm"

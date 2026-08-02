@@ -4,7 +4,7 @@ import PlayerBar from './PlayerBar'
 import NotificationCenter from './NotificationCenter'
 import QueuePanel from './QueuePanel'
 import { useAudioPlayer } from '../hooks/useAudioPlayer'
-import { ChevronLeft, ChevronRight, Home, Library, Search, Settings, Download } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Home, Library, Search, Settings, Download, Globe } from 'lucide-react'
 import { useAuthStore } from '../stores/authStore'
 import { usePrefetchSettingsStore } from '../stores/prefetchSettingsStore'
 import { authFetch } from '../api'
@@ -27,6 +27,7 @@ export default function MainLayout() {
   useAudioPlayer()
   const location = useLocation()
   const token = useAuthStore((s) => s.token)
+  const username = useAuthStore((s) => s.username)
   const [collapsed, setCollapsed] = useState(false)
   const [queuePanelWidth, setQueuePanelWidth] = useState(QUEUE_DEFAULT_WIDTH)
   const [queuePanelClosed, setQueuePanelClosed] = useState(false)
@@ -224,12 +225,6 @@ export default function MainLayout() {
               ) : (
                 <>
                   <div className="flex items-center gap-2">
-                    <img
-                      src="/assets/brand/polly_512x512.png"
-                      alt="SpotiFU icon"
-                      className="w-8 h-8 rounded-sm shrink-0"
-                      style={{ imageRendering: 'auto' }}
-                    />
                     <div
                       className="text-2xl font-bold tracking-wide"
                       style={{
@@ -260,7 +255,19 @@ export default function MainLayout() {
                     </button>
                   </div>
                   <div
-                    className="text-sm mt-1"
+                    className="y2k-only"
+                    style={{
+                      fontFamily: 'var(--font-mono)',
+                      fontSize: 10,
+                      letterSpacing: '0.3em',
+                      color: 'var(--text-secondary)',
+                      marginTop: 3,
+                    }}
+                  >
+                    セルフィー
+                  </div>
+                  <div
+                    className="y2k-hidden text-sm mt-1"
                     style={{ fontFamily: "'Barlow Semi Condensed', sans-serif", color: 'var(--text-primary)', letterSpacing: '0.05em' }}
                   >
                     local music · soulseek
@@ -269,16 +276,51 @@ export default function MainLayout() {
               )}
             </div>
 
+            {/* Connection status panel */}
+            {!collapsed && (
+              <div className="mx-3 mt-3 tf tf-brackets" style={{ padding: 10 }}>
+                <div className="flex items-center gap-2.5">
+                  <div
+                    style={{
+                      border: '1px solid var(--border-subtle)',
+                      borderRadius: 2,
+                      padding: 6,
+                      display: 'grid',
+                      placeItems: 'center',
+                      flexShrink: 0,
+                    }}
+                  >
+                    <Globe size={18} style={{ color: 'var(--text-secondary)' }} />
+                  </div>
+                  <div
+                    style={{
+                      fontFamily: 'var(--font-mono)',
+                      fontSize: 9,
+                      letterSpacing: '0.14em',
+                      textTransform: 'uppercase',
+                      lineHeight: 1.8,
+                      color: 'var(--text-secondary)',
+                      minWidth: 0,
+                    }}
+                  >
+                    <div style={{ color: 'var(--text-faint)' }}>Connected to</div>
+                    <div>Soulseek // Local Network</div>
+                    <div className="truncate">User: @{username ?? 'unknown'}</div>
+                  </div>
+                </div>
+              </div>
+            )}
+
             {/* Nav */}
             <nav className="px-0 pt-3 pb-1" aria-label="Navigation">
               <div
-                className="px-4 mb-1 text-sm tracking-widest"
+                className="px-4 mb-1.5 text-sm tracking-widest"
                 style={{
                   fontFamily: "'Barlow Condensed', sans-serif",
                   fontWeight: 700,
                   textTransform: 'uppercase',
                   letterSpacing: '0.15em',
-                  color: 'var(--text-primary)',
+                  color: 'var(--section-title-color, var(--text-primary))',
                   opacity: collapsed ? 0 : 1,
                   transform: collapsed ? 'translateX(-6px)' : 'translateX(0)',
                   transition: 'opacity 120ms ease, transform 220ms cubic-bezier(0.2, 0.9, 0.2, 1)',
@@ -287,49 +329,78 @@ export default function MainLayout() {
               >
                 Navigate
               </div>
-              {NAV_ITEMS.map((item) => {
-                const active = navActive(item.id)
-                return (
-                  <Link
-                    key={item.id}
-                    to={item.id}
-                    className="flex items-center cursor-pointer transition-all duration-150"
-                    style={{
-                      background: active ? 'color-mix(in srgb, var(--accent) 0.12, transparent)' : 'transparent',
-                      borderLeft: active ? '2px solid var(--accent)' : '2px solid transparent',
-                      paddingLeft: collapsed ? 0 : 16,
-                      paddingRight: collapsed ? 0 : 16,
-                      paddingTop: collapsed ? 10 : 6,
-                      paddingBottom: collapsed ? 10 : 6,
-                      justifyContent: collapsed ? 'center' : 'flex-start',
-                      gap: collapsed ? 0 : 12,
-                      width: '100%',
-                    }}
-                    title={collapsed ? item.label : undefined}
-                    aria-label={collapsed ? item.label : undefined}
-                  >
-                    <item.icon
-                      size={collapsed ? 22 : 16}
-                      className="w-4 h-4"
-                      style={{ color: active ? 'var(--text-primary)' : 'var(--text-primary)' }}
-                    />
-                    <span
-                      className="text-sm"
+              <div className={collapsed ? undefined : 'flex flex-col gap-1.5 px-3'}>
+                {NAV_ITEMS.map((item) => {
+                  const active = navActive(item.id)
+                  if (collapsed) {
+                    return (
+                      <Link
+                        key={item.id}
+                        to={item.id}
+                        className="flex items-center cursor-pointer transition-all duration-150"
+                        style={{
+                          background: active ? 'color-mix(in srgb, var(--accent) 0.12, transparent)' : 'transparent',
+                          borderLeft: active ? '2px solid var(--accent)' : '2px solid transparent',
+                          paddingLeft: 0,
+                          paddingRight: 0,
+                          paddingTop: 10,
+                          paddingBottom: 10,
+                          justifyContent: 'center',
+                          gap: 0,
+                          width: '100%',
+                        }}
+                        title={item.label}
+                        aria-label={item.label}
+                      >
+                        <item.icon
+                          size={22}
+                          className="w-4 h-4"
+                          style={{ color: 'var(--text-primary)' }}
+                        />
+                      </Link>
+                    )
+                  }
+                  return (
+                    <Link
+                      key={item.id}
+                      to={item.id}
+                      className="tf tf-brackets flex items-center cursor-pointer"
                       style={{
-                        fontFamily: "'Barlow Semi Condensed', sans-serif",
-                        color: active ? 'var(--text-primary)' : 'var(--text-primary)',
-                        opacity: collapsed ? 0 : 1,
-                        width: collapsed ? 0 : 'auto',
-                        overflow: 'hidden',
-                        whiteSpace: 'nowrap',
-                        transition: 'opacity 120ms ease',
+                        gap: 12,
+                        padding: '7px 12px',
+                        borderColor: active ? 'var(--accent)' : undefined,
+                        background: active ? 'color-mix(in srgb, var(--accent) 0.08, transparent)' : undefined,
+                        textDecoration: 'none',
                       }}
                     >
-                      {item.label}
-                    </span>
-                  </Link>
-                )
-              })}
+                      <item.icon
+                        size={15}
+                        style={{ color: active ? 'var(--accent)' : 'var(--text-secondary)', flexShrink: 0 }}
+                      />
+                      <span
+                        className="text-sm"
+                        style={{
+                          fontFamily: "'Barlow Semi Condensed', sans-serif",
+                          textTransform: 'uppercase',
+                          letterSpacing: '0.12em',
+                          color: active ? 'var(--text-primary)' : 'var(--text-secondary)',
+                          whiteSpace: 'nowrap',
+                        }}
+                      >
+                        {item.label}
+                      </span>
+                      {active && (
+                        <span
+                          className="tfx"
+                          style={{ marginLeft: 'auto', color: 'var(--accent)', fontSize: 10 }}
+                        >
+                          ✕
+                        </span>
+                      )}
+                    </Link>
+                  )
+                })}
+              </div>
             </nav>
 
             <div className="mx-4 my-2" style={{ height: '1px', background: 'var(--bg-surface)' }} />
@@ -337,13 +408,13 @@ export default function MainLayout() {
             {/* Playlists */}
             <div className="flex-1 overflow-y-auto overflow-x-hidden pb-4">
               <div
-                className="px-4 mb-1 text-sm tracking-widest"
+                className="px-4 mb-1.5 text-sm tracking-widest flex items-center"
                 style={{
                   fontFamily: "'Barlow Condensed', sans-serif",
                   fontWeight: 700,
                   textTransform: 'uppercase',
                   letterSpacing: '0.15em',
-                  color: 'var(--text-primary)',
+                  color: 'var(--section-title-color, var(--text-primary))',
                   opacity: collapsed ? 0 : 1,
                   transform: collapsed ? 'translateX(-6px)' : 'translateX(0)',
                   transition: 'opacity 120ms ease, transform 220ms cubic-bezier(0.2, 0.9, 0.2, 1)',
@@ -351,9 +422,10 @@ export default function MainLayout() {
                 }}
               >
                 Playlists
+                <span className="tfx" style={{ marginLeft: 'auto' }}>80BJ93X</span>
               </div>
               <div
-                className={collapsed ? 'flex flex-col items-center gap-2 px-2 pt-1' : 'space-y-0.5'}
+                className={collapsed ? 'flex flex-col items-center gap-2 px-2 pt-1' : 'flex flex-col gap-1.5 px-3'}
                 style={{ transition: 'all 220ms cubic-bezier(0.2, 0.9, 0.2, 1)' }}
               >
                 {sidebarPlaylists?.map((pl) => {
@@ -362,36 +434,86 @@ export default function MainLayout() {
                   const cover = pl.cover_image_url
                   const tile = playlistTileSize
                   const coverSize = collapsed ? tile : 26
+                  if (collapsed) {
+                    return (
+                      <Link
+                        key={pl.id}
+                        to={href}
+                        className="relative cursor-pointer min-w-0 overflow-hidden focus:outline-none"
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          gap: 0,
+                          padding: 0,
+                          width: tile,
+                          height: tile,
+                          borderRadius: 6,
+                          background: active ? 'color-mix(in srgb, var(--accent) 0.12, transparent)' : 'var(--bg-surface)',
+                          border: 'none',
+                          boxShadow: `inset 0 0 0 1px ${active ? 'color-mix(in srgb, var(--accent) 0.55, transparent)' : 'var(--text-primary)'}`,
+                          transition: 'width 220ms cubic-bezier(0.2, 0.9, 0.2, 1), height 220ms cubic-bezier(0.2, 0.9, 0.2, 1), padding 220ms cubic-bezier(0.2, 0.9, 0.2, 1), background 120ms ease, border-color 120ms ease',
+                        }}
+                        title={pl.title}
+                        aria-label={pl.title}
+                      >
+                        <div
+                          className="relative shrink-0 overflow-hidden"
+                          style={{
+                            width: coverSize,
+                            height: coverSize,
+                            borderRadius: 4,
+                            background: 'var(--bg-surface)',
+                            display: 'grid',
+                            placeItems: 'center',
+                            transition: 'width 220ms cubic-bezier(0.2, 0.9, 0.2, 1), height 220ms cubic-bezier(0.2, 0.9, 0.2, 1)',
+                          }}
+                        >
+                          {cover ? (
+                            <img
+                              src={cover}
+                              alt=""
+                              className="w-full h-full object-cover block"
+                              loading="lazy"
+                              style={{
+                                background: 'var(--bg-surface)',
+                                transform: 'scale(1.015)',
+                                transformOrigin: 'center',
+                                backfaceVisibility: 'hidden',
+                              }}
+                            />
+                          ) : (
+                            <span
+                              style={{
+                                fontFamily: "'Barlow Condensed', sans-serif",
+                                fontWeight: 800,
+                                color: 'var(--text-primary)',
+                                fontSize: 16,
+                                letterSpacing: '0.06em',
+                              }}
+                            >
+                              {playlistInitial(pl.title)}
+                            </span>
+                          )}
+                        </div>
+                      </Link>
+                    )
+                  }
                   return (
                     <Link
                       key={pl.id}
                       to={href}
-                      className="relative cursor-pointer min-w-0 overflow-hidden focus:outline-none"
+                      className="tf tf-brackets relative cursor-pointer min-w-0 overflow-hidden focus:outline-none flex items-center"
                       style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: collapsed ? 'center' : 'flex-start',
-                        gap: collapsed ? 0 : 10,
-                        paddingLeft: collapsed ? 0 : 16,
-                        paddingRight: collapsed ? 0 : 16,
-                        paddingTop: collapsed ? 0 : 6,
-                        paddingBottom: collapsed ? 0 : 6,
-                        width: collapsed ? tile : '100%',
-                        height: collapsed ? tile : 'auto',
-                        marginLeft: collapsed ? 0 : undefined,
-                        marginRight: collapsed ? 0 : undefined,
-                        borderRadius: collapsed ? 6 : 4,
-                        background: active ? 'color-mix(in srgb, var(--accent) 0.12, transparent)' : collapsed ? 'var(--bg-surface)' : 'transparent',
-                        border: 'none',
-                        boxShadow: collapsed
-                          ? `inset 0 0 0 1px ${active ? 'color-mix(in srgb, var(--accent) 0.55, transparent)' : 'var(--text-primary)'}`
-                          : `inset 2px 0 0 0 ${active ? 'var(--text-primary)' : 'transparent'}`,
-                        transition: 'width 220ms cubic-bezier(0.2, 0.9, 0.2, 1), height 220ms cubic-bezier(0.2, 0.9, 0.2, 1), padding 220ms cubic-bezier(0.2, 0.9, 0.2, 1), background 120ms ease, border-color 120ms ease',
+                        gap: 10,
+                        padding: '6px 10px',
+                        borderColor: active ? 'var(--accent)' : undefined,
+                        background: active ? 'color-mix(in srgb, var(--accent) 0.08, transparent)' : undefined,
+                        textDecoration: 'none',
                       }}
                       title={pl.title}
-                      aria-label={collapsed ? pl.title : undefined}
                     >
-                      {cover && !collapsed && (
+                      {cover && (
                         <div
                           className="absolute inset-0 pointer-events-none"
                           style={{
@@ -402,17 +524,16 @@ export default function MainLayout() {
                           }}
                         />
                       )}
-                      {/* Cover / initial */}
                       <div
                         className="relative shrink-0 overflow-hidden"
                         style={{
                           width: coverSize,
                           height: coverSize,
-                          borderRadius: 4,
+                          borderRadius: 2,
+                          border: '1px solid var(--border-subtle)',
                           background: 'var(--bg-surface)',
                           display: 'grid',
                           placeItems: 'center',
-                          transition: 'width 220ms cubic-bezier(0.2, 0.9, 0.2, 1), height 220ms cubic-bezier(0.2, 0.9, 0.2, 1)',
                         }}
                       >
                         {cover ? (
@@ -434,7 +555,7 @@ export default function MainLayout() {
                               fontFamily: "'Barlow Condensed', sans-serif",
                               fontWeight: 800,
                               color: 'var(--text-primary)',
-                              fontSize: collapsed ? 16 : 12,
+                              fontSize: 12,
                               letterSpacing: '0.06em',
                             }}
                           >
@@ -442,19 +563,14 @@ export default function MainLayout() {
                           </span>
                         )}
                       </div>
-
-                      {/* Expanded-only title */}
                       <span
                         className="relative z-10 text-xs truncate min-w-0 flex-1"
                         style={{
                           fontFamily: "'Barlow Semi Condensed', sans-serif",
-                          color: active ? 'var(--text-primary)' : 'var(--text-primary)',
-                          opacity: collapsed ? 0 : 1,
-                          width: collapsed ? 0 : 'auto',
-                          overflow: 'hidden',
+                          textTransform: 'uppercase',
+                          letterSpacing: '0.1em',
+                          color: active ? 'var(--text-primary)' : 'var(--text-secondary)',
                           whiteSpace: 'nowrap',
-                          transition: 'opacity 120ms ease',
-                          pointerEvents: collapsed ? 'none' : 'auto',
                         }}
                       >
                         {pl.title}
@@ -464,6 +580,48 @@ export default function MainLayout() {
                 })}
               </div>
             </div>
+
+            {/* Decorative bottom block */}
+            {!collapsed && (
+              <div className="y2k-only px-3 pb-3 pt-2">
+                <div style={{ borderTop: '1px solid var(--border-subtle)', marginBottom: 10 }} />
+                <div
+                  className="tfxb"
+                  style={{ marginBottom: 8, fontSize: 13, letterSpacing: '0.22em', color: 'var(--text-secondary)', fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 800 }}
+                >
+                  SpotiFU<span style={{ textDecoration: 'line-through', opacity: 0.5 }}> Net</span>work
+                </div>
+                <div className="tf" style={{ padding: 8, display: 'flex', alignItems: 'center', gap: 10 }}>
+                  <Globe size={22} style={{ color: 'var(--text-faint)', flexShrink: 0 }} />
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div className="tfxb">Priority</div>
+                    <div
+                      style={{
+                        fontFamily: "'Barlow Condensed', sans-serif",
+                        fontWeight: 800,
+                        fontSize: 26,
+                        lineHeight: 1,
+                        color: 'var(--text-primary)',
+                      }}
+                    >
+                      4
+                    </div>
+                  </div>
+                  <div
+                    style={{
+                      fontFamily: 'var(--font-mono)',
+                      fontSize: 18,
+                      color: 'var(--text-secondary)',
+                      letterSpacing: '0.1em',
+                    }}
+                  >
+                    058
+                  </div>
+                </div>
+                <div className="tbarcode" style={{ marginTop: 8 }} />
+                <div className="tfxb" style={{ marginTop: 6, textAlign: 'right' }}>// User data encrypted</div>
+              </div>
+            )}
           </div>
         </aside>
 

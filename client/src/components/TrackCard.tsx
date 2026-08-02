@@ -12,12 +12,13 @@ const BACKDROP_OPACITY = 0.14
 interface TrackCardProps {
   track: any
   size?: number
+  index?: number
   onPlay: (track: any) => void
   onHoverArtist?: (artistId: string, albumIds?: string[]) => void
   onContextMenu?: (e: React.MouseEvent, track: any) => void
 }
 
-const TrackCardImpl = ({ track, size = 96, onPlay, onHoverArtist, onContextMenu }: TrackCardProps) => {
+const TrackCardImpl = ({ track, size = 96, index, onPlay, onHoverArtist, onContextMenu }: TrackCardProps) => {
   const rootRef = useRef<HTMLDivElement>(null)
   const staticCover = track.album_cover as string | null | undefined
   const { url: lazyCover } = useCoverWhenVisible(
@@ -29,12 +30,8 @@ const TrackCardImpl = ({ track, size = 96, onPlay, onHoverArtist, onContextMenu 
   return (
     <div
       ref={rootRef}
-      className="flex flex-col items-center gap-2 px-3 py-3 rounded cursor-pointer border shrink-0 transition-colors hover:border-[var(--accent)] group relative overflow-hidden"
-      style={{
-        background: 'var(--bg-surface)',
-        borderColor: 'var(--border)',
-        width: size + 48,
-      }}
+      className="tf tf-brackets flex flex-col items-center gap-2 px-2.5 py-2.5 cursor-pointer shrink-0 group relative overflow-hidden"
+      style={{ width: size + 40 }}
       onClick={() => onPlay(track)}
       onContextMenu={onContextMenu ? (e) => onContextMenu(e, track) : undefined}
       onMouseEnter={() => {
@@ -56,12 +53,22 @@ const TrackCardImpl = ({ track, size = 96, onPlay, onHoverArtist, onContextMenu 
       )}
       <div className="relative z-10 w-full flex flex-col items-center gap-2">
         {cover ? (
-          <div className="relative rounded overflow-hidden" style={{ width: size, height: size }}>
+          <div
+            className="relative overflow-hidden"
+            style={{
+              width: size,
+              height: size,
+              border: '1px solid var(--border-subtle)',
+              borderRadius: 2,
+              padding: 3,
+              background: 'var(--bg-base)',
+            }}
+          >
             <img
               src={cover}
               alt={track.title}
               className="w-full h-full"
-              style={{ objectFit: 'cover' }}
+              style={{ objectFit: 'cover', borderRadius: 1 }}
               loading="lazy"
             />
             {isLocalTrack(track) && (
@@ -75,8 +82,14 @@ const TrackCardImpl = ({ track, size = 96, onPlay, onHoverArtist, onContextMenu 
           </div>
         ) : (
           <div
-            className="rounded flex items-center justify-center shrink-0"
-            style={{ width: size, height: size, background: 'var(--bg-surface)' }}
+            className="flex items-center justify-center shrink-0"
+            style={{
+              width: size,
+              height: size,
+              background: 'var(--bg-surface)',
+              border: '1px solid var(--border-subtle)',
+              borderRadius: 2,
+            }}
           >
             <span style={{ fontSize: Math.floor(size * 0.25), color: 'var(--text-primary)' }}>▦</span>
           </div>
@@ -90,10 +103,15 @@ const TrackCardImpl = ({ track, size = 96, onPlay, onHoverArtist, onContextMenu 
           </p>
           <p
             className="text-xs truncate mt-0.5"
-            style={{ fontFamily: "'Barlow Semi Condensed', sans-serif", color: 'var(--text-primary)' }}
+            style={{ fontFamily: "'Barlow Semi Condensed', sans-serif", color: 'var(--text-secondary)' }}
           >
             {displayArtist(track)}
           </p>
+          {index !== undefined && (
+            <p className="tfxb" style={{ marginTop: 3, textAlign: 'center' }}>
+              // TRK_{String(index + 1).padStart(2, '0')}
+            </p>
+          )}
         </div>
       </div>
     </div>
@@ -105,6 +123,7 @@ export default memo(TrackCardImpl, (prev, next) => {
     prev.track?.mb_id === next.track?.mb_id &&
     prev.track?.track_id === next.track?.track_id &&
     prev.track?.album_cover === next.track?.album_cover &&
+    prev.index === next.index &&
     prev.onPlay === next.onPlay
   )
 })

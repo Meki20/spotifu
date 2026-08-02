@@ -8,7 +8,7 @@ import { ChevronLeft, ChevronRight, Home, Library, Search, Settings, Download, G
 import { useAuthStore } from '../stores/authStore'
 import { usePrefetchSettingsStore } from '../stores/prefetchSettingsStore'
 import { authFetch } from '../api'
-import { fetchPlaylistsList } from '../api/playlists'
+import { fetchPlaylistsList, fetchAutoPlaylistsList } from '../api/playlists'
 import { useEffect, useState } from 'react'
 
 const QUEUE_MIN_WIDTH = 200
@@ -127,6 +127,12 @@ export default function MainLayout() {
     enabled: !!token,
   })
 
+  const { data: autoPlaylists } = useQuery({
+    queryKey: ['auto-playlists'],
+    queryFn: fetchAutoPlaylistsList,
+    enabled: !!token,
+  })
+
   useEffect(() => {
     if (!token) {
       usePrefetchSettingsStore.getState().resetToDefaults()
@@ -148,6 +154,24 @@ export default function MainLayout() {
     const t = (title || '').trim()
     return (t[0] || '•').toUpperCase()
   }
+
+  type SidebarItem = { id: number; title: string; cover_image_url: string | null; href: string }
+  const sidebarItems: SidebarItem[] = [
+    ...(sidebarPlaylists ?? []).map((pl) => ({
+      id: pl.id,
+      title: pl.title,
+      cover_image_url: pl.cover_image_url ?? null,
+      href: `/playlist/${pl.id}`,
+    })),
+    ...(autoPlaylists ?? [])
+      .filter((ap) => ap.is_enabled && ap.last_generated_at)
+      .map((ap) => ({
+        id: ap.id,
+        title: ap.name,
+        cover_image_url: ap.cover_url ?? null,
+        href: `/auto-playlist/${ap.id}`,
+      })),
+  ]
 
   function navActive(href: string) {
     if (href === '/') return location.pathname === '/'
@@ -428,8 +452,8 @@ export default function MainLayout() {
                 className={collapsed ? 'flex flex-col items-center gap-2 px-2 pt-1' : 'flex flex-col gap-1.5 px-3'}
                 style={{ transition: 'all 220ms cubic-bezier(0.2, 0.9, 0.2, 1)' }}
               >
-                {sidebarPlaylists?.map((pl) => {
-                  const href = `/playlist/${pl.id}`
+                {sidebarItems.map((pl) => {
+                  const href = pl.href
                   const active = location.pathname === href
                   const cover = pl.cover_image_url
                   const tile = playlistTileSize

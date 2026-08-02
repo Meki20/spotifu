@@ -32,6 +32,23 @@ export async function fetchPlaylistsList(): Promise<PlaylistSummary[]> {
   return res.json()
 }
 
+export interface AutoPlaylistSummary {
+  id: number
+  name: string
+  playlist_type: string
+  is_enabled: boolean
+  last_generated_at: string | null
+  created_at: string
+  track_count: number
+  cover_url: string
+}
+
+export async function fetchAutoPlaylistsList(): Promise<AutoPlaylistSummary[]> {
+  const res = await authFetch('/auto-playlists')
+  if (!res.ok) throw new Error('Failed to fetch auto playlists')
+  return res.json()
+}
+
 export async function fetchPlaylistDetail(id: number): Promise<PlaylistDetail> {
   const res = await authFetch(`/playlists/${id}`)
   if (!res.ok) throw new Error('Failed to load playlist')

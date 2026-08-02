@@ -201,7 +201,7 @@ export default function PlaylistPage() {
     const normalized = itemToPlayableTrack(item, playlist?.cover_image_url ?? null, cachedMbIds)
     openContextMenu(e.clientX, e.clientY, normalized, {
       onPlay: () => playItem(item),
-      onRemoveFromPlaylist: () => removeItemMutation.mutate(item.id),
+      onRemoveFromPlaylist: isAutoPlaylist ? undefined : () => removeItemMutation.mutate(item.id),
     })
   }
 
@@ -264,20 +264,34 @@ export default function PlaylistPage() {
         >
           <ArrowLeft size={20} />
         </button>
-        <button
-          type="button"
-          onClick={openCoverEditor}
-          className="w-44 h-44 md:w-52 md:h-52 shrink-0 rounded overflow-hidden flex items-center justify-center cursor-pointer transition-opacity hover:opacity-90 focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--bg-base)]"
-          style={{ background: 'var(--bg-surface)', boxShadow: '0 12px 40px rgba(0,0,0,0.45)', border: 'none', padding: 0 }}
-          aria-label="Change playlist cover"
-          title="Change cover art"
-        >
-          {cover ? (
-            <img src={cover} alt="" className="w-full h-full object-cover" loading="lazy" />
-          ) : (
-            <span style={{ fontSize: 48, color: 'var(--text-primary)' }}>▦</span>
-          )}
-        </button>
+        {!isAutoPlaylist ? (
+          <button
+            type="button"
+            onClick={openCoverEditor}
+            className="w-44 h-44 md:w-52 md:h-52 shrink-0 rounded overflow-hidden flex items-center justify-center cursor-pointer transition-opacity hover:opacity-90 focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--bg-base)]"
+            style={{ background: 'var(--bg-surface)', boxShadow: '0 12px 40px rgba(0,0,0,0.45)', border: 'none', padding: 0 }}
+            aria-label="Change playlist cover"
+            title="Change cover art"
+          >
+            {cover ? (
+              <img src={cover} alt="" className="w-full h-full object-cover" loading="lazy" />
+            ) : (
+              <span style={{ fontSize: 48, color: 'var(--text-primary)' }}>▦</span>
+            )}
+          </button>
+        ) : (
+          <div
+            className="w-44 h-44 md:w-52 md:h-52 shrink-0 rounded overflow-hidden flex items-center justify-center"
+            style={{ background: 'var(--bg-surface)', boxShadow: '0 12px 40px rgba(0,0,0,0.45)', border: 'none', padding: 0 }}
+            aria-label="Playlist cover"
+          >
+            {cover ? (
+              <img src={cover} alt="" className="w-full h-full object-cover" loading="lazy" />
+            ) : (
+              <span style={{ fontSize: 48, color: 'var(--text-primary)' }}>▦</span>
+            )}
+          </div>
+        )}
         <div className="min-w-0 flex-1 pb-1">
           <p
             className="text-xs uppercase mb-1"
@@ -318,20 +332,22 @@ export default function PlaylistPage() {
         >
           <Play size={22} fill="currentColor" className="ml-0.5" />
         </button>
-        <button
-          type="button"
-          onClick={() => setUploadOpen(true)}
-          className="w-11 h-11 rounded flex items-center justify-center transition-colors hover:border-[var(--accent)]"
-          style={{
-            color: 'var(--text-primary)',
-            border: '1px solid var(--border)',
-            background: 'transparent',
-          }}
-          aria-label="Upload CSV"
-          title="Upload CSV"
-        >
-          <FileSpreadsheet size={20} strokeWidth={1.75} />
-        </button>
+        {!isAutoPlaylist && (
+          <button
+            type="button"
+            onClick={() => setUploadOpen(true)}
+            className="w-11 h-11 rounded flex items-center justify-center transition-colors hover:border-[var(--accent)]"
+            style={{
+              color: 'var(--text-primary)',
+              border: '1px solid var(--border)',
+              background: 'transparent',
+            }}
+            aria-label="Upload CSV"
+            title="Upload CSV"
+          >
+            <FileSpreadsheet size={20} strokeWidth={1.75} />
+          </button>
+        )}
         {!isAutoPlaylist && (
           <>
             <button

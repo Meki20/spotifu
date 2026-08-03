@@ -481,11 +481,9 @@ export default function Search() {
                 }}
                 onMouseEnter={(e) => {
                   e.currentTarget.style.borderColor = 'var(--text-primary)'
-                  e.currentTarget.style.color = 'var(--text-primary)'
                 }}
                 onMouseLeave={(e) => {
-                  e.currentTarget.style.borderColor = 'var(--text-primary)'
-                  e.currentTarget.style.color = 'var(--text-primary)'
+                  e.currentTarget.style.borderColor = 'var(--border)'
                 }}
               >
                 {term}

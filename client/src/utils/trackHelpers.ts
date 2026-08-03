@@ -46,6 +46,14 @@ export function formatDuration(secs: number): string {
   return `${m}:${String(s).padStart(2, '0')}`
 }
 
+/** Compact count for UI chrome (e.g. 1100 → "1.1k"). */
+export function formatCompactCount(n: number): string {
+  if (!Number.isFinite(n) || n < 0) return '0'
+  if (n < 1000) return String(Math.floor(n))
+  const tenths = Math.round(n / 100) / 10
+  return `${tenths}k`
+}
+
 /** Match a track row from a list (local imports use ``track_id``; MB tracks use ``mb_id``). */
 export function indexOfTrackInList(list: any[], track: any): number {
   const tid = track?.track_id ?? track?.id

@@ -12,7 +12,7 @@ import {
   type PlaylistItemDTO,
 } from '../api/playlists'
 import { coverManager } from '../lib/coverManager'
-import { toTrack, resolveTrackArtUrl } from '../utils/trackHelpers'
+import { toTrack, resolveTrackArtUrl, formatDuration } from '../utils/trackHelpers'
 import PlaylistTrackCover from '../components/PlaylistTrackCover'
 import { usePlayerStore } from '../stores/playerStore'
 import { useDownloadStates } from '../hooks/useDownloadStates'
@@ -46,7 +46,7 @@ function itemToPlayableTrack(
       mb_artist_id: item.mb_artist_id,
       mb_release_id: item.mb_release_id,
       mb_release_group_id: item.mb_release_group_id,
-      duration: 0,
+      duration: item.duration ?? 0,
       is_cached: isCached,
       local_stream_url: streamOnlyWhenReady ? `/stream/${item.track_id}` : null,
     },
@@ -226,32 +226,10 @@ export default function PlaylistPage() {
 
   return (
     <div key={playlistId} className="min-h-full relative">
-      {cover ? (
-        <div
-          className="absolute inset-x-0 top-0 h-64 md:h-80 pointer-events-none overflow-hidden"
-          style={{ zIndex: 0 }}
-        >
-          <div
-            className="absolute inset-0"
-            style={{
-              backgroundImage: `url(${cover})`,
-              backgroundSize: 'cover',
-              backgroundPosition: 'center',
-              opacity: 0.18,
-            }}
-          />
-          <div
-            className="absolute inset-0"
-            style={{
-              background: 'linear-gradient(180deg, color-mix(in srgb, var(--bg-base) 55%, transparent) 0%, color-mix(in srgb, var(--bg-base) 90%, transparent) 100%)',
-            }}
-          />
-        </div>
-      ) : null}
       <div
         className="relative z-[1] flex items-end gap-4 md:gap-6 p-6"
         style={{
-          background: 'linear-gradient(180deg, var(--bg-surface-3) 0%, var(--bg-base) 100%)',
+          background: 'transparent',
           borderBottom: '1px solid var(--border-subtle)',
         }}
       >
@@ -399,7 +377,7 @@ export default function PlaylistPage() {
             <span>Title</span>
             <span>Artist</span>
             <span>Album</span>
-            <span className="text-right"> </span>
+            <span className="text-right">Duration</span>
           </div>
           {playlist.items.length === 0 ? (
             <p className="py-8 text-sm" style={{ color: 'var(--text-primary)', fontFamily: "'Barlow Semi Condensed', sans-serif" }}>
@@ -423,7 +401,7 @@ export default function PlaylistPage() {
                     borderBottom: '1px solid var(--bg-surface)',
                   }}
                   onMouseEnter={(e) => {
-                    e.currentTarget.style.background = 'var(--text-primary)'
+                    e.currentTarget.style.background = 'var(--bg-surface-2)'
                   }}
                   onMouseLeave={(e) => {
                     e.currentTarget.style.background = 'transparent'
@@ -484,7 +462,7 @@ export default function PlaylistPage() {
                     className="text-sm tabular-nums text-right shrink-0 flex items-center justify-end"
                     style={{ fontFamily: "'Barlow Semi Condensed', monospace", color: 'var(--text-primary)' }}
                   >
-                    {isDownloading ? `${downloadPercent ?? 0}%` : isCached ? '✓' : '—'}
+                    {isDownloading ? `${downloadPercent ?? 0}%` : (item.duration ? formatDuration(item.duration) : '—')}
                   </span>
                 </div>
               )

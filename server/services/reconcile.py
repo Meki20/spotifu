@@ -1,6 +1,7 @@
 """Startup reconciliation: fix tracks stuck in FETCHING after crash/restart.
 
-Also backfills missing mb_ids for all READY tracks.
+Also backfills missing mb_ids for all READY tracks, and missing durations from
+local audio files (never from MusicBrainz).
 """
 
 from __future__ import annotations
@@ -83,11 +84,17 @@ def _find_match(artist: str, title: str, files: list[str]) -> Optional[str]:
 
 
 def reconcile_stuck_tracks() -> None:
-    """Runs at startup. Claims orphan files, else demotes FETCHING → ERROR."""
+    """Runs at startup. Claims orphan files, else demotes FETCHING → ERROR.
+
+    Also backfills ``duration`` from local audio files when missing (never from MB).
+    """
+    from services.audio_quality import extract_duration_seconds
+
     files = _list_cache_files()
     claimed: set[str] = set()
     claimed_count = 0
     demoted_count = 0
+    duration_filled = 0
 
     with Session(engine) as session:
         rows = session.exec(
@@ -99,6 +106,11 @@ def reconcile_stuck_tracks() -> None:
             if match:
                 track.status = TrackStatus.READY
                 track.local_file_path = match
+                if not track.duration or track.duration <= 0:
+                    dur = extract_duration_seconds(match)
+                    if dur > 0:
+                        track.duration = dur
+                        duration_filled += 1
                 claimed.add(match)
                 claimed_count += 1
                 logger.info(
@@ -135,14 +147,21 @@ def reconcile_stuck_tracks() -> None:
                     track.local_file_path = None
                     missing += 1
                     changed = True
+                    continue
+                if not track.duration or track.duration <= 0:
+                    dur = extract_duration_seconds(track.local_file_path)
+                    if dur > 0:
+                        track.duration = dur
+                        duration_filled += 1
+                        changed = True
             if changed:
                 session.commit()
             if len(ready_batch) < _BATCH:
                 break
 
     logger.info(
-        "Reconcile: claimed=%d demoted=%d missing_files=%d",
-        claimed_count, demoted_count, missing,
+        "Reconcile: claimed=%d demoted=%d missing_files=%d duration_filled=%d",
+        claimed_count, demoted_count, missing, duration_filled,
     )
 
 

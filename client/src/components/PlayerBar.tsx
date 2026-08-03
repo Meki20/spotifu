@@ -295,17 +295,20 @@ export default function PlayerBar() {
           </button>
           <button
             onClick={handlePlayPause}
-            className="w-8 h-8 flex items-center justify-center transition-colors"
+            className="w-9 h-9 flex items-center justify-center transition-colors"
             style={{
-              background: 'color-mix(in srgb, var(--accent) 0.1, transparent)',
-              border: '1px solid var(--accent)',
-              borderRadius: 2,
-              color: 'var(--text-primary)',
-              boxShadow: '0 0 12px color-mix(in srgb, var(--accent) 0.35, transparent)',
+              background: 'var(--accent)',
+              border: 'none',
+              borderRadius: '50%',
+              color: 'var(--bg-base)',
             }}
             title={isPlaying ? 'Pause' : 'Play'}
           >
-            {isPlaying ? <Pause size={14} /> : <Play size={14} />}
+            {isPlaying ? (
+              <Pause size={15} fill="currentColor" strokeWidth={0} />
+            ) : (
+              <Play size={15} fill="currentColor" strokeWidth={0} className="ml-0.5" />
+            )}
           </button>
           <button
             onClick={() => controller.skipNext()}

@@ -147,6 +147,10 @@ async def lifespan(app: FastAPI):
     _testing = os.environ.get("SPOTIFU_TESTING", "").strip().lower() in ("1", "true", "yes")
 
     if not _testing:
+        # Claim orphan downloads + backfill missing durations from local files.
+        from services.reconcile import reconcile_stuck_tracks
+        await asyncio.to_thread(reconcile_stuck_tracks)
+
         def _loop_exception_handler(loop, context):
             exc = context.get("exception")
             if exc is not None:

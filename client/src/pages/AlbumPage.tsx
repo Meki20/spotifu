@@ -100,7 +100,7 @@ export default function AlbumPage() {
       <div
         className="flex items-end gap-4 md:gap-6 p-6"
         style={{
-          background: 'linear-gradient(180deg, var(--bg-surface-3) 0%, var(--bg-base) 100%)',
+          background: 'transparent',
           borderBottom: '1px solid var(--border-subtle)',
         }}
       >

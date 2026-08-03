@@ -171,6 +171,12 @@ def get_auto_playlist_detail(
     tracks = session.exec(stmt).all()
     
     cover_url = definition.cover_image or generate_playlist_cover(definition.playlist_type)
+
+    track_ids = [t.track_id for t in tracks if t.track_id is not None]
+    duration_by_id: dict[int, int] = {}
+    if track_ids:
+        for tr in session.exec(select(Track).where(Track.id.in_(track_ids))).all():
+            duration_by_id[tr.id] = int(tr.duration or 0)
     
     return {
         "id": definition.id,
@@ -191,6 +197,7 @@ def get_auto_playlist_detail(
                 "album_cover": None,
                 "track_id": t.track_id,
                 "is_cached": t.track_id is not None and session.get(Track, t.track_id) is not None and session.get(Track, t.track_id).local_file_path is not None,
+                "duration": duration_by_id.get(t.track_id, 0) if t.track_id is not None else 0,
             }
             for t in tracks
         ]

@@ -20,6 +20,7 @@ export interface PlaylistItemDTO {
   album_cover: string | null
   track_id: number | null
   is_cached?: boolean
+  duration?: number
 }
 
 export interface PlaylistDetail extends PlaylistSummary {

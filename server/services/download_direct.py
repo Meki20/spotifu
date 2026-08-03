@@ -255,8 +255,11 @@ async def download_track_direct(
                 track.status = status
                 track.local_file_path = local_path
                 if local_path:
-                    from services.audio_quality import extract_quality
+                    from services.audio_quality import extract_quality, extract_duration_seconds
                     track.quality = extract_quality(local_path)
+                    dur = extract_duration_seconds(local_path)
+                    if dur > 0:
+                        track.duration = dur
                 session.add(track)
                 session.commit()
 

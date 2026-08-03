@@ -329,8 +329,8 @@ export default function QueuePanel({ width, onWidthChange, onClose, onOpen, maxW
       style={{
         width: width,
         opacity: isClosed ? 0 : 1,
-        background: 'var(--bg-surface)',
-        borderLeft: '1px solid var(--bg-surface)',
+        background: 'color-mix(in srgb, var(--bg-surface) 0.8, transparent)',
+        borderLeft: '1px solid var(--border)',
         transition: 'width 220ms cubic-bezier(0.2, 0.9, 0.2, 1), opacity 120ms ease',
         willChange: 'width, opacity',
       }}

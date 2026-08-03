@@ -4,16 +4,25 @@ import PlayerBar from './PlayerBar'
 import NotificationCenter from './NotificationCenter'
 import QueuePanel from './QueuePanel'
 import { useAudioPlayer } from '../hooks/useAudioPlayer'
-import { ChevronLeft, ChevronRight, Home, Library, Search, Settings, Download, Globe } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Home, Library, Search, Settings, Download, Disc3 } from 'lucide-react'
 import { useAuthStore } from '../stores/authStore'
 import { usePrefetchSettingsStore } from '../stores/prefetchSettingsStore'
 import { authFetch } from '../api'
 import { fetchPlaylistsList, fetchAutoPlaylistsList } from '../api/playlists'
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
+import { formatCompactCount } from '../utils/trackHelpers'
+import { subscribeSpotifuWebSocket, WS_RECONNECT } from '../spotifuWebSocket'
+import { queryClient } from '../queryClient'
+import phrasesRaw from '../data/sidebar-phrases.txt?raw'
 
 const QUEUE_MIN_WIDTH = 200
 const QUEUE_DEFAULT_WIDTH = 320
 const QUEUE_MAX_WIDTH = 480
+
+const SIDEBAR_PHRASES = phrasesRaw
+  .split('\n')
+  .map((line) => line.trim())
+  .filter(Boolean)
 
 const NAV_ITEMS = [
   { id: '/', icon: Home, label: 'Home' },
@@ -133,6 +142,53 @@ export default function MainLayout() {
     enabled: !!token,
   })
 
+  const { data: soulseekSettings } = useQuery({
+    queryKey: ['settings-connection-status'],
+    queryFn: async () => {
+      const res = await authFetch('/settings')
+      if (!res.ok) throw new Error('Failed to fetch settings')
+      return res.json() as Promise<{ soulseek_connected: boolean }>
+    },
+    enabled: !!token,
+    staleTime: 15_000,
+  })
+
+  const { data: libraryCountData } = useQuery({
+    queryKey: ['downloaded-track-count'],
+    queryFn: async () => {
+      const res = await authFetch('/settings/tracks/count')
+      if (!res.ok) throw new Error('Failed to fetch track count')
+      return res.json() as Promise<{ count: number }>
+    },
+    enabled: !!token,
+    staleTime: 60_000,
+  })
+
+  const sidebarPhrase = useMemo(() => {
+    if (SIDEBAR_PHRASES.length === 0) return ''
+    return SIDEBAR_PHRASES[Math.floor(Math.random() * SIDEBAR_PHRASES.length)]
+  }, [])
+
+  const soulseekConnected = Boolean(soulseekSettings?.soulseek_connected)
+  const libraryCount = libraryCountData?.count ?? 0
+
+  useEffect(() => {
+    if (!token) return
+    return subscribeSpotifuWebSocket((data) => {
+      if (
+        data.type !== 'soulseek_connected' &&
+        data.type !== 'soulseek_error' &&
+        data.type !== WS_RECONNECT
+      ) {
+        if (data.type === 'track_ready') {
+          queryClient.invalidateQueries({ queryKey: ['downloaded-track-count'] })
+        }
+        return
+      }
+      queryClient.invalidateQueries({ queryKey: ['settings-connection-status'] })
+    })
+  }, [token])
+
   useEffect(() => {
     if (!token) {
       usePrefetchSettingsStore.getState().resetToDefaults()
@@ -189,7 +245,7 @@ export default function MainLayout() {
           className="flex flex-col h-full relative shrink-0 overflow-hidden"
           style={{
             width: sidebarWidthPx,
-            background: 'var(--bg-surface)',
+            background: 'color-mix(in srgb, var(--bg-surface) 0.8, transparent)',
             borderRight: '1px solid var(--border)',
             transition: 'width 220ms cubic-bezier(0.2, 0.9, 0.2, 1)',
             willChange: 'width',
@@ -295,33 +351,48 @@ export default function MainLayout() {
             {/* Connection status panel */}
             {!collapsed && (
               <div className="mx-3 mt-3 tf tf-brackets" style={{ padding: 10 }}>
-                <div className="flex items-center gap-2.5">
-                  <div
-                    style={{
-                      border: '1px solid var(--border-subtle)',
-                      borderRadius: 2,
-                      padding: 6,
-                      display: 'grid',
-                      placeItems: 'center',
-                      flexShrink: 0,
-                    }}
-                  >
-                    <Globe size={18} style={{ color: 'var(--text-secondary)' }} />
+                <div
+                  style={{
+                    fontFamily: 'var(--font-mono)',
+                    fontSize: 9,
+                    letterSpacing: '0.14em',
+                    textTransform: 'uppercase',
+                    lineHeight: 1.9,
+                    color: 'var(--text-secondary)',
+                  }}
+                >
+                  <div className="flex items-center gap-2">
+                    <span
+                      style={{
+                        width: 7,
+                        height: 7,
+                        borderRadius: '50%',
+                        background: 'var(--color-success)',
+                        boxShadow: '0 0 6px color-mix(in srgb, var(--color-success) 0.55, transparent)',
+                        flexShrink: 0,
+                      }}
+                    />
+                    <span>Local network · connected</span>
                   </div>
-                  <div
-                    style={{
-                      fontFamily: 'var(--font-mono)',
-                      fontSize: 9,
-                      letterSpacing: '0.14em',
-                      textTransform: 'uppercase',
-                      lineHeight: 1.8,
-                      color: 'var(--text-secondary)',
-                      minWidth: 0,
-                    }}
-                  >
-                    <div style={{ color: 'var(--text-faint)' }}>Connected to</div>
-                    <div>Soulseek // Local Network</div>
-                    <div className="truncate">User: @{username ?? 'unknown'}</div>
+                  <div className="flex items-center gap-2">
+                    <span
+                      style={{
+                        width: 7,
+                        height: 7,
+                        borderRadius: '50%',
+                        background: soulseekConnected ? 'var(--color-success)' : 'var(--color-danger)',
+                        boxShadow: soulseekConnected
+                          ? '0 0 6px color-mix(in srgb, var(--color-success) 0.55, transparent)'
+                          : undefined,
+                        flexShrink: 0,
+                      }}
+                    />
+                    <span>
+                      Soulseek · {soulseekConnected ? 'connected' : 'disconnected'}
+                    </span>
+                  </div>
+                  <div className="truncate" style={{ color: 'var(--text-faint)', marginTop: 2 }}>
+                    User: @{username ?? 'unknown'}
                   </div>
                 </div>
               </div>
@@ -353,25 +424,18 @@ export default function MainLayout() {
                       <Link
                         key={item.id}
                         to={item.id}
-                        className="flex items-center cursor-pointer transition-all duration-150"
-                        style={{
-                          background: active ? 'color-mix(in srgb, var(--accent) 0.12, transparent)' : 'transparent',
-                          borderLeft: active ? '2px solid var(--accent)' : '2px solid transparent',
-                          paddingLeft: 0,
-                          paddingRight: 0,
-                          paddingTop: 10,
-                          paddingBottom: 10,
-                          justifyContent: 'center',
-                          gap: 0,
-                          width: '100%',
-                        }}
+                        className={`nav-link nav-link--collapsed${active ? ' nav-link--active' : ''}`}
                         title={item.label}
                         aria-label={item.label}
+                        aria-current={active ? 'page' : undefined}
                       >
                         <item.icon
                           size={22}
                           className="w-4 h-4"
-                          style={{ color: 'var(--text-primary)' }}
+                          style={{
+                            color: active ? 'var(--text-primary)' : 'var(--text-secondary)',
+                            opacity: active ? 1 : 0.75,
+                          }}
                         />
                       </Link>
                     )
@@ -380,18 +444,16 @@ export default function MainLayout() {
                     <Link
                       key={item.id}
                       to={item.id}
-                      className="tf tf-brackets flex items-center cursor-pointer"
-                      style={{
-                        gap: 12,
-                        padding: '7px 12px',
-                        borderColor: active ? 'var(--accent)' : undefined,
-                        background: active ? 'color-mix(in srgb, var(--accent) 0.08, transparent)' : undefined,
-                        textDecoration: 'none',
-                      }}
+                      className={`nav-link${active ? ' nav-link--active' : ''}`}
+                      aria-current={active ? 'page' : undefined}
                     >
                       <item.icon
                         size={15}
-                        style={{ color: active ? 'var(--accent)' : 'var(--text-secondary)', flexShrink: 0 }}
+                        style={{
+                          color: active ? 'var(--text-primary)' : 'var(--text-secondary)',
+                          flexShrink: 0,
+                          opacity: active ? 1 : 0.8,
+                        }}
                       />
                       <span
                         className="text-sm"
@@ -401,18 +463,12 @@ export default function MainLayout() {
                           letterSpacing: '0.12em',
                           color: active ? 'var(--text-primary)' : 'var(--text-secondary)',
                           whiteSpace: 'nowrap',
+                          fontWeight: active ? 700 : 500,
+                          opacity: active ? 1 : 0.85,
                         }}
                       >
                         {item.label}
                       </span>
-                      {active && (
-                        <span
-                          className="tfx"
-                          style={{ marginLeft: 'auto', color: 'var(--accent)', fontSize: 10 }}
-                        >
-                          ✕
-                        </span>
-                      )}
                     </Link>
                   )
                 })}
@@ -608,9 +664,9 @@ export default function MainLayout() {
                   SpotiFU<span style={{ textDecoration: 'line-through', opacity: 0.5 }}> Net</span>work
                 </div>
                 <div className="tf" style={{ padding: 8, display: 'flex', alignItems: 'center', gap: 10 }}>
-                  <Globe size={22} style={{ color: 'var(--text-faint)', flexShrink: 0 }} />
+                  <Disc3 size={22} style={{ color: 'var(--text-faint)', flexShrink: 0 }} />
                   <div style={{ flex: 1, minWidth: 0 }}>
-                    <div className="tfxb">Priority</div>
+                    <div className="tfxb">Saved</div>
                     <div
                       style={{
                         fontFamily: "'Barlow Condensed', sans-serif",
@@ -620,22 +676,16 @@ export default function MainLayout() {
                         color: 'var(--text-primary)',
                       }}
                     >
-                      4
+                      {formatCompactCount(libraryCount)}
                     </div>
-                  </div>
-                  <div
-                    style={{
-                      fontFamily: 'var(--font-mono)',
-                      fontSize: 18,
-                      color: 'var(--text-secondary)',
-                      letterSpacing: '0.1em',
-                    }}
-                  >
-                    058
                   </div>
                 </div>
                 <div className="tbarcode" style={{ marginTop: 8 }} />
-                <div className="tfxb" style={{ marginTop: 6, textAlign: 'right' }}>// User data encrypted</div>
+                {sidebarPhrase ? (
+                  <div className="tfxb" style={{ marginTop: 6, textAlign: 'right' }}>
+                    // {sidebarPhrase}
+                  </div>
+                ) : null}
               </div>
             )}
           </div>

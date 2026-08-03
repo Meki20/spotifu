@@ -62,6 +62,7 @@ class PlaylistItemOut(BaseModel):
     album_cover: str | None
     track_id: int | None
     is_cached: bool = False
+    duration: int = 0
 
 
 class PlaylistDetailResponse(BaseModel):
@@ -214,7 +215,7 @@ def _effective_playlist_item_cached(session: Session, row: PlaylistItem, annotat
     return bool(annotated)
 
 
-def _playlist_item_to_out(row: PlaylistItem, *, is_cached: bool = False) -> PlaylistItemOut:
+def _playlist_item_to_out(row: PlaylistItem, *, is_cached: bool = False, duration: int = 0) -> PlaylistItemOut:
     return PlaylistItemOut(
         id=row.id,
         position=row.position,
@@ -228,6 +229,7 @@ def _playlist_item_to_out(row: PlaylistItem, *, is_cached: bool = False) -> Play
         album_cover=row.album_cover,
         track_id=row.track_id,
         is_cached=is_cached,
+        duration=duration,
     )
 
 
@@ -580,10 +582,33 @@ def get_playlist(
     from services.covers import attach_cached_covers_only
 
     attach_cached_covers_only(session, list(items))
+    # Duration comes only from local Track rows (filled on download / reconcile).
+    track_ids = [i.track_id for i in items if i.track_id is not None]
+    duration_by_track_id: dict[int, int] = {}
+    if track_ids:
+        for tr in session.exec(select(Track).where(Track.id.in_(track_ids))).all():
+            if tr.duration and tr.duration > 0:
+                duration_by_track_id[tr.id] = int(tr.duration)
+    mb_ids = [i.mb_recording_id for i in items if i.mb_recording_id]
+    duration_by_mb: dict[str, int] = {}
+    if mb_ids:
+        for tr in session.exec(
+            select(Track).where(
+                Track.mb_id.in_(mb_ids),
+                Track.status == TrackStatus.READY,
+                Track.duration > 0,
+            )
+        ).all():
+            if tr.mb_id and tr.mb_id not in duration_by_mb:
+                duration_by_mb[tr.mb_id] = int(tr.duration)
     item_outs = [
         _playlist_item_to_out(
             row,
             is_cached=_effective_playlist_item_cached(session, row, bool(d.get("is_cached"))),
+            duration=(
+                (duration_by_track_id.get(row.track_id, 0) if row.track_id is not None else 0)
+                or duration_by_mb.get(row.mb_recording_id, 0)
+            ),
         )
         for row, d in zip(items, shadow, strict=True)
     ]

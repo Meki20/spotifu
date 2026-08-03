@@ -190,6 +190,25 @@ def get_downloaded_tracks(
     )
 
 
+@router.get("/tracks/count")
+def get_downloaded_track_count(
+    user: User = Depends(get_current_user),
+    session: Session = Depends(get_session),
+):
+    # Prefer READY; fall back to any row with a local file so the badge isn't stuck at 0
+    # if older rows were imported without a clean status.
+    ready = session.exec(
+        select(func.count()).select_from(Track).where(Track.status == TrackStatus.READY)
+    ).one()
+    count = int(ready or 0)
+    if count == 0:
+        with_file = session.exec(
+            select(func.count()).select_from(Track).where(Track.local_file_path.isnot(None))
+        ).one()
+        count = int(with_file or 0)
+    return {"count": count}
+
+
 @router.delete("/tracks/{track_id}")
 def delete_downloaded_track(
     track_id: int,
@@ -1117,7 +1136,7 @@ def import_local_files(
     from datetime import datetime
     from services.download_direct import _extract_metadata
     from services.covers import _extract_local_cover
-    from services.audio_quality import extract_quality
+    from services.audio_quality import extract_quality, extract_duration_seconds
 
     tracks: list[LocalFileExtractItem] = []
 
@@ -1151,9 +1170,12 @@ def import_local_files(
             if extracted_album:
                 track.album = extracted_album
 
-            # Extract quality
+            # Extract quality + duration from the local file (not MusicBrainz)
             quality = extract_quality(item.path)
             track.quality = quality
+            dur = extract_duration_seconds(item.path)
+            if dur > 0:
+                track.duration = dur
 
             # Extract cover
             cover_url = _extract_local_cover(item.path, track.id)

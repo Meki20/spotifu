@@ -6,6 +6,26 @@ from typing import Optional
 logger = logging.getLogger(__name__)
 
 
+def extract_duration_seconds(file_path: str) -> int:
+    """Read duration from a local audio file via mutagen. Returns whole seconds, or 0."""
+    if not file_path or not os.path.isfile(file_path):
+        return 0
+    try:
+        from mutagen import File as MutagenFile
+
+        audio = MutagenFile(file_path, easy=False)
+        if audio is None or audio.info is None:
+            return 0
+        length = getattr(audio.info, "length", None)
+        if length is None:
+            return 0
+        secs = int(round(float(length)))
+        return secs if secs > 0 else 0
+    except Exception:
+        logger.warning("Duration extraction failed for: %s", file_path, exc_info=True)
+        return 0
+
+
 def extract_quality(file_path: str) -> Optional[str]:
     if not file_path or not os.path.isfile(file_path):
         return None

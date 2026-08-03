@@ -212,8 +212,11 @@ async def _run_download(track_id: int, title: str, artist: str, album: str = "",
             track.status = status
             track.local_file_path = local_path
             if status == TrackStatus.READY and local_path:
-                from services.audio_quality import extract_quality
+                from services.audio_quality import extract_quality, extract_duration_seconds
                 track.quality = extract_quality(local_path)
+                dur = extract_duration_seconds(local_path)
+                if dur > 0:
+                    track.duration = dur
             if not track.artist_credit:
                 track.artist_credit = track.artist
             mb_id_for_ws = track.mb_id

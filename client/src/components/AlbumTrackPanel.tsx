@@ -84,10 +84,9 @@ export default function AlbumTrackPanel({ album, onClose }: AlbumTrackPanelProps
         }}
       >
         <div
-          className="rounded-t-xl overflow-hidden"
+          className="fx-glass-lg rounded-t-xl overflow-hidden"
           style={{
             background: 'color-mix(in srgb, var(--bg-surface) 0.97, transparent)',
-            backdropFilter: 'blur(24px)',
             borderTop: '1px solid var(--border)',
           }}
         >

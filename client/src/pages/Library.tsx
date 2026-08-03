@@ -82,7 +82,7 @@ function PlaylistCard({
     >
       {playlist.cover_image_url && (
         <div
-          className="absolute inset-0 pointer-events-none"
+          className="fx-card-backdrop absolute inset-0 pointer-events-none"
           style={{
             backgroundImage: `url(${playlist.cover_image_url})`,
             backgroundSize: 'cover',

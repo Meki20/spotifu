@@ -4,6 +4,7 @@ import './index.css'
 import App from './App.tsx'
 import { useConnectionStore } from './config/connectionStore'
 import { PRESET_THEMES, DEFAULT_THEME_ID, type Theme } from './lib/themes'
+import { applyVisualEffects, readStoredVisualEffects } from './stores/visualEffectsStore'
 
 useConnectionStore.getState().seedFromEnv()
 
@@ -44,6 +45,7 @@ useConnectionStore.getState().seedFromEnv()
     root.style.setProperty('--bg-image-dim', String(Math.max(0, 1 - bg.opacity)))
   }
   root.dataset.flavor = theme.flavor ?? ''
+  applyVisualEffects(readStoredVisualEffects())
 })()
 
 createRoot(document.getElementById('root')!).render(

@@ -39,7 +39,7 @@ function formatTime(secs: number) {
 export default function PlayerBar() {
   const navigate = useNavigate()
   const {
-    currentTrack, isPlaying, volume, currentTime, duration,
+    currentTrack, isPlaying, volume,
     phase, isDownloadBuffering, shuffle, repeat,
     setIsPlaying,
   } = usePlayerStore(
@@ -47,8 +47,6 @@ export default function PlayerBar() {
       currentTrack: s.currentTrack,
       isPlaying: s.isPlaying,
       volume: s.volume,
-      currentTime: s.currentTime,
-      duration: s.duration,
       phase: s.phase,
       isDownloadBuffering: s.isDownloadBuffering,
       shuffle: s.shuffle,
@@ -62,10 +60,6 @@ export default function PlayerBar() {
   const [addPlOpen, setAddPlOpen] = useState(false)
   const [addPlTrack, setAddPlTrack] = useState<AddToPlaylistTrack | null>(null)
   const [liked, setLiked] = useState(false)
-  const [isDragging, setIsDragging] = useState(false)
-  const [dragProgress, setDragProgress] = useState(0)
-  const progressRef = useRef<HTMLDivElement>(null)
-  const progressHitboxRef = useRef<HTMLDivElement>(null)
   const { downloadStates } = useDownloadStates()
   const trackMbId = currentTrack?.mb_id
   const { url: lazyCover } = useCover(trackMbId, 'viewport')
@@ -104,45 +98,12 @@ export default function PlayerBar() {
     setContextMenuPos({ left, top })
   }, [contextMenu])
 
-  const progress = duration > 0 ? (currentTime / duration) * 100 : 0
-
   const isBuffering =
     phase === 'resolving' ||
     phase === 'waiting_for_bytes' ||
     (phase === 'streaming' && isDownloadBuffering)
 
   const seekBlocked = phase === 'idle' || phase === 'resolving' || phase === 'waiting_for_bytes'
-
-  const calcProgressFromEvent = (e: React.MouseEvent | MouseEvent) => {
-    if (!progressRef.current) return 0
-    const rect = progressRef.current.getBoundingClientRect()
-    return Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width))
-  }
-
-  const handleBarMouseDown = (e: React.MouseEvent) => {
-    if (seekBlocked) return
-    setIsDragging(true)
-    setDragProgress(calcProgressFromEvent(e))
-  }
-
-  useEffect(() => {
-    if (!isDragging) return
-    const handleMouseMove = (e: MouseEvent) => {
-      setDragProgress(calcProgressFromEvent(e))
-    }
-    const handleMouseUp = (e: MouseEvent) => {
-      seekAudio(calcProgressFromEvent(e) * duration)
-      setIsDragging(false)
-    }
-    document.addEventListener('mousemove', handleMouseMove)
-    document.addEventListener('mouseup', handleMouseUp)
-    return () => {
-      document.removeEventListener('mousemove', handleMouseMove)
-      document.removeEventListener('mouseup', handleMouseUp)
-    }
-  }, [isDragging, duration])
-
-  const displayProgress = isDragging ? dragProgress * 100 : progress
 
   const handleContextMenu = (e: React.MouseEvent, track: typeof currentTrack) => {
     e.preventDefault()
@@ -170,10 +131,9 @@ export default function PlayerBar() {
   if (!currentTrack) {
     return (
       <div
-        className="h-20 flex items-center px-5 shrink-0 relative z-50"
+        className="fx-glass h-20 flex items-center px-5 shrink-0 relative z-50"
         style={{
           background: 'color-mix(in srgb, var(--bg-surface) 0.92, transparent)',
-          backdropFilter: 'blur(20px)',
           borderTop: '1px solid var(--border)',
         }}
       >
@@ -192,10 +152,9 @@ export default function PlayerBar() {
   return (
     <>
       <div
-        className="h-20 flex flex-col shrink-0 relative z-50"
+        className="fx-glass h-20 flex flex-col shrink-0 relative z-50"
         style={{
           background: 'color-mix(in srgb, var(--bg-surface) 0.92, transparent)',
-          backdropFilter: 'blur(20px)',
           borderTop: '1px solid var(--border)',
         }}
       >
@@ -404,71 +363,8 @@ export default function PlayerBar() {
         </div>
         </div>
 
-        {/* Full-width progress row */}
-        <div className="flex items-center gap-2 px-5 pb-2">
-          <span
-            className="text-xs w-9 text-right shrink-0"
-            style={{ fontFamily: 'var(--font-mono)', color: 'var(--text-secondary)' }}
-          >
-            {formatTime(currentTime)}
-          </span>
-          <div
-            ref={progressRef}
-            className="flex-1 relative cursor-pointer group"
-            style={{ height: '14px' }}
-          >
-            <div
-              ref={progressHitboxRef}
-              className="absolute inset-0 cursor-pointer"
-              onMouseDown={handleBarMouseDown}
-            />
-            <div
-              className="absolute inset-x-0 top-1/2 -translate-y-1/2 h-px pointer-events-none"
-              style={{ background: 'var(--border)' }}
-            >
-              {/* Fill */}
-              <div
-                className="absolute left-0 top-0 h-full"
-                style={{
-                  width: `${displayProgress}%`,
-                  background: 'var(--accent)',
-                  boxShadow: '0 0 6px color-mix(in srgb, var(--accent) 0.6, transparent)',
-                }}
-              />
-              {/* Buffering */}
-              {isBuffering && (
-                <div className="absolute top-0 left-0 h-full overflow-hidden w-full">
-                  <div
-                    className="h-full"
-                    style={{
-                      animation: 'shimmerSlide 1.2s ease-in-out infinite',
-                      background: 'var(--accent)',
-                      width: '33%',
-                      opacity: 0.5,
-                    }}
-                  />
-                </div>
-              )}
-              {/* Handle */}
-              {!seekBlocked && (
-                <div
-                  className="absolute top-1/2 -translate-y-1/2 w-2 h-2 rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
-                  style={{
-                    background: 'var(--accent)',
-                    left: `calc(${displayProgress}% - 4px)`,
-                    boxShadow: '0 0 6px color-mix(in srgb, var(--accent) 0.8, transparent)',
-                  }}
-                />
-              )}
-            </div>
-          </div>
-          <span
-            className="text-xs w-9 shrink-0"
-            style={{ fontFamily: 'var(--font-mono)', color: 'var(--text-secondary)', textAlign: 'right' }}
-          >
-            {formatTime(duration)}
-          </span>
-        </div>
+        {/* Full-width progress row — isolated so timeupdate doesn't re-render the bar shell */}
+        <PlayerProgress seekBlocked={seekBlocked} isBuffering={isBuffering} />
       </div>
 
       {/* Context Menu */}
@@ -563,5 +459,112 @@ export default function PlayerBar() {
         }}
       />
     </>
+  )
+}
+
+/** Owns currentTime subscription so the rest of PlayerBar isn't invalidated every tick. */
+function PlayerProgress({ seekBlocked, isBuffering }: { seekBlocked: boolean; isBuffering: boolean }) {
+  const currentTime = usePlayerStore((s) => s.currentTime)
+  const duration = usePlayerStore((s) => s.duration)
+  const [isDragging, setIsDragging] = useState(false)
+  const [dragProgress, setDragProgress] = useState(0)
+  const progressRef = useRef<HTMLDivElement>(null)
+
+  const progress = duration > 0 ? (currentTime / duration) * 100 : 0
+  const displayProgress = isDragging ? dragProgress * 100 : progress
+
+  const calcProgressFromEvent = (e: React.MouseEvent | MouseEvent) => {
+    if (!progressRef.current) return 0
+    const rect = progressRef.current.getBoundingClientRect()
+    return Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width))
+  }
+
+  const handleBarMouseDown = (e: React.MouseEvent) => {
+    if (seekBlocked) return
+    setIsDragging(true)
+    setDragProgress(calcProgressFromEvent(e))
+  }
+
+  useEffect(() => {
+    if (!isDragging) return
+    const handleMouseMove = (e: MouseEvent) => {
+      setDragProgress(calcProgressFromEvent(e))
+    }
+    const handleMouseUp = (e: MouseEvent) => {
+      seekAudio(calcProgressFromEvent(e) * duration)
+      setIsDragging(false)
+    }
+    document.addEventListener('mousemove', handleMouseMove)
+    document.addEventListener('mouseup', handleMouseUp)
+    return () => {
+      document.removeEventListener('mousemove', handleMouseMove)
+      document.removeEventListener('mouseup', handleMouseUp)
+    }
+  }, [isDragging, duration])
+
+  // scaleX stays on the compositor; width:% forces layout every tick.
+  const fillScale = Math.max(0, Math.min(1, displayProgress / 100))
+
+  return (
+    <div className="flex items-center gap-2 px-5 pb-2">
+      <span
+        className="text-xs w-9 text-right shrink-0"
+        style={{ fontFamily: 'var(--font-mono)', color: 'var(--text-secondary)' }}
+      >
+        {formatTime(currentTime)}
+      </span>
+      <div
+        ref={progressRef}
+        className="flex-1 relative cursor-pointer group"
+        style={{ height: '14px' }}
+      >
+        <div
+          className="absolute inset-0 cursor-pointer"
+          onMouseDown={handleBarMouseDown}
+        />
+        <div
+          className="absolute inset-x-0 top-1/2 -translate-y-1/2 h-px pointer-events-none"
+          style={{ background: 'var(--border)' }}
+        >
+          <div
+            className="absolute left-0 top-0 h-full w-full"
+            style={{
+              background: 'var(--accent)',
+              transform: `scaleX(${fillScale})`,
+              transformOrigin: 'left center',
+              willChange: 'transform',
+            }}
+          />
+          {isBuffering && (
+            <div className="absolute top-0 left-0 h-full overflow-hidden w-full">
+              <div
+                className="h-full"
+                style={{
+                  animation: 'shimmerSlide 1.2s ease-in-out infinite',
+                  background: 'var(--accent)',
+                  width: '33%',
+                  opacity: 0.5,
+                }}
+              />
+            </div>
+          )}
+          {!seekBlocked && (
+            <div
+              className="absolute top-1/2 -translate-y-1/2 w-2 h-2 rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
+              style={{
+                background: 'var(--accent)',
+                left: `calc(${displayProgress}% - 4px)`,
+              }}
+            />
+          )}
+        </div>
+      </div>
+      <span
+        className="text-xs w-9 shrink-0"
+        style={{ fontFamily: 'var(--font-mono)', color: 'var(--text-secondary)', textAlign: 'right' }}
+      >
+        {formatTime(duration)}
+      </span>
+    </div>
   )
 }

@@ -192,7 +192,6 @@ export default memo(TrackRowImpl, (prev, next) => {
     prev.downloadState?.percent === next.downloadState?.percent &&
     prev.isPlaying === next.isPlaying &&
     prev.isCached === next.isCached &&
-    prev.showDuration === next.showDuration &&
-    prev.onPlay === next.onPlay
+    prev.showDuration === next.showDuration
   )
 })

@@ -380,7 +380,7 @@ export default function QueuePanel({ width, onWidthChange, onClose, onOpen, maxW
 
       {/* Circuit pattern overlay */}
       <div
-        className="absolute inset-0 pointer-events-none opacity-4"
+        className="fx-circuit absolute inset-0 pointer-events-none opacity-4"
         style={{
           backgroundImage: `radial-gradient(circle, var(--border) 1px, transparent 1px), linear-gradient(var(--border-subtle) 1px, transparent 1px), linear-gradient(90deg, var(--border-subtle) 1px, transparent 1px)`,
           backgroundSize: '24px 24px',

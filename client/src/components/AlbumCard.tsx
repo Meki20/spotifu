@@ -39,7 +39,7 @@ export default function AlbumCard({ album, onClick, onMouseEnter, onContextMenu 
     >
       {album.cover && (
         <div
-          className="absolute inset-0 pointer-events-none"
+          className="fx-card-backdrop absolute inset-0 pointer-events-none"
           style={{
             backgroundImage: `url(${album.cover})`,
             backgroundSize: 'cover',

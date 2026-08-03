@@ -15,6 +15,7 @@ class PlaybackController {
   private _systemOriginIndexAtPlay: number = 0
   private _initialized = false
   private _playTimeout: ReturnType<typeof setTimeout> | null = null
+  private _timeRaf = 0
 
   constructor() {
     this._audio = new Audio()
@@ -26,8 +27,13 @@ class PlaybackController {
 
     this._audio.volume = usePlayerStore.getState().volume
 
+    // Coalesce timeupdate → at most one store write per animation frame.
     this._audio.addEventListener('timeupdate', () => {
-      usePlayerStore.setState({ currentTime: this._audio.currentTime })
+      if (this._timeRaf) return
+      this._timeRaf = requestAnimationFrame(() => {
+        this._timeRaf = 0
+        usePlayerStore.setState({ currentTime: this._audio.currentTime })
+      })
     })
 
     this._audio.addEventListener('durationchange', () => {

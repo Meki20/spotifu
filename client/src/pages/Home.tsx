@@ -1,6 +1,5 @@
-import { useRef } from 'react'
+import { useCallback } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { useVirtualizer } from '@tanstack/react-virtual'
 import { queryClient } from '../queryClient'
 import { useAuthStore } from '../stores/authStore'
 import { authFetch } from '../api'
@@ -126,53 +125,40 @@ export default function Home() {
     staleTime: 30 * 1000,
   })
 
-  function playFromRecentlyDownloaded(track: any) {
-    const list = (recentlyDownloaded || []).map((t) => toTrack(t))
-    const idx = Math.max(0, indexOfTrackInList(recentlyDownloaded || [], track))
+  const playFromRecentlyDownloaded = useCallback((track: any) => {
+    const list = recentlyDownloaded.map((t) => toTrack(t))
+    const idx = Math.max(0, indexOfTrackInList(recentlyDownloaded, track))
     controller.setSystemAndPlay(list, idx, { kind: 'recently-added' })
-  }
+  }, [recentlyDownloaded])
 
-  function playFromRecentlyPlayed(track: any) {
+  const playFromRecentlyPlayed = useCallback((track: any) => {
     const list = (recentlyPlayed || []).map((t) => toTrack(t))
     const idx = Math.max(0, indexOfTrackInList(recentlyPlayed || [], track))
     controller.setSystemAndPlay(list, idx, { kind: 'recently-played' })
-  }
+  }, [recentlyPlayed])
 
-  function handleRecentlyDownloadedContextMenu(e: React.MouseEvent, track: any) {
+  const handleRecentlyDownloadedContextMenu = useCallback((e: React.MouseEvent, track: any) => {
     e.preventDefault()
     e.stopPropagation()
     openContextMenu(e.clientX, e.clientY, track)
-  }
+  }, [openContextMenu])
 
-  function handleRecentlyPlayedContextMenu(e: React.MouseEvent, track: any) {
+  const handleRecentlyPlayedContextMenu = useCallback((e: React.MouseEvent, track: any) => {
     e.preventDefault()
     e.stopPropagation()
     openContextMenu(e.clientX, e.clientY, track)
-  }
+  }, [openContextMenu])
 
-  function refreshRecentlyPlayed() {
+  const handleHoverArtist = useCallback((aid: string, albs?: string[]) => {
+    enqueue(aid, albs)
+  }, [enqueue])
+
+  const refreshRecentlyPlayed = useCallback(() => {
     queryClient.invalidateQueries({ queryKey: ['recently-played'] })
-  }
-
-  const recentlyPlayedScrollRef = useRef<HTMLDivElement>(null)
-  const recentlyPlayedVirtualizer = useVirtualizer({
-    count: recentlyPlayed?.length ?? 0,
-    getScrollElement: () => recentlyPlayedScrollRef.current,
-    estimateSize: () => 40,
-    overscan: 8,
-  })
-
-  const recentlyDownloadedScrollRef = useRef<HTMLDivElement>(null)
-  const recentlyDownloadedVirtualizer = useVirtualizer({
-    count: recentlyDownloaded?.length ?? 0,
-    getScrollElement: () => recentlyDownloadedScrollRef.current,
-    estimateSize: () => 146,
-    horizontal: true,
-    overscan: 4,
-  })
+  }, [])
 
   return (
-    <div className="p-6 flex-1 overflow-y-auto">
+    <div className="p-6">
       <div className="mb-6 flex items-start justify-between gap-4">
         <h1
           className="text-4xl font-bold uppercase leading-none"
@@ -219,7 +205,7 @@ export default function Home() {
                 >
                   {def.cover_url && (
                     <div
-                      className="absolute inset-0 pointer-events-none"
+                      className="fx-card-backdrop absolute inset-0 pointer-events-none"
                       style={{
                         backgroundImage: `url(${def.cover_url})`,
                         backgroundSize: 'cover',
@@ -277,7 +263,7 @@ export default function Home() {
               >
                 {pl.cover_image_url && (
                   <div
-                    className="absolute inset-0 pointer-events-none"
+                    className="fx-card-backdrop absolute inset-0 pointer-events-none"
                     style={{
                       backgroundImage: `url(${pl.cover_image_url})`,
                       backgroundSize: 'cover',
@@ -315,7 +301,7 @@ export default function Home() {
         </div>
       )}
 
-      {/* Recently Played */}
+      {/* Recently Played — ≤20 rows; no virtualizer (mount/measure cost > savings) */}
       <div className="mb-6">
         <div
           className="flex items-center gap-2.5 mb-3"
@@ -335,50 +321,29 @@ export default function Home() {
           </button>
         </div>
         <div
-          ref={recentlyPlayedScrollRef}
           className="overflow-y-auto"
-          style={{ maxHeight: 256 }}
+          style={{ maxHeight: 256, overscrollBehavior: 'contain', contain: 'content' }}
         >
           {recentlyPlayed && recentlyPlayed.length > 0 ? (
-            <div
-              className="relative"
-              style={{ height: `${recentlyPlayedVirtualizer.getTotalSize()}px` }}
-            >
-              {recentlyPlayedVirtualizer.getVirtualItems().map((vr) => {
-                const track = recentlyPlayed[vr.index]
-                return (
-                  <div
-                    key={track.track_id}
-                    data-index={vr.index}
-                    ref={recentlyPlayedVirtualizer.measureElement}
-                    className="flex items-center"
-                    style={{
-                      position: 'absolute',
-                      top: 0,
-                      left: 0,
-                      width: '100%',
-                      transform: `translateY(${vr.start}px)`,
-                    }}
-                  >
-                    <span
-                      className="w-8 text-center text-xs shrink-0"
-                      style={{ fontFamily: 'var(--font-mono)', color: 'var(--text-faint)' }}
-                    >
-                      {vr.index + 1}
-                    </span>
-                    <TrackRow
-                      track={track}
-                      isCached={track.is_cached}
-                      playlistStyleCover
-                      onPlay={playFromRecentlyPlayed}
-                      onHoverArtist={(aid, albs) => enqueue(aid, albs)}
-                      onContextMenu={handleRecentlyPlayedContextMenu}
-                      style={{ padding: '8px 16px 8px 0' }}
-                    />
-                  </div>
-                )
-              })}
-            </div>
+            recentlyPlayed.map((track, i) => (
+              <div key={track.track_id} className="flex items-center">
+                <span
+                  className="w-8 text-center text-xs shrink-0"
+                  style={{ fontFamily: 'var(--font-mono)', color: 'var(--text-faint)' }}
+                >
+                  {i + 1}
+                </span>
+                <TrackRow
+                  track={track}
+                  isCached={track.is_cached}
+                  playlistStyleCover
+                  onPlay={playFromRecentlyPlayed}
+                  onHoverArtist={handleHoverArtist}
+                  onContextMenu={handleRecentlyPlayedContextMenu}
+                  style={{ padding: '8px 16px 8px 0' }}
+                />
+              </div>
+            ))
           ) : (
             <p className="text-sm" style={{ color: 'var(--text-primary)', fontFamily: "'Barlow Semi Condensed', sans-serif" }}>no recently played tracks</p>
           )}
@@ -395,47 +360,21 @@ export default function Home() {
           <div className="flex-1 h-px" style={{ background: 'var(--bg-surface)' }} />
         </div>
         <div
-          ref={recentlyDownloadedScrollRef}
-          className="overflow-x-auto overflow-y-auto pb-1"
-          style={{ maxHeight: 256 }}
+          className="overflow-x-auto pb-1"
+          style={{ overscrollBehavior: 'contain', contain: 'content' }}
         >
-          {recentlyDownloaded && recentlyDownloaded.length > 0 ? (
-            <div
-              className="relative"
-              style={{
-                width: `${recentlyDownloadedVirtualizer.getTotalSize()}px`,
-                height: 190,
-              }}
-            >
-              {recentlyDownloadedVirtualizer.getVirtualItems().map((vr) => {
-                const track = recentlyDownloaded[vr.index]
-                return (
-                  <div
-                    key={track.track_id}
-                    data-index={vr.index}
-                    ref={recentlyDownloadedVirtualizer.measureElement}
-                    className="flex"
-                    style={{
-                      position: 'absolute',
-                      top: 0,
-                      left: 0,
-                      height: 190,
-                      width: vr.size,
-                      paddingLeft: 10,
-                      transform: `translateX(${vr.start}px)`,
-                      alignItems: 'flex-start',
-                    }}
-                  >
-                    <TrackCard
-                      track={track}
-                      index={vr.index}
-                      onPlay={playFromRecentlyDownloaded}
-                      onHoverArtist={(aid, albs) => enqueue(aid, albs)}
-                      onContextMenu={(e) => handleRecentlyDownloadedContextMenu(e, track)}
-                    />
-                  </div>
-                )
-              })}
+          {recentlyDownloaded.length > 0 ? (
+            <div className="flex gap-2.5" style={{ width: 'max-content' }}>
+              {recentlyDownloaded.map((track, i) => (
+                <TrackCard
+                  key={track.track_id}
+                  track={track}
+                  index={i}
+                  onPlay={playFromRecentlyDownloaded}
+                  onHoverArtist={handleHoverArtist}
+                  onContextMenu={handleRecentlyDownloadedContextMenu}
+                />
+              ))}
             </div>
           ) : (
             <p className="text-sm" style={{ color: 'var(--text-primary)', fontFamily: "'Barlow Semi Condensed', sans-serif" }}>no recently downloaded tracks</p>

@@ -185,11 +185,12 @@
   display: none;
 }
 
-/* Structural decorations shown only for the y2k flavor (revert = natural display) */
+/* Structural decorations shown only for the y2k flavor (revert = natural display).
+   data-fx-y2k-chrome gates the chrome independently for perf A/B testing. */
 .y2k-only {
   display: none;
 }
-[data-flavor="y2k"] .y2k-only {
+[data-flavor="y2k"][data-fx-y2k-chrome="1"] .y2k-only {
   display: revert;
 }
 [data-flavor="y2k"] .y2k-hidden {
@@ -203,7 +204,7 @@
 /* Corner brackets, drawn as ONE static SVG layer (painted once, no per-scroll
    gradient recompute). Uses currentColor so it stays neutral/cheap; tinted
    toward the accent but kept subtle for repaint-free composition. */
-[data-flavor="y2k"] .tf-brackets::after {
+[data-flavor="y2k"][data-fx-brackets="1"] .tf-brackets::after {
   content: '';
   position: absolute;
   inset: 0;
@@ -215,7 +216,7 @@
   background-size: 100% 100%;
 }
 
-[data-flavor="y2k"] .tfx {
+[data-flavor="y2k"][data-fx-y2k-chrome="1"] .tfx {
   display: inline;
   font-family: var(--font-mono);
   font-size: 9px;
@@ -225,7 +226,7 @@
   white-space: nowrap;
 }
 
-[data-flavor="y2k"] .tfxb {
+[data-flavor="y2k"][data-fx-y2k-chrome="1"] .tfxb {
   display: block;
   font-family: var(--font-mono);
   font-size: 9px;
@@ -235,7 +236,7 @@
 }
 
 /* Barcode strip decoration */
-[data-flavor="y2k"] .tbarcode {
+[data-flavor="y2k"][data-fx-y2k-chrome="1"] .tbarcode {
   height: 18px;
   background-image: repeating-linear-gradient(
     90deg,
@@ -249,6 +250,43 @@
     transparent 11px, transparent 14px
   );
   opacity: 0.55;
+}
+
+/* ── Visual-effect toggles (Appearance → Effects) ───────────────────────────
+   data-fx-* attrs are written by visualEffectsStore / main.tsx bootstrap.
+   Defaults are applied as "1" so missing attrs before bootstrap still look fine
+   once bootstrap runs; rules below require "1" for the expensive paint path. */
+
+/* Opaque panels when translucency is off (less blending over bg image). */
+html[data-fx-translucent="0"] .tf {
+  background: var(--bg-surface);
+}
+
+/* Glass blur utility — PlayerBar / sheets. */
+.fx-glass {
+  backdrop-filter: blur(20px);
+}
+.fx-glass-lg {
+  backdrop-filter: blur(24px);
+}
+html[data-fx-glass="0"] .fx-glass,
+html[data-fx-glass="0"] .fx-glass-lg {
+  backdrop-filter: none;
+}
+
+/* Faded cover wash behind cards. */
+html[data-fx-card-backdrop="0"] .fx-card-backdrop {
+  display: none !important;
+}
+
+/* Sidebar / queue circuit grid. */
+html[data-fx-circuit="0"] .fx-circuit {
+  display: none !important;
+}
+
+/* Background photo layer. */
+html[data-fx-bg="0"] body::before {
+  background-image: none;
 }
 
 * {

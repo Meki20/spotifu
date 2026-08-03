@@ -31,7 +31,7 @@ const TrackCardImpl = ({ track, size = 96, index, onPlay, onHoverArtist, onConte
     <div
       ref={rootRef}
       className="tf tf-brackets flex flex-col items-center gap-2 px-2.5 py-2.5 cursor-pointer shrink-0 group relative overflow-hidden"
-      style={{ width: size + 40 }}
+      style={{ width: size + 40, contain: 'layout style paint' }}
       onClick={() => onPlay(track)}
       onContextMenu={onContextMenu ? (e) => onContextMenu(e, track) : undefined}
       onMouseEnter={() => {
@@ -42,7 +42,7 @@ const TrackCardImpl = ({ track, size = 96, index, onPlay, onHoverArtist, onConte
     >
       {cover && (
         <div
-          className="absolute inset-0 pointer-events-none"
+          className="fx-card-backdrop absolute inset-0 pointer-events-none"
           style={{
             backgroundImage: `url(${cover})`,
             backgroundSize: 'cover',
@@ -124,7 +124,8 @@ export default memo(TrackCardImpl, (prev, next) => {
     prev.track?.mb_id === next.track?.mb_id &&
     prev.track?.track_id === next.track?.track_id &&
     prev.track?.album_cover === next.track?.album_cover &&
+    prev.track?.title === next.track?.title &&
     prev.index === next.index &&
-    prev.onPlay === next.onPlay
+    prev.size === next.size
   )
 })

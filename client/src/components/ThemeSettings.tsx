@@ -7,6 +7,11 @@
 import { useMemo, useState } from 'react'
 import { useThemeStore, normalizeVars } from '../stores/themeStore'
 import {
+  useVisualEffectsStore,
+  VISUAL_EFFECT_KEYS,
+  type VisualEffectKey,
+} from '../stores/visualEffectsStore'
+import {
   PRESET_THEMES,
   adjustLightness,
   getTheme,
@@ -14,6 +19,37 @@ import {
   normalizeHex,
   paletteFromAccent,
 } from '../lib/themes'
+
+const EFFECT_META: Record<VisualEffectKey, { label: string; hint: string }> = {
+  backgroundImage: {
+    label: 'Background image',
+    hint: 'Fixed full-viewport photo behind the UI',
+  },
+  glassBlur: {
+    label: 'Glass blur',
+    hint: 'backdrop-filter on the player bar and album sheet',
+  },
+  translucentPanels: {
+    label: 'Translucent panels',
+    hint: 'Semi-transparent .tf surfaces (shows bg through)',
+  },
+  cornerBrackets: {
+    label: 'Corner brackets',
+    hint: 'Y2K SVG corner ticks on technical frames',
+  },
+  cardCoverBackdrop: {
+    label: 'Card cover wash',
+    hint: 'Faded album art behind track/playlist/album cards',
+  },
+  y2kChrome: {
+    label: 'Y2K chrome',
+    hint: 'Annotations, barcode strip, status labels',
+  },
+  circuitPattern: {
+    label: 'Circuit pattern',
+    hint: 'Dot/grid overlay on sidebar and queue',
+  },
+}
 
 const TOKENS: { key: string; label: string }[] = [
   { key: '--bg-base', label: 'Page background' },
@@ -47,6 +83,9 @@ export default function ThemeSettings() {
   const deleteCustom = useThemeStore((s) => s.deleteCustom)
 
   const customs = useThemeStore((s) => s.customs)
+  const effects = useVisualEffectsStore((s) => s.effects)
+  const setEffect = useVisualEffectsStore((s) => s.setEffect)
+  const setAllEffects = useVisualEffectsStore((s) => s.setAll)
   const baseTheme = useMemo(() => {
     const custom = customs.find((t) => t.id === activeId)
     return custom ?? getTheme(activeId)
@@ -264,6 +303,63 @@ export default function ThemeSettings() {
                   />
                 </div>
               </div>
+            )
+          })}
+        </div>
+      </section>
+
+      {/* Visual effects (perf A/B) */}
+      <section>
+        <SectionLabel>Effects</SectionLabel>
+        <p className="text-xs mb-3" style={hint()}>
+          Toggle individual paint-heavy effects to isolate scroll lag. All on by
+          default. Changes apply immediately and persist in this browser.
+        </p>
+        <div className="flex flex-wrap gap-2 mb-3">
+          <button type="button" onClick={() => setAllEffects(true)} style={secondaryBtn()}>
+            All on
+          </button>
+          <button type="button" onClick={() => setAllEffects(false)} style={secondaryBtn()}>
+            All off
+          </button>
+        </div>
+        <div className="space-y-2">
+          {VISUAL_EFFECT_KEYS.map((key) => {
+            const meta = EFFECT_META[key]
+            const on = effects[key]
+            return (
+              <label
+                key={key}
+                className="flex items-start gap-3 p-3 rounded cursor-pointer"
+                style={{
+                  background: 'var(--bg-surface)',
+                  border: `1px solid ${on ? 'var(--border)' : 'var(--border-subtle)'}`,
+                }}
+              >
+                <input
+                  type="checkbox"
+                  checked={on}
+                  onChange={(e) => setEffect(key, e.target.checked)}
+                  style={{ marginTop: 3, accentColor: 'var(--accent)', cursor: 'pointer' }}
+                />
+                <span className="min-w-0">
+                  <span
+                    className="block text-sm"
+                    style={{
+                      color: 'var(--text-primary)',
+                      fontFamily: 'var(--font-display)',
+                      fontWeight: 600,
+                      textTransform: 'uppercase',
+                      letterSpacing: '0.05em',
+                    }}
+                  >
+                    {meta.label}
+                  </span>
+                  <span className="block text-xs mt-0.5" style={hint()}>
+                    {meta.hint}
+                  </span>
+                </span>
+              </label>
             )
           })}
         </div>
